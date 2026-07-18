@@ -42,6 +42,16 @@ El script clona LibraGenda en ese tag a un directorio temporal y corre
 mismo paso, reproducible, que reemplaza el sync manual por rsync usado en
 dev.
 
+## Documentación
+
+- [ROADMAP.md](ROADMAP.md) — dirección estratégica.
+- [TASKS.md](TASKS.md) — trabajo concreto vigente.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — arquitectura actual.
+- [CONVENTIONS.md](CONVENTIONS.md) — estándares del código.
+- [DECISIONS.md](DECISIONS.md) — decisiones y motivos.
+- [CHANGELOG.md](CHANGELOG.md) — cambios publicados.
+- [MODULES.md](MODULES.md) — inventario de módulos.
+
 ## Desarrollo
 
 ```bash

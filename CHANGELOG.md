@@ -1,0 +1,24 @@
+# Changelog — Gestiolibra
+
+## [Unreleased]
+
+- Normalización documental al estándar híbrido por producto.
+
+## 2026-07-18 — Disponibilidad y agenda
+
+- CRUD de ventanas semanales, bloqueos y excepciones por recurso.
+- Agenda por rango de fechas.
+- Validación de turnos contra disponibilidad real configurada.
+- Corrección upstream en LibraGenda para datetimes UTC-aware entre SQLite y PostgreSQL.
+
+## 2026-07-18 — CRUD del MVP
+
+- CRUD de sucursales, recursos, servicios y clientes.
+- Repositorio compartido LibraGenda extendido con operaciones get/update/delete.
+
+## 2026-07-18 — Integración inicial
+
+- Separación de routers y servicios de aplicación.
+- LibraGenda `v0.3.0` pineado.
+- PostgreSQL dedicado migrado y verificado end-to-end en entorno dev real.
+- Smoke test HTTP inicial.
