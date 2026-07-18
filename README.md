@@ -5,18 +5,39 @@ barberías, peluquerías, estética, lavaderos, talleres y similares.
 
 Compone:
 
-- LibraGenda `v0.3.0` — agenda, recursos, servicios, ciclo de vida de turnos,
+- LibraGenda `v0.4.1` — agenda, recursos, servicios, ciclo de vida de turnos,
   disponibilidad/bloqueos/excepciones, feriados y timezone por sucursal,
   recurrencias, recordatorios (puerto de notificaciones) y señas (puerto de
   pagos).
 - LibraCore — administración/facturación/caja, cuando corresponda.
 
+API: CRUD real de `/branches`, `/resources`, `/services`, `/clients`, y
+`/appointments` (crear/confirmar). El endpoint `/demo/seed` fue reemplazado
+por el CRUD.
+
 Gestiolibra posee la API HTTP y el flujo de producto. LibraGenda permanece
 como paquete reutilizable con PostgreSQL dedicado y migraciones propias —
 base `gestiolibra` en el mismo Postgres 16 del VPS Donweb que aloja la de
 LibraGenda, migrada con las migraciones del propio paquete de LibraGenda
-(no se distribuyen en el wheel de PyPI, se aplican desde un checkout de esa
-versión exacta contra `DATABASE_URL`).
+(no se distribuyen en el wheel de pip; ver más abajo).
+
+## Migraciones de LibraGenda
+
+Las migraciones de Alembic de LibraGenda no viajan en el wheel instalado
+por pip (decisión documentada en el `CONVENTIONS.md` de LibraGenda). El
+paso de deploy de Gestiolibra debe correr, antes de levantar la API, el
+script `scripts/run_migrations.sh` del repo de LibraGenda en el mismo tag
+pineado en `pyproject.toml` (hoy `v0.4.1`):
+
+```bash
+LIBRAGENDA_REF=v0.4.1 DATABASE_URL="$LIBRAGENDA_DATABASE_URL" \
+  bash path/a/libragenda/scripts/run_migrations.sh
+```
+
+El script clona LibraGenda en ese tag a un directorio temporal y corre
+`alembic upgrade head` contra `DATABASE_URL` sin tocar `alembic.ini`. Es el
+mismo paso, reproducible, que reemplaza el sync manual por rsync usado en
+dev.
 
 ## Desarrollo
 
