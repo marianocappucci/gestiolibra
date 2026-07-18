@@ -1,0 +1,15 @@
+"""FastAPI dependency providers reading shared state off the app instance."""
+
+from fastapi import Request
+
+from libragenda.catalog_repository import SqlAlchemyCatalogRepository
+
+from .services.appointments import AppointmentService
+
+
+def get_catalog_repository(request: Request) -> SqlAlchemyCatalogRepository:
+    return request.app.state.catalog
+
+
+def get_appointment_service(request: Request) -> AppointmentService:
+    return request.app.state.appointment_service

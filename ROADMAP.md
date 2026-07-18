@@ -9,9 +9,17 @@ y verificado end-to-end con los repositorios SQLAlchemy reales — no solo el
 smoke test sqlite del demo. Cierra el ítem "Gestiolibra usa LibraGenda en un
 entorno dev real" de la Fase 3 del roadmap de LibraGenda.
 
-## Fase 1 — MVP operativo (siguiente)
+## Fase 1 — MVP operativo (en curso)
 
-- Separar el demo en routers y servicios de aplicación.
+- Separar el demo en routers y servicios de aplicación (completo).
+  `app/routers/` (health, demo, appointments) + `app/services/` (
+  `AppointmentService`, capa de aplicación sobre `InMemoryScheduler`) +
+  `app/dependencies.py`. El endpoint `/demo/seed` queda como placeholder
+  explícito hasta que lo reemplace el CRUD real del siguiente ítem. Se
+  amplió la cobertura de tests HTTP a las ramas de error (servicio
+  inexistente, conflicto de horario, fuera de disponibilidad, turno
+  inexistente, doble confirmación) que antes solo se probaban por el
+  camino feliz.
 - CRUD de sucursales, recursos, servicios y clientes.
 - Agenda diaria/semanal y disponibilidad configurable por negocio.
 - Cancelar y reprogramar con motivos.

@@ -1,8 +1,18 @@
 # Módulos de Gestiolibra
 
-## MVP
+## Implementados
 
-- `app`: factory FastAPI, health y routers.
+- `app/main.py`: factory FastAPI — configura LibraGenda, arma repos/servicios
+  en `app.state`, monta routers.
+- `app/dependencies.py`: providers de FastAPI que leen `app.state`.
+- `app/services/appointments.py`: `AppointmentService` — capa de aplicación
+  que delega en `InMemoryScheduler` de LibraGenda; la única regla propia es
+  validar que el servicio reservado exista.
+- `app/routers/`: `health.py`, `demo.py` (placeholder hasta el CRUD real),
+  `appointments.py` — traducen excepciones de dominio a códigos HTTP.
+
+## MVP (pendiente)
+
 - `agenda`: composición de LibraGenda para recursos, servicios y turnos.
 - `customers`: clientes operativos del negocio.
 - `business`: sucursales, configuración comercial y servicios ofrecidos.
