@@ -2,8 +2,12 @@
 
 ## Fase 0 — scaffold (completa)
 
-Repo privado, FastAPI, dependencia LibraGenda `v0.1.0`, PostgreSQL preparado y
-smoke test de seed/crear/confirmar turno.
+Repo privado, FastAPI, dependencia LibraGenda `v0.3.0`, PostgreSQL dedicado
+real (base `gestiolibra`, usuario `gestiolibra_dev`, Postgres 16 del VPS
+Donweb) migrado con la cadena Alembic completa de LibraGenda (`0001`→`0006`)
+y verificado end-to-end con los repositorios SQLAlchemy reales — no solo el
+smoke test sqlite del demo. Cierra el ítem "Gestiolibra usa LibraGenda en un
+entorno dev real" de la Fase 3 del roadmap de LibraGenda.
 
 ## Fase 1 — MVP operativo (siguiente)
 
