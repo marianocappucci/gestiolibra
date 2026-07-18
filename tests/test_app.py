@@ -5,12 +5,14 @@ from app.main import create_app
 
 def _seeded_client():
     client = TestClient(create_app("sqlite:///:memory:"))
-    seed = client.post("/demo/seed", json={
-        "resource_id": "resource-1", "resource_name": "Box 1",
-        "service_id": "service-1", "service_name": "Corte",
-        "client_id": "client-1", "client_name": "Ana",
-    })
-    assert seed.status_code == 200
+    assert client.post("/branches", json={"id": "branch-1", "name": "Sucursal demo"}).status_code == 201
+    assert client.post("/resources", json={
+        "id": "resource-1", "name": "Box 1", "branch_id": "branch-1",
+    }).status_code == 201
+    assert client.post("/services", json={
+        "id": "service-1", "name": "Corte", "duration_minutes": 30,
+    }).status_code == 201
+    assert client.post("/clients", json={"id": "client-1", "name": "Ana"}).status_code == 201
     return client
 
 
@@ -18,7 +20,7 @@ def test_health_reports_ok():
     client = TestClient(create_app("sqlite:///:memory:"))
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"ok": True, "product": "gestiolibra-example"}
+    assert response.json() == {"ok": True, "product": "gestiolibra"}
 
 
 def test_gestiolibra_creates_and_confirms_appointment():

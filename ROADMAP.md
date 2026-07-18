@@ -20,7 +20,14 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   inexistente, conflicto de horario, fuera de disponibilidad, turno
   inexistente, doble confirmación) que antes solo se probaban por el
   camino feliz.
-- CRUD de sucursales, recursos, servicios y clientes.
+- CRUD de sucursales, recursos, servicios y clientes (completo). Routers
+  `branches`, `resources`, `services`, `clients` con create/list/get/
+  update/delete real, reemplazando el `/demo/seed`. Requirió extender
+  `SqlAlchemyCatalogRepository` de LibraGenda (upstream) con `get_x`/
+  `update_x`/`delete_x` — solo tenía `add_x`/`list_x`; se corrigió ahí, no
+  con un shim local, siguiendo la regla de no duplicar reglas/persistencia
+  de LibraGenda (LibraGenda `v0.4.1`, tag patch). Verificado contra la base
+  real de Gestiolibra en el VPS, no solo sqlite.
 - Agenda diaria/semanal y disponibilidad configurable por negocio.
 - Cancelar y reprogramar con motivos.
 - Login y roles básicos.

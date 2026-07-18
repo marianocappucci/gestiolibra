@@ -8,14 +8,18 @@
 - `app/services/appointments.py`: `AppointmentService` — capa de aplicación
   que delega en `InMemoryScheduler` de LibraGenda; la única regla propia es
   validar que el servicio reservado exista.
-- `app/routers/`: `health.py`, `demo.py` (placeholder hasta el CRUD real),
-  `appointments.py` — traducen excepciones de dominio a códigos HTTP.
+- `app/routers/`: `health.py`, `branches.py`, `resources.py`, `services.py`,
+  `clients.py` (CRUD completo — create/list/get/update/delete — sobre
+  `SqlAlchemyCatalogRepository` de LibraGenda), `appointments.py` —
+  traducen excepciones de dominio y `IntegrityError`/`KeyError` a códigos
+  HTTP (404/409/422). Reemplazó al `/demo/seed` placeholder.
 
 ## MVP (pendiente)
 
-- `agenda`: composición de LibraGenda para recursos, servicios y turnos.
-- `customers`: clientes operativos del negocio.
-- `business`: sucursales, configuración comercial y servicios ofrecidos.
+- `business`: configuración comercial más allá del CRUD básico de sucursales.
+- Agenda diaria/semanal y disponibilidad configurable por negocio.
+- Cancelar y reprogramar con motivos.
+- Login y roles básicos.
 - `billing` (opcional): composición de LibraCore para facturación/caja.
 
 ## Después del MVP
