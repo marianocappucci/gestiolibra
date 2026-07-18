@@ -28,7 +28,22 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   con un shim local, siguiendo la regla de no duplicar reglas/persistencia
   de LibraGenda (LibraGenda `v0.4.1`, tag patch). Verificado contra la base
   real de Gestiolibra en el VPS, no solo sqlite.
-- Agenda diaria/semanal y disponibilidad configurable por negocio.
+- Agenda diaria/semanal y disponibilidad configurable por negocio
+  (completo). `/resources/{id}/availability` (ventanas semanales),
+  `/blocks` (bloqueos puntuales), `/exceptions` (excepciones por fecha) —
+  CRUD completo sobre `SqlAlchemyAvailabilityRepository` de LibraGenda.
+  `/resources/{id}/agenda?date_from=&date_to=` devuelve los turnos del
+  recurso en el rango. **Cambio de comportamiento real**: `AppointmentService.create()`
+  dejó de usar una ventana 9-18 hardcodeada — ahora lee la disponibilidad
+  real configurada (ventanas + bloqueos + excepciones); un recurso sin
+  disponibilidad configurada ya no puede recibir turnos (409). Encontró un
+  bug real de LibraGenda en el camino: `DateTime(timezone=True)` vuelve
+  *naive* en SQLite (sin tipo timestamptz nativo) pero *aware* en
+  PostgreSQL — mismo dato, comportamiento distinto por dialecto, invisible
+  en dev con sqlite pero rompía comparaciones de intervalos contra la base
+  real. Corregido upstream en LibraGenda (`ensure_utc()` en las
+  conversiones fila→dominio, tag `v0.4.2`) — otra vez el mismo patrón:
+  arreglar en el motor, no con un workaround local.
 - Cancelar y reprogramar con motivos.
 - Login y roles básicos.
 

@@ -13,6 +13,10 @@ def _seeded_client():
         "id": "service-1", "name": "Corte", "duration_minutes": 30,
     }).status_code == 201
     assert client.post("/clients", json={"id": "client-1", "name": "Ana"}).status_code == 201
+    # 2026-07-20 is a Monday (weekday 0).
+    assert client.post("/resources/resource-1/availability", json={
+        "weekday": 0, "starts_at": "09:00:00", "ends_at": "18:00:00",
+    }).status_code == 201
     return client
 
 

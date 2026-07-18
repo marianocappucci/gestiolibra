@@ -7,10 +7,11 @@ cases and domain exceptions, per CONVENTIONS.md ("no duplicar reglas de
 LibraGenda").
 """
 
-from datetime import datetime, time
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
-from libragenda import Appointment, Availability, InMemoryScheduler
+from libragenda import Appointment, InMemoryScheduler
+from libragenda.availability_repository import SqlAlchemyAvailabilityRepository
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.repositories import AppointmentRepository
 
@@ -19,12 +20,32 @@ class ServiceNotFound(Exception):
     """Raised when booking references a service that was never registered."""
 
 
+def _as_utc(starts_at: datetime) -> datetime:
+    """Normalize to a timezone-aware UTC instant.
+
+    PostgreSQL's DateTime(timezone=True) columns always return aware
+    datetimes; a naive value from the request would blow up comparing
+    against a block/appointment already round-tripped through the database
+    (works by accident on SQLite, which stays naive throughout). Naive
+    input is treated as already being UTC — branch-local time conversion
+    is not wired yet (see libragenda.timezones for that, once branches
+    carry a selected timezone through this API).
+    """
+    if starts_at.tzinfo is None:
+        return starts_at.replace(tzinfo=timezone.utc)
+    return starts_at.astimezone(timezone.utc)
+
+
 class AppointmentService:
     def __init__(
-        self, catalog: SqlAlchemyCatalogRepository, appointments: AppointmentRepository
+        self,
+        catalog: SqlAlchemyCatalogRepository,
+        appointments: AppointmentRepository,
+        availability: SqlAlchemyAvailabilityRepository,
     ) -> None:
         self.catalog = catalog
         self.appointments = appointments
+        self.availability = availability
 
     def create(
         self, resource_id: str, service_id: str, client_id: str, starts_at: datetime
@@ -33,12 +54,14 @@ class AppointmentService:
         service = services.get(service_id)
         if service is None:
             raise ServiceNotFound(service_id)
+        windows = [item for _, item in self.availability.list_availability(resource_id)]
+        blocks = [item for _, item in self.availability.list_blocks(resource_id)]
+        exceptions = [item for _, item in self.availability.list_exceptions(resource_id)]
         scheduler = InMemoryScheduler(
-            [Availability(resource_id, starts_at.weekday(), time(9), time(18))],
-            repository=self.appointments,
+            windows, blocks, exceptions, repository=self.appointments,
         )
         appointment = Appointment(
-            str(uuid4()), resource_id, service_id, client_id, starts_at, service.duration,
+            str(uuid4()), resource_id, service_id, client_id, _as_utc(starts_at), service.duration,
         )
         scheduler.create(appointment)
         return appointment
@@ -46,3 +69,13 @@ class AppointmentService:
     def confirm(self, appointment_id: str) -> Appointment:
         scheduler = InMemoryScheduler(repository=self.appointments)
         return scheduler.confirm(appointment_id)
+
+    def agenda(self, resource_id: str, day_from: date, day_to: date) -> list[Appointment]:
+        return sorted(
+            (
+                item for item in self.appointments.list()
+                if item.resource_id == resource_id
+                and day_from <= item.starts_at.date() <= day_to
+            ),
+            key=lambda item: item.starts_at,
+        )
