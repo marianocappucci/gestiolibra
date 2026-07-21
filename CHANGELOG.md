@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- `POST /appointments/{id}/cancel` y `POST /appointments/{id}/reschedule`,
+  ambos con `reason` opcional en el body (usa el campo agregado en
+  LibraGenda `v0.5.0`). Completa el MVP operativo de turnos.
 - LibraGenda actualizado a `v0.5.0` (motivo opcional en cancelación/
   reprogramación de turnos). Base `gestiolibra` migrada a `0007_appointment_reason`.
 - Normalización documental al estándar híbrido por producto.

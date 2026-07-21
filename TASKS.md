@@ -4,7 +4,6 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-- [ ] Completar el MVP operativo: cancelar y reprogramar turnos con motivos.
 - [ ] Implementar login y roles básicos.
 
 ## Próximas

@@ -70,6 +70,23 @@ class AppointmentService:
         scheduler = InMemoryScheduler(repository=self.appointments)
         return scheduler.confirm(appointment_id)
 
+    def cancel(self, appointment_id: str, reason: str | None = None) -> Appointment:
+        scheduler = InMemoryScheduler(repository=self.appointments)
+        return scheduler.cancel(appointment_id, reason=reason)
+
+    def reschedule(
+        self, appointment_id: str, starts_at: datetime, reason: str | None = None
+    ) -> Appointment:
+        current = self.appointments.get(appointment_id)
+        resource_id = current.resource_id if current is not None else ""
+        windows = [item for _, item in self.availability.list_availability(resource_id)]
+        blocks = [item for _, item in self.availability.list_blocks(resource_id)]
+        exceptions = [item for _, item in self.availability.list_exceptions(resource_id)]
+        scheduler = InMemoryScheduler(
+            windows, blocks, exceptions, repository=self.appointments,
+        )
+        return scheduler.reschedule(appointment_id, _as_utc(starts_at), reason=reason)
+
     def agenda(self, resource_id: str, day_from: date, day_to: date) -> list[Appointment]:
         return sorted(
             (

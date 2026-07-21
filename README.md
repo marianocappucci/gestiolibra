@@ -13,10 +13,11 @@ Compone:
 
 API: CRUD real de `/branches`, `/resources`, `/services`, `/clients`;
 disponibilidad configurable por recurso (`/resources/{id}/availability`,
-`/blocks`, `/exceptions`); `/appointments` (crear/confirmar — ahora valida
-contra la disponibilidad real configurada, no una ventana fija); y
-`/resources/{id}/agenda` (turnos en un rango de fechas). El endpoint
-`/demo/seed` fue reemplazado por el CRUD.
+`/blocks`, `/exceptions`); `/appointments` (crear/confirmar/cancelar/
+reprogramar — valida contra la disponibilidad real configurada, no una
+ventana fija; cancelar y reprogramar aceptan un `reason` opcional en el
+body); y `/resources/{id}/agenda` (turnos en un rango de fechas). El
+endpoint `/demo/seed` fue reemplazado por el CRUD.
 
 Gestiolibra posee la API HTTP y el flujo de producto. LibraGenda permanece
 como paquete reutilizable con PostgreSQL dedicado y migraciones propias —
