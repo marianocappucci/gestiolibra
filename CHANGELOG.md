@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- LibraGenda actualizado a `v0.5.0` (motivo opcional en cancelación/
+  reprogramación de turnos). Base `gestiolibra` migrada a `0007_appointment_reason`.
 - Normalización documental al estándar híbrido por producto.
 
 ## 2026-07-18 — Disponibilidad y agenda
