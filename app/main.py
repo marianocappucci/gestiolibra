@@ -9,11 +9,15 @@ from libragenda.sqlalchemy_repository import Base, SqlAlchemyAppointmentReposito
 
 from .auth import build_session_auth, require_admin, require_staff
 from .routers import (
-    agenda, appointments, availability, branches, clients, health, resources,
-    services, users as users_router,
+    agenda, appointments, availability, branch_hours, branches, business_settings,
+    clients, health, resources, service_prices, services, users as users_router,
 )
 from .routers import auth as auth_router
 from .services.appointments import AppointmentService
+from .services.branch_hours import BranchHoursRepository
+from .services.branches import BranchRepository
+from .services.business_settings import BusinessSettingsRepository
+from .services.service_prices import ServicePriceRepository
 from .services.users import UserRepository, ensure_default_admin
 
 
@@ -26,13 +30,18 @@ def create_app(database_url: str) -> FastAPI:
     appointment_repository = SqlAlchemyAppointmentRepository(sessions)
     availability_repository = SqlAlchemyAvailabilityRepository(sessions)
     user_repository = UserRepository(sessions)
+    branch_hours_repository = BranchHoursRepository(sessions)
     ensure_default_admin(user_repository)
 
     app = FastAPI(title="Gestiolibra")
     app.state.catalog = catalog
     app.state.availability = availability_repository
+    app.state.branches = BranchRepository(catalog, sessions)
+    app.state.branch_hours = branch_hours_repository
+    app.state.service_prices = ServicePriceRepository(sessions)
+    app.state.business_settings = BusinessSettingsRepository(sessions)
     app.state.appointment_service = AppointmentService(
-        catalog, appointment_repository, availability_repository,
+        catalog, appointment_repository, availability_repository, branch_hours_repository,
     )
     app.state.users = user_repository
     app.state.session_auth = build_session_auth(user_repository)
@@ -40,13 +49,17 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth_router.router)
     # Catalog/admin surface: only admins manage branches, resources, services,
-    # clients, availability and other users -- staff only touches turnos.
+    # clients, availability, hours, prices, business settings and other users
+    # -- staff only touches turnos.
     admin_only = [Depends(require_admin)]
     app.include_router(branches.router, dependencies=admin_only)
+    app.include_router(branch_hours.router, dependencies=admin_only)
     app.include_router(resources.router, dependencies=admin_only)
     app.include_router(services.router, dependencies=admin_only)
+    app.include_router(service_prices.router, dependencies=admin_only)
     app.include_router(clients.router, dependencies=admin_only)
     app.include_router(availability.router, dependencies=admin_only)
+    app.include_router(business_settings.router, dependencies=admin_only)
     app.include_router(users_router.router, dependencies=admin_only)
     # Agenda surface: staff manages their own turnos too.
     staff_or_admin = [Depends(require_staff)]

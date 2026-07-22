@@ -98,3 +98,30 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   contra PostgreSQL real que las dos cadenas de versión conviven sin
   pisarse. Cualquier tabla nueva propia de Gestiolibra (no de LibraGenda)
   se agrega acá, nunca en el repo de LibraGenda.
+
+## ADR-008 — Configuración comercial: opt-in, y separada de LibraGenda
+
+- Estado: aceptada
+- Fecha: 2026-07-22
+- Contexto: "configuración comercial" estaba anotada en `TASKS.md` desde
+  el scaffold sin nunca detallarse. Preguntado al usuario, se acordó
+  alcance concreto: horario comercial por sucursal, precio por servicio y
+  sucursal, y datos de contacto/marca del negocio.
+- Decisión: las tres piezas quedan como tablas propias de Gestiolibra
+  (`branch_hours`, `service_prices`, `branch_contacts`,
+  `business_settings`), no en LibraGenda — el motor no calcula precios
+  (mismo principio que señas/`Deposit`) ni tiene noción de "horario del
+  negocio" a nivel sucursal (solo disponibilidad por recurso), y ningún
+  otro vertical de la familia pidió esto todavía como para justificar
+  subirlo al motor compartido (ver ADR-002: los cambios genéricos se
+  corrigen en LibraGenda, pero esto no es un cambio genérico probado por
+  dos consumidores, es específico de este negocio por ahora). El horario
+  comercial es **opt-in**: una sucursal sin horario configurado no gatea
+  nada — se decidió así para no romper ningún flujo de turnos existente
+  con una restricción nueva no pedida; solo al configurarlo se exige
+  además de la disponibilidad del recurso (intersección).
+- Consecuencias: si MedLibra (o un futuro vertical) pide horario comercial
+  por sucursal, evaluar en ese momento si conviene subirlo a LibraGenda
+  (misma señal que ya disparó la extracción de CRUD de catálogo y el fix
+  de datetimes). Precio y contacto/marca son negocio/vertical-specific casi
+  con certeza — poco probable que se generalicen.

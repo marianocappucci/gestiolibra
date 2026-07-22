@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Configuración comercial del negocio: `/branches/{id}/hours` (horario
+  comercial semanal por sucursal, opt-in — sin configurar no gatea nada),
+  `/services/{id}/prices` (precio por servicio y sucursal), `/branches`
+  ahora acepta `phone`/`address`, `/business` (nombre comercial y moneda,
+  singleton). `AppointmentService.create()`/`reschedule()` validan el
+  horario comercial cuando está configurado. Migración
+  `0002_business_config`.
 - CI (GitHub Actions): `pytest` + smoke check de las dos cadenas de Alembic
   (LibraGenda + propia) contra Postgres de servicio, en cada push/PR a
   `main`. Requiere el secret `LIBRA_PAT` (ver `README.md`).

@@ -16,14 +16,36 @@
   Gestiolibra no valida ni interpreta el contenido, solo lo pasa.
 - `app/routers/`: `health.py` (público), `auth.py` (`/auth/login`,
   `/auth/logout`, `/auth/me`), `users.py` (CRUD de usuarios, admin-only),
-  `branches.py`, `resources.py`, `services.py`, `clients.py` (CRUD completo
-  — create/list/get/update/delete — sobre `SqlAlchemyCatalogRepository` de
-  LibraGenda), `availability.py` (CRUD de ventanas/bloqueos/excepciones por
-  recurso sobre `SqlAlchemyAvailabilityRepository`), `appointments.py`
-  (crear, confirmar, cancelar y reprogramar — los dos últimos con `reason`
-  opcional en el body), `agenda.py` — traducen excepciones de dominio y
-  `IntegrityError`/`KeyError` a códigos HTTP (404/409/422). Reemplazó al
-  `/demo/seed` placeholder.
+  `branches.py` (CRUD de sucursales, incluye teléfono/dirección),
+  `branch_hours.py` (`/branches/{id}/hours` — horario comercial por
+  sucursal), `resources.py`, `services.py`, `service_prices.py`
+  (`/services/{id}/prices` — precio por servicio y sucursal),
+  `business_settings.py` (`/business` — nombre comercial y moneda,
+  singleton), `clients.py` (CRUD completo — create/list/get/update/delete
+  — sobre `SqlAlchemyCatalogRepository` de LibraGenda), `availability.py`
+  (CRUD de ventanas/bloqueos/excepciones por recurso sobre
+  `SqlAlchemyAvailabilityRepository`), `appointments.py` (crear, confirmar,
+  cancelar y reprogramar — los dos últimos con `reason` opcional en el
+  body; `create`/`reschedule` validan además el horario comercial de la
+  sucursal del recurso, si está configurado), `agenda.py` — traducen
+  excepciones de dominio y `IntegrityError`/`KeyError` a códigos HTTP
+  (404/409/422). Reemplazó al `/demo/seed` placeholder.
+- `app/services/branches.py`: `BranchRepository` — coordina el `Branch`
+  genérico de LibraGenda con una extensión propia de Gestiolibra
+  (`BranchContactRow`: `phone`, `address`), mismo patrón que `Patient`
+  extiende `Client` en MedLibra.
+- `app/services/branch_hours.py`: `BranchHoursRepository` — horario
+  comercial semanal por sucursal. **Opt-in**: una sucursal sin horario
+  configurado no gatea nada (mismo comportamiento que siempre hubo); solo
+  al configurarlo empieza a exigirse además de la disponibilidad del
+  recurso. No es dominio de LibraGenda — el motor solo conoce
+  disponibilidad por recurso, no horario "del negocio" a nivel sucursal.
+- `app/services/service_prices.py`: `ServicePriceRepository` — precio por
+  par (servicio, sucursal), no un precio único en `Service` (LibraGenda no
+  conoce precios por diseño, mismo principio que señas/`Deposit`).
+- `app/services/business_settings.py`: `BusinessSettingsRepository` —
+  configuración global del negocio (nombre comercial, moneda), fila única
+  (`id` fijo), no hay multi-tenant de "varios negocios" en un mismo deploy.
 - `app/auth.py`: reusa `libracore.auth.SessionAuth` (cookie firmada, ya
   probada en producción por Contalibra/Restolibra) para la mecánica de
   sesión — pero define sus propias dependencias FastAPI (`get_current_user`,
@@ -49,7 +71,6 @@
 
 ## MVP (pendiente)
 
-- `business`: configuración comercial más allá del CRUD básico de sucursales.
 - `billing` (opcional): composición de LibraCore para facturación/caja.
 
 ## Después del MVP

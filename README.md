@@ -13,14 +13,19 @@ Compone:
   firmada); administración/facturación/caja, cuando corresponda.
 
 API: `/auth/login`, `/auth/logout`, `/auth/me` (sesión por cookie); CRUD de
-usuarios en `/users` (solo `admin`); CRUD real de `/branches`, `/resources`,
-`/services`, `/clients` (solo `admin`); disponibilidad configurable por
-recurso (`/resources/{id}/availability`, `/blocks`, `/exceptions`, solo
-`admin`); `/appointments` (crear/confirmar/cancelar/reprogramar — `admin` o
-`staff`, valida contra la disponibilidad real configurada, no una ventana
-fija; cancelar y reprogramar aceptan un `reason` opcional en el body); y
-`/resources/{id}/agenda` (turnos en un rango de fechas, `admin` o `staff`).
-El endpoint `/demo/seed` fue reemplazado por el CRUD.
+usuarios en `/users` (solo `admin`); CRUD real de `/branches` (incluye
+`phone`/`address`), `/resources`, `/services`, `/clients` (solo `admin`);
+horario comercial por sucursal en `/branches/{id}/hours` (opt-in — sin
+configurar no gatea nada); precio por servicio y sucursal en
+`/services/{id}/prices`; datos globales del negocio (nombre comercial,
+moneda) en `/business`; disponibilidad configurable por recurso
+(`/resources/{id}/availability`, `/blocks`, `/exceptions`, solo `admin`);
+`/appointments` (crear/confirmar/cancelar/reprogramar — `admin` o `staff`,
+valida contra la disponibilidad real configurada y el horario comercial de
+la sucursal si está configurado; cancelar y reprogramar aceptan un
+`reason` opcional en el body); y `/resources/{id}/agenda` (turnos en un
+rango de fechas, `admin` o `staff`). El endpoint `/demo/seed` fue
+reemplazado por el CRUD.
 
 ## Autenticación
 
@@ -56,7 +61,8 @@ LIBRAGENDA_REF=v0.5.0 DATABASE_URL="$DATABASE_URL" \
   bash path/a/libragenda/scripts/run_migrations.sh
 ```
 
-**2. Migraciones propias de Gestiolibra** (tabla `users` — no pertenece al
+**2. Migraciones propias de Gestiolibra** (`users`, `branch_contacts`,
+`branch_hours`, `service_prices`, `business_settings` — no pertenecen al
 dominio de LibraGenda, ver `MODULES.md`). Viajan en este mismo repo, se
 aplican directamente:
 

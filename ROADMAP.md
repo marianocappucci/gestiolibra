@@ -56,8 +56,19 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   Gating centralizado al montar los routers en `app/main.py`, no repetido
   por endpoint. Suma `libracore` como dependencia nueva de Gestiolibra.
 
-## Fase 2 — operación comercial
+## Fase 2 — operación comercial (en curso)
 
+- Configuración comercial del negocio (completo). Tres piezas, alcance
+  acordado con el usuario antes de codificar: (1) horario comercial por
+  sucursal (`branch_hours`, opt-in — sin configurar no gatea nada, igual
+  que hasta ahora; configurado, se exige además de la disponibilidad del
+  recurso); (2) precio por servicio y sucursal (`service_prices`, no un
+  precio único en `Service` — LibraGenda no conoce precios por diseño);
+  (3) datos de contacto por sucursal (`branch_contacts`: teléfono,
+  dirección) y datos globales del negocio (`business_settings`: nombre
+  comercial, moneda). Cuatro tablas nuevas, migración `0002_business_config`
+  en el Alembic propio de Gestiolibra. `AppointmentService.create()`/
+  `reschedule()` validan el horario comercial cuando está configurado.
 - Recordatorios.
 - Señas y políticas de cancelación.
 - Caja/facturación componiendo LibraCore.

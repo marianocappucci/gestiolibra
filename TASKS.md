@@ -9,7 +9,6 @@ y roles — ver `ROADMAP.md`.
 
 ## Próximas
 
-- [ ] Configuración comercial por negocio más allá del CRUD básico de sucursales.
 - [ ] Evaluar composición con LibraCore para facturación y caja (ya se sumó
       como dependencia para `SessionAuth`; falta decidir si además se usa
       para caja/facturación).
@@ -28,6 +27,10 @@ Ninguna bloqueada registrada.
 Resuelto (2026-07-21): Alembic propio de Gestiolibra para la tabla `users`
 (`alembic_version_gestiolibra`, cadena independiente de la de LibraGenda
 sobre la misma base) — ver `README.md`.
+
+Resuelto (2026-07-22): configuración comercial del negocio — horario por
+sucursal, precio por servicio y sucursal, contacto de sucursal y datos
+globales del negocio. Migración `0002_business_config`.
 
 ## Notas de testing
 
