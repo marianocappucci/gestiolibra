@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- **SQLite pasa a ser el destino de producción por defecto** (arquitectura
+  silo, mismo estándar que toda la familia Libra) — Postgres sigue
+  soportado, ver `DECISIONS.md` ADR-010. LibraGenda actualizado a
+  `v0.6.0` (activa `PRAGMA foreign_keys=ON` en toda conexión SQLite). CI
+  ya no levanta un servicio Postgres, corre contra un archivo SQLite.
+  Bug real corregido de paso: `BranchRepository.delete()` borraba el
+  `Branch` antes que `BranchContactRow` (FK invertida) — invisible en
+  SQLite sin FKs forzadas, ahora corregido. `DELETE` de sucursales,
+  recursos, servicios y clientes ahora devuelve 409 (antes 500) cuando
+  todavía tienen registros dependientes.
 - Recordatorios y señas: `POST /reminders/dispatch` (admin-only, dispara
   avisos vencidos — 24h y 2h antes, fijo) y `POST`/`GET /appointments/{id}/deposit`
   + `POST /deposits/{id}/mark-paid`/`mark-failed`/`refund` (admin-only para

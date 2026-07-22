@@ -71,9 +71,10 @@
   para una app server-rendered, no para esta API JSON pura).
 - `app/security.py`: hashing de contraseñas PBKDF2 (260k iteraciones, salt
   por password, comparación constante contra un hash señuelo) — mismo
-  algoritmo que `libracore.db.usuarios`, reimplementado porque ese módulo
-  está acoplado a SQLite vía `libracore.db.core.get_connection` y
-  Gestiolibra usa PostgreSQL/SQLAlchemy.
+  algoritmo que `libracore.db.usuarios`, reimplementado en vez de importar
+  las funciones privadas (prefijo `_`) de ese módulo, no pensado para
+  reuso directo (razón que se sostiene aunque ambos usen SQLite hoy — ver
+  `DECISIONS.md` ADR-005/ADR-010).
 - `app/services/users.py`: `UserRow` (tabla propia de Gestiolibra, no del
   dominio de LibraGenda) + `UserRepository` (CRUD + `check_credentials` con
   el mismo patrón de tiempo constante contra un hash señuelo) +

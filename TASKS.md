@@ -37,6 +37,13 @@ Resuelto (2026-07-22): recordatorios y señas — `POST /reminders/dispatch`,
 (`LoggingNotificationPort`, `ManualPaymentPort`) hasta definir proveedor
 real. Sin migración nueva (tablas de LibraGenda ya migradas).
 
+Resuelto (2026-07-22): SQLite como destino de producción por defecto
+(estándar de familia, ver `DECISIONS.md` ADR-010). LibraGenda a `v0.6.0`.
+Bug real corregido: `BranchRepository.delete()` con orden de borrado
+invertido (FK), invisible sin FKs forzadas. `DELETE` de sucursales/
+recursos/servicios/clientes ahora devuelve 409 en vez de 500 con
+dependientes. CI simplificado (sin servicio Postgres).
+
 ## Notas de testing
 
 - La suite (`pytest`) usa cookies de sesión firmadas con timestamp

@@ -95,4 +95,6 @@ def delete_client(
         catalog.delete_client(client_id)
     except KeyError:
         raise HTTPException(404, "client not found")
+    except IntegrityError:
+        raise HTTPException(409, "client still has dependent records")
     return Response(status_code=204)

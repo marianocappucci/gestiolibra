@@ -75,7 +75,7 @@ elegido (ver ADR-009):
   propia cadena), no de Gestiolibra.
 
 - `MODULES.md`: inventario operativo de módulos.
-- LibraGenda `v0.5.0`: dependencia versionada para dominio, persistencia y migraciones propias.
+- LibraGenda `v0.6.0`: dependencia versionada para dominio, persistencia y migraciones propias.
 - LibraCore (sin versión de facturación/caja todavía): dependencia versionada
   solo por `libracore.auth.SessionAuth` — ver `DECISIONS.md` ADR-005.
 
@@ -91,7 +91,7 @@ trae su propia tabla de usuarios en su propio stack de persistencia (ver
 
 ## Persistencia e integración
 
-La aplicación configura LibraGenda mediante `LIBRAGENDA_DATABASE_URL` y usa PostgreSQL dedicado para Gestiolibra. Dos cadenas de Alembic independientes corren contra la misma base, cada una con su propia tabla de versión: las de LibraGenda (schema del motor, ejecutadas desde el repositorio upstream en el tag exacto pineado) y las propias de Gestiolibra (`migrations/` de este repo — `users`, y desde `0002_business_config` también `branch_contacts`/`branch_hours`/`service_prices`/`business_settings` —, tabla de versión `alembic_version_gestiolibra` para no colisionar con la de LibraGenda). `Base.metadata.create_all()` sigue existiendo en `create_app()` pero solo importa para los tests con SQLite en memoria — en producción es un no-op una vez que ambas cadenas de Alembic ya crearon el schema real.
+La aplicación configura LibraGenda mediante `LIBRAGENDA_DATABASE_URL`. **SQLite es el destino de producción por defecto** (arquitectura silo: una base aislada por instancia/cliente, mismo estándar que toda la familia Libra — ver `DECISIONS.md` ADR-010); PostgreSQL sigue soportado para el caso puntual que lo amerite, sin cambios de código. Dos cadenas de Alembic independientes corren contra la misma base, cada una con su propia tabla de versión: las de LibraGenda (schema del motor, ejecutadas desde el repositorio upstream en el tag exacto pineado) y las propias de Gestiolibra (`migrations/` de este repo — `users`, y desde `0002_business_config` también `branch_contacts`/`branch_hours`/`service_prices`/`business_settings` —, tabla de versión `alembic_version_gestiolibra` para no colisionar con la de LibraGenda). `Base.metadata.create_all()` sigue existiendo en `create_app()` pero solo importa para los tests con SQLite en memoria — en producción es un no-op una vez que ambas cadenas de Alembic ya crearon el schema real.
 
 La lógica de negocio no debe duplicarse localmente cuando pertenece al motor genérico. Los routers traducen errores de dominio e integridad a respuestas HTTP.
 

@@ -5,7 +5,7 @@ barberías, peluquerías, estética, lavaderos, talleres y similares.
 
 Compone:
 
-- LibraGenda `v0.5.0` — agenda, recursos, servicios, ciclo de vida de turnos,
+- LibraGenda `v0.6.0` — agenda, recursos, servicios, ciclo de vida de turnos,
   disponibilidad/bloqueos/excepciones, feriados y timezone por sucursal,
   recurrencias, recordatorios (puerto de notificaciones), señas (puerto de
   pagos) y motivo opcional de cancelación/reprogramación.
@@ -46,10 +46,18 @@ configurada la app no levanta salvo `ENV=development`, donde usa
 `/resources/{id}/agenda`).
 
 Gestiolibra posee la API HTTP y el flujo de producto. LibraGenda permanece
-como paquete reutilizable con PostgreSQL dedicado y migraciones propias —
-base `gestiolibra` en el mismo Postgres 16 del VPS Donweb que aloja la de
-LibraGenda, migrada con las migraciones del propio paquete de LibraGenda
-(no se distribuyen en el wheel de pip; ver más abajo).
+como paquete reutilizable, con sus propias migraciones (no se distribuyen
+en el wheel de pip; ver más abajo).
+
+## Base de datos
+
+**SQLite es el destino de producción por defecto**, mismo estándar que
+toda la familia Libra (arquitectura silo: una instancia/base aislada por
+cliente, igual que Contalibra/Restolibra — ver `DECISIONS.md` ADR-010).
+`LibraGenda.configure(url)` activa `PRAGMA foreign_keys=ON`
+automáticamente para cualquier conexión SQLite. PostgreSQL sigue
+soportado vía la misma `DATABASE_URL` para el caso puntual que lo
+amerite, sin cambios de código.
 
 ## Migraciones
 
@@ -63,10 +71,10 @@ la API:
 servicios, clientes, turnos, disponibilidad...). No viajan en el wheel
 instalado por pip (decisión documentada en el `CONVENTIONS.md` de
 LibraGenda), así que se aplican clonando el repo en el tag pineado en
-`pyproject.toml` (hoy `v0.5.0`):
+`pyproject.toml` (hoy `v0.6.0`):
 
 ```bash
-LIBRAGENDA_REF=v0.5.0 DATABASE_URL="$DATABASE_URL" \
+LIBRAGENDA_REF=v0.6.0 DATABASE_URL="sqlite:///data/gestiolibra.db" \
   bash path/a/libragenda/scripts/run_migrations.sh
 ```
 
@@ -89,8 +97,8 @@ se escriben a mano, mismo criterio que ya usa LibraGenda para las suyas.
 
 `.github/workflows/ci.yml`: en cada push/PR a `main` — instala el paquete,
 corre `pytest`, y como smoke check aplica las dos cadenas de Alembic
-(LibraGenda + propia) contra un Postgres 16 de servicio, mismo orden que
-un deploy real.
+(LibraGenda + propia) contra un archivo SQLite, mismo orden que un deploy
+real. Sin servicio de base de datos que levantar — SQLite es un archivo.
 
 **Requiere un secret `LIBRA_PAT`** en este repo (Settings → Secrets and
 variables → Actions): `libragenda` y `libracore` son privados, y el
@@ -120,5 +128,5 @@ pytest
 uvicorn app.main:app --reload
 ```
 
-La base PostgreSQL y las migraciones de LibraGenda deben estar configuradas
-antes de iniciar la aplicación real.
+Las migraciones de LibraGenda y las propias deben aplicarse (`alembic
+upgrade head` en ambas cadenas) antes de iniciar la aplicación real.

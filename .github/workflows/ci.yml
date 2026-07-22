@@ -10,23 +10,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: gestiolibra
-          POSTGRES_USER: gestiolibra_ci
-          POSTGRES_PASSWORD: gestiolibra_ci_only
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U gestiolibra_ci -d gestiolibra"
-          --health-interval 3s
-          --health-timeout 3s
-          --health-retries 10
-
+    # SQLite is the production default for the whole Libra family (silo
+    # deployment: one isolated instance per client) -- no service
+    # container needed, the smoke check below runs against a plain file.
     env:
-      DATABASE_URL: postgresql+psycopg://gestiolibra_ci:gestiolibra_ci_only@localhost:5432/gestiolibra
+      DATABASE_URL: sqlite:///${{ github.workspace }}/ci.db
 
     steps:
       - uses: actions/checkout@v4

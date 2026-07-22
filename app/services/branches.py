@@ -68,11 +68,16 @@ class BranchRepository:
         return self._to_out(branch, phone, address)
 
     def delete(self, branch_id: str) -> None:
-        self.catalog.delete_branch(branch_id)  # raises KeyError if missing
+        # Borrar primero la extension (BranchContactRow.branch_id tiene FK
+        # a branches.id): borrar el Branch antes violaria esa FK con
+        # integridad referencial forzada (SQLite con PRAGMA foreign_keys=ON,
+        # o Postgres) -- mismo bug ya encontrado y corregido en
+        # PatientRepository.delete() de MedLibra.
         with self.session_factory.begin() as session:
             row = session.get(BranchContactRow, branch_id)
             if row is not None:
                 session.delete(row)
+        self.catalog.delete_branch(branch_id)  # raises KeyError if missing
 
     def _extension(self, branch_id: str) -> tuple[str | None, str | None]:
         with self.session_factory() as session:

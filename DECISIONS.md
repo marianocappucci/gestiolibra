@@ -153,3 +153,48 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   a mano hasta que se reemplacen los puertos. `NotificationPort`/
   `PaymentPort` son `Protocol` sin `@runtime_checkable`, así que la
   conformidad es estructural (duck typing), no verificada por `isinstance`.
+
+## ADR-010 — SQLite como destino de producción por defecto
+
+- Estado: aceptada
+- Fecha: 2026-07-22
+- Contexto: al scopear si MedLibra debía componer LibraCore para
+  facturación, salió a la luz que Contalibra/Restolibra despliegan con
+  arquitectura silo real (instancia + base SQLite aislada por cliente) y
+  que Gestiolibra ya prevé exactamente el mismo patrón de despliegue
+  (Docker, `panel_admin.py`, sin infraestructura de producción propia
+  todavía — ver "Infraestructura" en la entidad de este repo en la wiki).
+  Mantener Gestiolibra en PostgreSQL mientras el resto de la familia usa
+  SQLite no aportaba nada real y complicaba cualquier composición futura
+  con LibraCore (SQLite-only, sin capa de abstracción). Decisión del
+  usuario, registrada como estándar de familia en LibraGenda (ver
+  `DECISIONS.md` de ese repo, ADR-005) y en `estandares-desarrollo.md`
+  del wiki.
+- Decisión: `DATABASE_URL` pasa a apuntar a un archivo SQLite por
+  defecto en vez de una base Postgres. Sin cambios de código propios:
+  `LibraGenda.configure(url)` ya activa `PRAGMA foreign_keys=ON`
+  automáticamente para cualquier conexión SQLite (ver ADR-005 de
+  LibraGenda) — antes esto solo se probaba contra SQLite en memoria
+  (tests) o contra Postgres real, nunca contra un archivo SQLite con FKs
+  forzadas. Al verificar contra un archivo real con FKs activas, salió
+  a la luz un bug preexistente (no introducido por este cambio, ya
+  estaba ahí desde que se creó `BranchRepository`): `delete()` borraba
+  el `Branch` genérico de LibraGenda **antes** que `BranchContactRow`
+  (extensión propia con FK a `branches.id`) — mismo patrón de bug que
+  `PatientRepository.delete()` de MedLibra (ver `DECISIONS.md` de ese
+  repo, ADR-011). Postgres ya lo hubiera bloqueado siempre (fuerza FKs
+  por default); nunca se ejerció ese camino contra Postgres real en las
+  verificaciones anteriores. Corregido invirtiendo el orden. De paso se
+  encontró que `DELETE /branches/{id}`, `/resources/{id}`,
+  `/services/{id}` y `/clients/{id}` no traducían `IntegrityError` a un
+  409 limpio (solo capturaban `KeyError`) — cualquier intento de borrar
+  una entidad de catálogo con dependientes devolvía un 500 crudo en vez
+  de un error entendible. Agregado el `except IntegrityError` faltante
+  en los cuatro routers.
+- Consecuencias: CI simplificado (sin servicio Postgres, smoke check
+  contra un archivo SQLite plano). Verificado con la suite completa y
+  end-to-end contra un archivo SQLite real (creación, turno, recordatorio,
+  seña, y los tres casos de borrado bloqueado por FK — sucursal con
+  recurso, recurso con turno — ahora devolviendo 409 en vez de 500).
+  Postgres sigue funcionando si se pasa esa `DATABASE_URL`; no se retira
+  como opción.
