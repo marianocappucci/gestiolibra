@@ -9,15 +9,27 @@ Compone:
   disponibilidad/bloqueos/excepciones, feriados y timezone por sucursal,
   recurrencias, recordatorios (puerto de notificaciones), señas (puerto de
   pagos) y motivo opcional de cancelación/reprogramación.
-- LibraCore — administración/facturación/caja, cuando corresponda.
+- LibraCore — solo `libracore.auth.SessionAuth` por ahora (login por cookie
+  firmada); administración/facturación/caja, cuando corresponda.
 
-API: CRUD real de `/branches`, `/resources`, `/services`, `/clients`;
-disponibilidad configurable por recurso (`/resources/{id}/availability`,
-`/blocks`, `/exceptions`); `/appointments` (crear/confirmar/cancelar/
-reprogramar — valida contra la disponibilidad real configurada, no una
-ventana fija; cancelar y reprogramar aceptan un `reason` opcional en el
-body); y `/resources/{id}/agenda` (turnos en un rango de fechas). El
-endpoint `/demo/seed` fue reemplazado por el CRUD.
+API: `/auth/login`, `/auth/logout`, `/auth/me` (sesión por cookie); CRUD de
+usuarios en `/users` (solo `admin`); CRUD real de `/branches`, `/resources`,
+`/services`, `/clients` (solo `admin`); disponibilidad configurable por
+recurso (`/resources/{id}/availability`, `/blocks`, `/exceptions`, solo
+`admin`); `/appointments` (crear/confirmar/cancelar/reprogramar — `admin` o
+`staff`, valida contra la disponibilidad real configurada, no una ventana
+fija; cancelar y reprogramar aceptan un `reason` opcional en el body); y
+`/resources/{id}/agenda` (turnos en un rango de fechas, `admin` o `staff`).
+El endpoint `/demo/seed` fue reemplazado por el CRUD.
+
+## Autenticación
+
+Sesión por cookie firmada (`gl_session`), sin API keys ni JWT todavía. Al
+arrancar sin usuarios, se crea un admin de bootstrap
+(`GESTIOLIBRA_ADMIN_USERNAME`/`GESTIOLIBRA_ADMIN_PASSWORD`; sin contraseña
+configurada la app no levanta salvo `ENV=development`, donde usa
+`admin`/`admin`). Roles: `admin` (todo) y `staff` (solo `/appointments` y
+`/resources/{id}/agenda`).
 
 Gestiolibra posee la API HTTP y el flujo de producto. LibraGenda permanece
 como paquete reutilizable con PostgreSQL dedicado y migraciones propias —

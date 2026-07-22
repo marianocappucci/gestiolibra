@@ -9,7 +9,7 @@ y verificado end-to-end con los repositorios SQLAlchemy reales — no solo el
 smoke test sqlite del demo. Cierra el ítem "Gestiolibra usa LibraGenda en un
 entorno dev real" de la Fase 3 del roadmap de LibraGenda.
 
-## Fase 1 — MVP operativo (en curso)
+## Fase 1 — MVP operativo (completa)
 
 - Separar el demo en routers y servicios de aplicación (completo).
   `app/routers/` (health, demo, appointments) + `app/services/` (
@@ -44,8 +44,17 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   real. Corregido upstream en LibraGenda (`ensure_utc()` en las
   conversiones fila→dominio, tag `v0.4.2`) — otra vez el mismo patrón:
   arreglar en el motor, no con un workaround local.
-- Cancelar y reprogramar con motivos.
-- Login y roles básicos.
+- Cancelar y reprogramar con motivos (completo). `POST /appointments/{id}/cancel`
+  y `POST /appointments/{id}/reschedule`, ambos con `reason` opcional en el
+  body, usando el campo que LibraGenda agregó en `v0.5.0` para exactamente
+  este caso (Gestiolibra y MedLibra lo tenían pendiente en paralelo).
+- Login y roles básicos (completo). Reusa `libracore.auth.SessionAuth`
+  (cookie firmada, ya probada en producción por Contalibra/Restolibra) para
+  la mecánica de sesión, con tabla `users` propia (SQLAlchemy/PostgreSQL,
+  no la de LibraCore que es SQLite) y dos roles: `admin` (todo el catálogo,
+  disponibilidad y usuarios) y `staff` (solo su propia agenda de turnos).
+  Gating centralizado al montar los routers en `app/main.py`, no repetido
+  por endpoint. Suma `libracore` como dependencia nueva de Gestiolibra.
 
 ## Fase 2 — operación comercial
 

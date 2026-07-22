@@ -2,9 +2,15 @@
 
 ## [Unreleased]
 
+- Login y roles básicos: `POST /auth/login`, `/auth/logout`, `GET /auth/me`,
+  CRUD de usuarios admin-only en `/users`. Reusa `libracore.auth.SessionAuth`
+  (cookie firmada); tabla `users` propia. Dos roles: `admin` (todo) y
+  `staff` (solo su agenda de turnos). Todos los routers existentes quedan
+  gateados por rol. Completa la Fase 1 (MVP operativo). Suma `libracore`
+  como dependencia nueva.
 - `POST /appointments/{id}/cancel` y `POST /appointments/{id}/reschedule`,
   ambos con `reason` opcional en el body (usa el campo agregado en
-  LibraGenda `v0.5.0`). Completa el MVP operativo de turnos.
+  LibraGenda `v0.5.0`).
 - LibraGenda actualizado a `v0.5.0` (motivo opcional en cancelación/
   reprogramación de turnos). Base `gestiolibra` migrada a `0007_appointment_reason`.
 - Normalización documental al estándar híbrido por producto.
