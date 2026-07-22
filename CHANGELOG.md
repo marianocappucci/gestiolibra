@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- **Facturación/caja con LibraCore**: `client_billing` extiende `Client`
+  con `cuit`/`condicion_iva` (migración `0003_client_billing`, primera
+  extensión propia de Client), `PUT`/`GET /config/arca` (config ARCA de
+  instancia única, admin-only), `POST /appointments/{id}/complete` — una
+  factura por turno completado cuando el servicio tiene precio
+  configurado (tipo A/B según condición de IVA), seña ya cobrada y saldo
+  restante como movimientos de caja separados sobre la misma factura.
+  `libragenda` a `v0.8.0`, `libracore` a `v0.16.1`. Mismo diseño exacto
+  que MedLibra. Ver `DECISIONS.md` ADR-011.
 - **SQLite pasa a ser el destino de producción por defecto** (arquitectura
   silo, mismo estándar que toda la familia Libra) — Postgres sigue
   soportado, ver `DECISIONS.md` ADR-010. LibraGenda actualizado a

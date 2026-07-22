@@ -2,10 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
-from libragenda import Client
-from libragenda.catalog_repository import SqlAlchemyCatalogRepository
-
-from ..dependencies import get_catalog_repository
+from ..dependencies import get_client_repository
+from ..services.clients import ClientRepository
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -16,6 +14,8 @@ class ClientCreate(BaseModel):
     phone: str | None = None
     email: str | None = None
     active: bool = True
+    cuit: str | None = None
+    condicion_iva: str | None = None
 
 
 class ClientUpdate(BaseModel):
@@ -23,6 +23,8 @@ class ClientUpdate(BaseModel):
     phone: str | None = None
     email: str | None = None
     active: bool = True
+    cuit: str | None = None
+    condicion_iva: str | None = None
 
 
 class ClientOut(BaseModel):
@@ -31,68 +33,58 @@ class ClientOut(BaseModel):
     phone: str | None
     email: str | None
     active: bool
-
-
-def _to_out(client: Client) -> ClientOut:
-    return ClientOut(
-        id=client.id, name=client.name, phone=client.phone,
-        email=client.email, active=client.active,
-    )
+    cuit: str | None
+    condicion_iva: str | None
 
 
 @router.post("", status_code=201, response_model=ClientOut)
 def create_client(
-    data: ClientCreate, catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository)
+    data: ClientCreate, clients: ClientRepository = Depends(get_client_repository),
 ):
     try:
-        client = Client(data.id, data.name, data.phone, data.email, data.active)
+        return clients.create(
+            data.id, data.name, data.phone, data.email, data.active,
+            data.cuit, data.condicion_iva,
+        )
     except ValueError as exc:
         raise HTTPException(422, str(exc))
-    try:
-        catalog.add_client(client)
     except IntegrityError:
         raise HTTPException(409, "client already exists")
-    return _to_out(client)
 
 
 @router.get("", response_model=list[ClientOut])
-def list_clients(catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository)):
-    return [_to_out(item) for item in catalog.list_clients()]
+def list_clients(clients: ClientRepository = Depends(get_client_repository)):
+    return clients.list()
 
 
 @router.get("/{client_id}", response_model=ClientOut)
-def get_client(
-    client_id: str, catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository)
-):
-    client = catalog.get_client(client_id)
+def get_client(client_id: str, clients: ClientRepository = Depends(get_client_repository)):
+    client = clients.get(client_id)
     if client is None:
         raise HTTPException(404, "client not found")
-    return _to_out(client)
+    return client
 
 
 @router.put("/{client_id}", response_model=ClientOut)
 def update_client(
-    client_id: str,
-    data: ClientUpdate,
-    catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository),
+    client_id: str, data: ClientUpdate,
+    clients: ClientRepository = Depends(get_client_repository),
 ):
     try:
-        client = Client(client_id, data.name, data.phone, data.email, data.active)
+        return clients.update(
+            client_id, data.name, data.phone, data.email, data.active,
+            data.cuit, data.condicion_iva,
+        )
     except ValueError as exc:
         raise HTTPException(422, str(exc))
-    try:
-        catalog.update_client(client_id, client)
     except KeyError:
         raise HTTPException(404, "client not found")
-    return _to_out(client)
 
 
 @router.delete("/{client_id}", status_code=204)
-def delete_client(
-    client_id: str, catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository)
-):
+def delete_client(client_id: str, clients: ClientRepository = Depends(get_client_repository)):
     try:
-        catalog.delete_client(client_id)
+        clients.delete(client_id)
     except KeyError:
         raise HTTPException(404, "client not found")
     except IntegrityError:

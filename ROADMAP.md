@@ -82,7 +82,16 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   `sent_reminders` son tablas propias de LibraGenda, ya migradas por su
   propia cadena (`0005`/`0006`). Reemplazar ambos puertos por integraciones
   reales queda para "Después del MVP" (ver `MODULES.md`).
-- Caja/facturación componiendo LibraCore.
+- Caja/facturación componiendo LibraCore (completo). Mismo diseño exacto
+  que MedLibra (ver ADR-011 y `DECISIONS.md` de ese repo, ADR-016):
+  `client_billing` extiende `Client` con `cuit`/`condicion_iva` (primera
+  extensión propia de Client — antes se usaba el genérico de LibraGenda
+  sin extensión), config ARCA de instancia única (`PUT`/
+  `GET /config/arca`), `POST /appointments/{id}/complete` factura el
+  turno completo con `libracore.arca_facturacion` cuando el servicio
+  tiene precio configurado — una sola factura (tipo A/B según condición
+  de IVA), seña y saldo como movimientos de caja separados sobre la
+  misma factura. `libragenda` a `v0.8.0`, `libracore` a `v0.16.1`.
 - Dashboard y reportes.
 
 ## Fase 3 — producto

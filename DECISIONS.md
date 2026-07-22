@@ -198,3 +198,48 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   recurso, recurso con turno — ahora devolviendo 409 en vez de 500).
   Postgres sigue funcionando si se pasa esa `DATABASE_URL`; no se retira
   como opción.
+
+## ADR-011 — Facturación/caja con LibraCore: mismo diseño que MedLibra
+
+- Estado: aceptada
+- Fecha: 2026-07-22
+- Contexto: pregunta abierta en `TASKS.md` desde que Gestiolibra sumó
+  LibraCore como dependencia (solo para `SessionAuth`): ¿también compone
+  el motor de facturación/caja? MedLibra ya había resuelto esta misma
+  pregunta el mismo día, con `libracore.arca_facturacion` construido,
+  probado y en producción real (Contalibra/Restolibra migrados al shim
+  nuevo). El usuario confirmó (`AskUserQuestion`) incorporar el mismo
+  diseño en Gestiolibra — mucho menos riesgo que la ronda de MedLibra
+  porque no hay nada nuevo que descubrir en LibraCore, solo componerlo.
+- Decisión — dominio: a diferencia de MedLibra (que ya tenía `Patient`
+  como extensión de `Client`), Gestiolibra usaba el `Client` genérico de
+  LibraGenda **sin ninguna extensión propia** — se agregó
+  `client_billing` (`cuit`/`condicion_iva`, migración `0003_client_
+  billing`), mismo patrón exacto que `patients` de MedLibra: una tabla
+  de extensión con FK a `clients.id`, coordinada en el borde de la API
+  vía `ClientRepository` (antes el router `clients.py` hablaba directo
+  con `SqlAlchemyCatalogRepository`, ahora pasa por esta capa nueva).
+  `client_billing.delete()` borra la extensión antes que el `Client`
+  genérico — mismo orden ya corregido en `BranchRepository`/
+  `PatientRepository` de esta familia, para no repetir ese bug.
+- Decisión — arquitectura y flujo de facturación: **idénticos a
+  MedLibra** (ver `DECISIONS.md` de ese repo, ADR-016, para el detalle
+  completo — no se repite acá porque no hay ninguna decisión de negocio
+  distinta). `app/services/billing.py` portado casi verbatim (única
+  diferencia: `EMPRESA = "negocio"` en vez de `"consultorio"`, y
+  `client` en vez de `patient` en los nombres). `POST /appointments/
+  {id}/complete` factura el turno completo cuando el servicio tiene
+  precio configurado, una sola factura (tipo A/B según condición de
+  IVA del cliente), seña y saldo como movimientos de caja separados.
+- Consecuencias: `libragenda` bumpeado a `v0.8.0`, `libracore` a
+  `v0.16.1` (mismo pin que MedLibra). 30 tests nuevos (106 en total).
+  Verificado con la suite completa (con reruns para descartar el flake
+  ya documentado del reloj de WSL2) + end-to-end contra archivos SQLite
+  reales (no memoria — `libracore.db` abre una conexión nueva por
+  llamada): login, config ARCA, turno con seña parcial + saldo, factura
+  tipo B con CAE simulado, dos movimientos de caja sobre la misma
+  factura. Migración `0003` verificada con el ciclo completo
+  `upgrade`→`downgrade`→`upgrade` contra un archivo real (con la cadena
+  de LibraGenda aplicada primero). Mismas simplificaciones documentadas
+  que MedLibra, no bloqueantes: IVA fijo al 21%, certificado/clave ARCA
+  como paths de texto en vez de upload multipart.

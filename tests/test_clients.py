@@ -21,6 +21,30 @@ def test_client_crud_round_trip(admin_client: TestClient):
     assert client.get("/clients/client-1").status_code == 404
 
 
+def test_client_cuit_and_condicion_iva_round_trip(admin_client: TestClient):
+    client = admin_client
+    created = client.post("/clients", json={
+        "id": "client-1", "name": "Carlos",
+        "cuit": "20111222339", "condicion_iva": "Responsable Inscripto",
+    })
+    assert created.status_code == 201
+    assert created.json()["cuit"] == "20111222339"
+    assert created.json()["condicion_iva"] == "Responsable Inscripto"
+
+    updated = client.put("/clients/client-1", json={
+        "name": "Carlos", "cuit": "20111222339", "condicion_iva": "Monotributista",
+    })
+    assert updated.status_code == 200
+    assert updated.json()["condicion_iva"] == "Monotributista"
+
+
+def test_client_cuit_and_condicion_iva_are_optional(admin_client: TestClient):
+    created = admin_client.post("/clients", json={"id": "client-1", "name": "Ana"})
+    assert created.status_code == 201
+    assert created.json()["cuit"] is None
+    assert created.json()["condicion_iva"] is None
+
+
 def test_client_not_found_returns_404(admin_client: TestClient):
     assert admin_client.get("/clients/missing").status_code == 404
     assert admin_client.put("/clients/missing", json={"name": "x"}).status_code == 404

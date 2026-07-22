@@ -1,5 +1,7 @@
 """Gestiolibra app factory: wires LibraGenda and mounts the routers."""
 
+import os
+
 from fastapi import Depends, FastAPI
 
 from libragenda import DepositManager, ReminderDispatcher, SqlAlchemyDepositRepository, SqlAlchemyReminderRepository
@@ -12,15 +14,17 @@ from .auth import build_session_auth, require_admin, require_staff
 from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
 from .routers import (
-    agenda, appointments, availability, branch_hours, branches, business_settings,
-    clients, deposits, health, reminders, resources, service_prices, services,
-    users as users_router,
+    agenda, appointments, availability, billing as billing_router, branch_hours, branches,
+    business_settings, clients, deposits, health, reminders, resources, service_prices,
+    services, users as users_router,
 )
 from .routers import auth as auth_router
+from .services import billing
 from .services.appointments import AppointmentService
 from .services.branch_hours import BranchHoursRepository
 from .services.branches import BranchRepository
 from .services.business_settings import BusinessSettingsRepository
+from .services.clients import ClientRepository
 from .services.service_prices import ServicePriceRepository
 from .services.users import UserRepository, ensure_default_admin
 
@@ -29,6 +33,7 @@ def create_app(database_url: str) -> FastAPI:
     """Build the vertical app after configuring LibraGenda's PostgreSQL port."""
     configure(database_url)
     Base.metadata.create_all(get_engine())  # demo only; deploy uses Alembic
+    billing.configure(os.environ.get("GESTIOLIBRA_LIBRACORE_DB_PATH", "./data/gestiolibra_libracore.db"))
     sessions = get_session_factory()
     catalog = SqlAlchemyCatalogRepository(sessions)
     appointment_repository = SqlAlchemyAppointmentRepository(sessions)
@@ -45,6 +50,7 @@ def create_app(database_url: str) -> FastAPI:
     app.state.branch_hours = branch_hours_repository
     app.state.service_prices = ServicePriceRepository(sessions)
     app.state.business_settings = BusinessSettingsRepository(sessions)
+    app.state.clients = ClientRepository(catalog, sessions)
     app.state.appointment_service = AppointmentService(
         catalog, appointment_repository, availability_repository, branch_hours_repository,
     )
@@ -74,6 +80,7 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(users_router.router, dependencies=admin_only)
     app.include_router(reminders.router, dependencies=admin_only)
     app.include_router(deposits.admin_router, dependencies=admin_only)
+    app.include_router(billing_router.router, dependencies=admin_only)
     # Agenda surface: staff manages their own turnos too.
     staff_or_admin = [Depends(require_staff)]
     app.include_router(appointments.router, dependencies=staff_or_admin)

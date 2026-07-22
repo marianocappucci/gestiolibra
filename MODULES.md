@@ -22,18 +22,38 @@
   (`/services/{id}/prices` — precio por servicio y sucursal),
   `business_settings.py` (`/business` — nombre comercial y moneda,
   singleton), `clients.py` (CRUD completo — create/list/get/update/delete
-  — sobre `SqlAlchemyCatalogRepository` de LibraGenda), `availability.py`
+  — sobre `ClientRepository`, incluye `cuit`/`condicion_iva` desde
+  ADR-011), `availability.py`
   (CRUD de ventanas/bloqueos/excepciones por recurso sobre
   `SqlAlchemyAvailabilityRepository`), `appointments.py` (crear, confirmar,
-  cancelar y reprogramar — los dos últimos con `reason` opcional en el
-  body; `create`/`reschedule` validan además el horario comercial de la
-  sucursal del recurso, si está configurado), `agenda.py` — traducen
-  excepciones de dominio y `IntegrityError`/`KeyError` a códigos HTTP
-  (404/409/422). Reemplazó al `/demo/seed` placeholder.
+  cancelar, reprogramar y **completar** — los dos de en medio con `reason`
+  opcional en el body; `create`/`reschedule` validan además el horario
+  comercial de la sucursal del recurso, si está configurado; `complete`
+  factura con LibraCore si el servicio tiene precio configurado, ver
+  ADR-011), `billing.py` (`/config/arca`, admin-only), `agenda.py` —
+  traducen excepciones de dominio y `IntegrityError`/`KeyError` a códigos
+  HTTP (404/409/422). Reemplazó al `/demo/seed` placeholder.
 - `app/services/branches.py`: `BranchRepository` — coordina el `Branch`
   genérico de LibraGenda con una extensión propia de Gestiolibra
   (`BranchContactRow`: `phone`, `address`), mismo patrón que `Patient`
   extiende `Client` en MedLibra.
+- `app/services/clients.py`: `ClientRepository` — coordina el `Client`
+  genérico de LibraGenda con `client_billing` (`cuit`, `condicion_iva`),
+  extensión propia agregada en ADR-011 para facturación (antes se
+  exponía el `Client` de LibraGenda directo, sin ninguna extensión).
+  `delete()` borra la extensión antes que el `Client` genérico, mismo
+  orden que `BranchRepository`/`PatientRepository` de esta familia.
+- `app/services/billing.py`: integración de facturación/caja con
+  `libracore.db` (sqlite3 crudo, conexión propia vía
+  `libracore.db.core.configure()`, separada del engine SQLAlchemy del
+  resto de la app). `configure(path)` asegura el schema compartido y
+  una caja por defecto; `get_arca_config()`/`set_arca_config()` — una
+  sola "empresa" fija (instancia única por cliente);
+  `invoice_appointment()` — una factura por el total del servicio (tipo
+  A/B según condición de IVA del cliente vía `arca_facturacion` de
+  LibraCore), seña ya cobrada y saldo restante como dos movimientos de
+  caja separados apuntando a la misma factura. Mismo diseño exacto que
+  MedLibra (ver ADR-011).
 - `app/services/branch_hours.py`: `BranchHoursRepository` — horario
   comercial semanal por sucursal. **Opt-in**: una sucursal sin horario
   configurado no gatea nada (mismo comportamiento que siempre hubo); solo
@@ -63,6 +83,7 @@
   (admin+staff, parte del flujo de reserva) y
   `POST /deposits/{id}/mark-paid`/`mark-failed`/`refund` (admin-only,
   confirmación de dinero). Envuelve `DepositManager` de LibraGenda.
+  `mark-paid` acepta `medio_pago` opcional desde LibraGenda `v0.8.0`.
 - `app/auth.py`: reusa `libracore.auth.SessionAuth` (cookie firmada, ya
   probada en producción por Contalibra/Restolibra) para la mecánica de
   sesión — pero define sus propias dependencias FastAPI (`get_current_user`,
@@ -86,10 +107,6 @@
   agenda de turnos, sin tocar catálogo ni usuarios). Gating centralizado en
   `app/main.py` vía `dependencies=[Depends(require_admin)]`/
   `require_staff` al montar cada router, no repetido por endpoint.
-
-## MVP (pendiente)
-
-- `billing` (opcional): composición de LibraCore para facturación/caja.
 
 ## Después del MVP
 

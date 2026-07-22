@@ -9,15 +9,15 @@ y roles — ver `ROADMAP.md`.
 
 ## Próximas
 
-- [ ] Evaluar composición con LibraCore para facturación y caja (ya se sumó
-      como dependencia para `SessionAuth`; falta decidir si además se usa
-      para caja/facturación).
-
-## Después del MVP
-
 - [ ] Dashboard y reportes operativos.
 - [ ] Onboarding multi-negocio.
 - [ ] Branding y dominio por cliente.
+- [ ] Upload real de certificado/clave ARCA (`PUT /config/arca` hoy acepta
+      solo paths en el filesystem del servidor — ver ADR-011).
+- [ ] Revisar el cálculo de IVA de facturación (21% fijo) con un contador
+      antes de facturar contra ARCA real (ver ADR-011).
+- [ ] Cargar credenciales ARCA reales cuando el usuario las tenga — hoy
+      solo funciona en modo mock (`ENV=development`).
 
 ## Bloqueadas
 
@@ -43,6 +43,21 @@ Bug real corregido: `BranchRepository.delete()` con orden de borrado
 invertido (FK), invisible sin FKs forzadas. `DELETE` de sucursales/
 recursos/servicios/clientes ahora devuelve 409 en vez de 500 con
 dependientes. CI simplificado (sin servicio Postgres).
+
+Resuelto (2026-07-22): facturación/caja con LibraCore (ver ADR-011).
+`client_billing` extiende `Client` con `cuit`/`condicion_iva` (migración
+`0003_client_billing`, primera extensión propia de Client — antes se
+usaba el genérico de LibraGenda sin extensión). `POST /appointments/
+{id}/complete` factura el turno (LibraGenda `v0.7.0`) cuando el servicio
+tiene precio configurado — una sola factura con `libracore.
+arca_facturacion` (LibraCore `v0.16.1`), tipo A/B según condición de
+IVA, seña ya cobrada y saldo restante como movimientos de caja
+separados apuntando a la misma factura. `PUT`/`GET /config/arca`
+(admin-only, instancia única). `libragenda` a `v0.8.0` (`medio_pago`
+opcional en depósitos). Mismo diseño exacto que MedLibra, portado casi
+verbatim — ver `DECISIONS.md` de ese repo (ADR-016) para el detalle
+completo. 30 tests nuevos, verificado además end-to-end contra
+archivos SQLite reales.
 
 ## Notas de testing
 

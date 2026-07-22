@@ -59,6 +59,12 @@ automáticamente para cualquier conexión SQLite. PostgreSQL sigue
 soportado vía la misma `DATABASE_URL` para el caso puntual que lo
 amerite, sin cambios de código.
 
+Facturación/caja usa `libracore.db` — sqlite3 crudo con su propia
+conexión, configurada aparte del engine SQLAlchemy de LibraGenda/
+Gestiolibra vía `GESTIOLIBRA_LIBRACORE_DB_PATH` (default
+`./data/gestiolibra_libracore.db`, mismo criterio de volumen persistente
+que el resto de los paths de datos). Ver `DECISIONS.md` ADR-011.
+
 ## Migraciones
 
 Dos cadenas de Alembic independientes corren contra la **misma** base

@@ -5,11 +5,15 @@ from app.main import create_app
 
 
 @pytest.fixture(autouse=True)
-def _dev_env(monkeypatch):
+def _dev_env(monkeypatch, tmp_path):
     # SessionAuth's SECRET_KEY resolution and the admin bootstrap both
     # fail closed unless ENV=development -- see app/auth.py and
     # app/services/users.py::ensure_default_admin.
     monkeypatch.setenv("ENV", "development")
+    # libracore.db is raw sqlite3 (a fresh connection per call, unlike
+    # SQLAlchemy's pooled engine) -- ":memory:" would give every call an
+    # empty, unrelated database. A real temp file per test is required.
+    monkeypatch.setenv("GESTIOLIBRA_LIBRACORE_DB_PATH", str(tmp_path / "gestiolibra_libracore.db"))
 
 
 def https_client(app) -> TestClient:

@@ -11,12 +11,17 @@ from .services.appointments import AppointmentService
 from .services.branch_hours import BranchHoursRepository
 from .services.branches import BranchRepository
 from .services.business_settings import BusinessSettingsRepository
+from .services.clients import ClientRepository
 from .services.service_prices import ServicePriceRepository
 from .services.users import UserRepository
 
 
 def get_catalog_repository(request: Request) -> SqlAlchemyCatalogRepository:
     return request.app.state.catalog
+
+
+def get_client_repository(request: Request) -> ClientRepository:
+    return request.app.state.clients
 
 
 def get_availability_repository(request: Request) -> SqlAlchemyAvailabilityRepository:
