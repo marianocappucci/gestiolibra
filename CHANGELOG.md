@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Recordatorios y señas: `POST /reminders/dispatch` (admin-only, dispara
+  avisos vencidos — 24h y 2h antes, fijo) y `POST`/`GET /appointments/{id}/deposit`
+  + `POST /deposits/{id}/mark-paid`/`mark-failed`/`refund` (admin-only para
+  confirmar). Notificaciones y pago sin proveedor real todavía: puertos
+  placeholder (`LoggingNotificationPort`, `ManualPaymentPort`) que loguean
+  en vez de enviar/cobrar — decisión acordada con el usuario, ver ADR-009.
+  Sin migración nueva (`deposits`/`sent_reminders` son tablas de LibraGenda).
 - Configuración comercial del negocio: `/branches/{id}/hours` (horario
   comercial semanal por sucursal, opt-in — sin configurar no gatea nada),
   `/services/{id}/prices` (precio por servicio y sucursal), `/branches`

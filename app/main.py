@@ -2,15 +2,19 @@
 
 from fastapi import Depends, FastAPI
 
+from libragenda import DepositManager, ReminderDispatcher, SqlAlchemyDepositRepository, SqlAlchemyReminderRepository
 from libragenda.availability_repository import SqlAlchemyAvailabilityRepository
 from libragenda.database import configure, get_engine, get_session_factory
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.sqlalchemy_repository import Base, SqlAlchemyAppointmentRepository
 
 from .auth import build_session_auth, require_admin, require_staff
+from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
+from .payments import ManualPaymentPort
 from .routers import (
     agenda, appointments, availability, branch_hours, branches, business_settings,
-    clients, health, resources, service_prices, services, users as users_router,
+    clients, deposits, health, reminders, resources, service_prices, services,
+    users as users_router,
 )
 from .routers import auth as auth_router
 from .services.appointments import AppointmentService
@@ -31,6 +35,7 @@ def create_app(database_url: str) -> FastAPI:
     availability_repository = SqlAlchemyAvailabilityRepository(sessions)
     user_repository = UserRepository(sessions)
     branch_hours_repository = BranchHoursRepository(sessions)
+    deposit_repository = SqlAlchemyDepositRepository(sessions)
     ensure_default_admin(user_repository)
 
     app = FastAPI(title="Gestiolibra")
@@ -45,6 +50,12 @@ def create_app(database_url: str) -> FastAPI:
     )
     app.state.users = user_repository
     app.state.session_auth = build_session_auth(user_repository)
+    app.state.reminder_dispatcher = ReminderDispatcher(
+        appointment_repository, SqlAlchemyReminderRepository(sessions),
+        LoggingNotificationPort(), DEFAULT_REMINDER_POLICIES,
+    )
+    app.state.deposits = deposit_repository
+    app.state.deposit_manager = DepositManager(deposit_repository, ManualPaymentPort())
 
     app.include_router(health.router)
     app.include_router(auth_router.router)
@@ -61,9 +72,12 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(availability.router, dependencies=admin_only)
     app.include_router(business_settings.router, dependencies=admin_only)
     app.include_router(users_router.router, dependencies=admin_only)
+    app.include_router(reminders.router, dependencies=admin_only)
+    app.include_router(deposits.admin_router, dependencies=admin_only)
     # Agenda surface: staff manages their own turnos too.
     staff_or_admin = [Depends(require_staff)]
     app.include_router(appointments.router, dependencies=staff_or_admin)
     app.include_router(agenda.router, dependencies=staff_or_admin)
+    app.include_router(deposits.request_router, dependencies=staff_or_admin)
 
     return app

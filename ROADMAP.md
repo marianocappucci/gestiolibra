@@ -69,8 +69,19 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   comercial, moneda). Cuatro tablas nuevas, migración `0002_business_config`
   en el Alembic propio de Gestiolibra. `AppointmentService.create()`/
   `reschedule()` validan el horario comercial cuando está configurado.
-- Recordatorios.
-- Señas y políticas de cancelación.
+- Recordatorios y señas (completo). `POST /reminders/dispatch` (admin-only)
+  dispara los avisos vencidos (24h y 2h antes, fijo por ahora) sobre
+  `ReminderDispatcher` de LibraGenda; `POST`/`GET /appointments/{id}/deposit`
+  (admin+staff) y `POST /deposits/{id}/mark-paid`/`mark-failed`/`refund`
+  (admin-only) sobre `DepositManager` de LibraGenda. Decisión acordada con
+  el usuario antes de codificar: sin proveedor de notificaciones ni de pago
+  todavía, así que ambos puertos de LibraGenda (`NotificationPort`,
+  `PaymentPort`) se implementan como placeholders — `LoggingNotificationPort`
+  solo loguea, `ManualPaymentPort` no cobra solo, la confirmación de señas
+  es manual por admin. No hizo falta migración nueva: `deposits` y
+  `sent_reminders` son tablas propias de LibraGenda, ya migradas por su
+  propia cadena (`0005`/`0006`). Reemplazar ambos puertos por integraciones
+  reales queda para "Después del MVP" (ver `MODULES.md`).
 - Caja/facturación componiendo LibraCore.
 - Dashboard y reportes.
 

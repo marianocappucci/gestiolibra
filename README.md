@@ -23,9 +23,18 @@ moneda) en `/business`; disponibilidad configurable por recurso
 `/appointments` (crear/confirmar/cancelar/reprogramar — `admin` o `staff`,
 valida contra la disponibilidad real configurada y el horario comercial de
 la sucursal si está configurado; cancelar y reprogramar aceptan un
-`reason` opcional en el body); y `/resources/{id}/agenda` (turnos en un
-rango de fechas, `admin` o `staff`). El endpoint `/demo/seed` fue
-reemplazado por el CRUD.
+`reason` opcional en el body); `/resources/{id}/agenda` (turnos en un
+rango de fechas, `admin` o `staff`); `/reminders/dispatch` (solo `admin`,
+dispara los recordatorios vencidos — 24h y 2h antes de cada turno, fijo);
+y `/appointments/{id}/deposit` (pedir/consultar una seña, `admin` o
+`staff`) + `/deposits/{id}/mark-paid`/`mark-failed`/`refund` (solo `admin`,
+confirma el estado de la seña). El endpoint `/demo/seed` fue reemplazado
+por el CRUD.
+
+Recordatorios y señas todavía no tienen un canal real conectado: los
+recordatorios se loguean (`LoggingNotificationPort`) y las señas se cobran
+y confirman fuera de la app, a mano (`ManualPaymentPort` — ver
+`DECISIONS.md` ADR-009).
 
 ## Autenticación
 

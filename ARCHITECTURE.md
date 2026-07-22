@@ -26,10 +26,14 @@ Gestiolibra posee el flujo HTTP y las reglas propias del negocio; LibraGenda apo
 - `app/services/branches.py`, `branch_hours.py`, `service_prices.py`,
   `business_settings.py`: configuración comercial, todas tablas propias de
   Gestiolibra (no de LibraGenda) — ver "Configuración comercial" abajo.
+- `app/notifications.py`, `app/payments.py`: implementaciones placeholder de
+  los puertos `NotificationPort`/`PaymentPort` de LibraGenda — ver
+  "Recordatorios y señas" abajo.
 - `app/routers/`: health (público), auth (login/logout/me), users (admin-only),
   sucursales (+ horario, + contacto), recursos, servicios (+ precio por
-  sucursal), clientes, disponibilidad, negocio (`/business`), turnos y
-  agenda.
+  sucursal), clientes, disponibilidad, negocio (`/business`), turnos,
+  agenda, recordatorios (`/reminders/dispatch`) y señas (`/appointments/{id}/deposit`,
+  `/deposits/{id}/...`).
 
 ## Configuración comercial
 
@@ -49,6 +53,27 @@ nivel sucursal, solo disponibilidad por recurso):
   sucursal (`branch_contacts`, extensión de `Branch` igual que `Patient`
   extiende `Client` en MedLibra); nombre comercial y moneda son del
   negocio como un todo (`business_settings`, fila única).
+## Recordatorios y señas
+
+Ambos ya vienen resueltos como motor de dominio en LibraGenda
+(`ReminderDispatcher`/`due_reminders()`, `DepositManager`) — lo que faltaba
+en Gestiolibra era conectarlos a un canal real, y todavía no hay uno
+elegido (ver ADR-009):
+
+- **Recordatorios**: `LoggingNotificationPort` implementa `NotificationPort`
+  logueando en vez de enviar. `DEFAULT_REMINDER_POLICIES` (24h y 2h antes,
+  fijo, no configurable por sucursal/servicio) se pasa a `ReminderDispatcher`
+  al construir la app. `POST /reminders/dispatch` (admin-only) está pensado
+  para un cron/scheduler externo, no hay uno corriendo dentro de este repo.
+- **Señas**: `ManualPaymentPort` implementa `PaymentPort`; `request_charge`/
+  `request_refund` no cobran ni reintegran solos, solo loguean la
+  intención. El dinero se confirma fuera de la app (efectivo, transferencia,
+  link de MercadoPago enviado a mano) y un admin lo refleja con
+  `POST /deposits/{id}/mark-paid`/`mark-failed`/`refund`.
+- Ninguna de las dos piezas necesitó una migración nueva: `deposits` y
+  `sent_reminders` son tablas propias de LibraGenda (`0005`/`0006` de su
+  propia cadena), no de Gestiolibra.
+
 - `MODULES.md`: inventario operativo de módulos.
 - LibraGenda `v0.5.0`: dependencia versionada para dominio, persistencia y migraciones propias.
 - LibraCore (sin versión de facturación/caja todavía): dependencia versionada

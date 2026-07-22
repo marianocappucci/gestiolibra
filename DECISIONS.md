@@ -125,3 +125,31 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   (misma señal que ya disparó la extracción de CRUD de catálogo y el fix
   de datetimes). Precio y contacto/marca son negocio/vertical-specific casi
   con certeza — poco probable que se generalicen.
+
+## ADR-009 — Recordatorios y señas: puertos placeholder hasta elegir proveedor
+
+- Estado: aceptada
+- Fecha: 2026-07-22
+- Contexto: LibraGenda ya resuelve el dominio de recordatorios
+  (`ReminderDispatcher`, `due_reminders()`) y señas (`DepositManager`) vía
+  dos puertos (`NotificationPort`, `PaymentPort`) que Gestiolibra debe
+  implementar. No hay todavía un proveedor de notificaciones (email/SMS/
+  WhatsApp) ni de pagos (MercadoPago u otro) elegido para el negocio.
+  Preguntado al usuario cómo resolver ambos vacíos antes de codificar.
+- Decisión: implementar ambos puertos como placeholders explícitos en vez
+  de bloquear la feature o improvisar una integración real a medias.
+  `LoggingNotificationPort` loguea cada recordatorio vencido en vez de
+  enviarlo. `ManualPaymentPort` no cobra ni reintegra solo — `request_charge`/
+  `request_refund` solo loguean la intención; la confirmación real de la
+  seña (efectivo, transferencia, link de MercadoPago enviado a mano) la
+  hace un admin a mano vía `POST /deposits/{id}/mark-paid`/`mark-failed`/
+  `refund`. Los dos endpoints de disparo (`/reminders/dispatch`) y consulta/
+  confirmación de señas quedan operativos igual, con el reemplazo del canal
+  como el único trabajo pendiente cuando se elija proveedor.
+- Consecuencias: la feature es usable en producción sin esperar una
+  integración externa (recordatorios visibles en logs para seguimiento
+  manual, señas cobradas y confirmadas por el propio negocio). El costo es
+  operativo, no técnico: alguien tiene que mirar los logs y marcar los pagos
+  a mano hasta que se reemplacen los puertos. `NotificationPort`/
+  `PaymentPort` son `Protocol` sin `@runtime_checkable`, así que la
+  conformidad es estructural (duck typing), no verificada por `isinstance`.

@@ -12,7 +12,6 @@ y roles — ver `ROADMAP.md`.
 - [ ] Evaluar composición con LibraCore para facturación y caja (ya se sumó
       como dependencia para `SessionAuth`; falta decidir si además se usa
       para caja/facturación).
-- [ ] Preparar recordatorios, señas y políticas de cancelación.
 
 ## Después del MVP
 
@@ -31,6 +30,12 @@ sobre la misma base) — ver `README.md`.
 Resuelto (2026-07-22): configuración comercial del negocio — horario por
 sucursal, precio por servicio y sucursal, contacto de sucursal y datos
 globales del negocio. Migración `0002_business_config`.
+
+Resuelto (2026-07-22): recordatorios y señas — `POST /reminders/dispatch`,
+`POST`/`GET /appointments/{id}/deposit`, `POST /deposits/{id}/mark-paid`/
+`mark-failed`/`refund`. Notificaciones y pago con puertos placeholder
+(`LoggingNotificationPort`, `ManualPaymentPort`) hasta definir proveedor
+real. Sin migración nueva (tablas de LibraGenda ya migradas).
 
 ## Notas de testing
 

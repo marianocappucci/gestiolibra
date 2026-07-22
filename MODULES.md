@@ -46,6 +46,23 @@
 - `app/services/business_settings.py`: `BusinessSettingsRepository` —
   configuración global del negocio (nombre comercial, moneda), fila única
   (`id` fijo), no hay multi-tenant de "varios negocios" en un mismo deploy.
+- `app/notifications.py`: `LoggingNotificationPort` — implementación
+  placeholder del `NotificationPort` de LibraGenda; loguea en vez de
+  enviar de verdad (sin proveedor de email/SMS/WhatsApp configurado
+  todavía). `DEFAULT_REMINDER_POLICIES` fija dos avisos (24h y 2h antes),
+  no configurable por sucursal/servicio por ahora.
+- `app/payments.py`: `ManualPaymentPort` — implementación placeholder del
+  `PaymentPort` de LibraGenda; `request_charge`/`request_refund` no cobran
+  solos, solo loguean la intención. La confirmación real de pago es manual
+  (`POST /deposits/{id}/mark-paid`, admin-only) hasta que se resuelva la
+  decisión de facturación/MercadoPago (`libracore.mp_api`).
+- `app/routers/reminders.py`: `POST /reminders/dispatch` (admin-only) —
+  dispara `ReminderDispatcher.dispatch()` de LibraGenda con `now` actual;
+  pensado para un cron/scheduler externo (no configurado en este repo).
+- `app/routers/deposits.py`: `POST`/`GET /appointments/{id}/deposit`
+  (admin+staff, parte del flujo de reserva) y
+  `POST /deposits/{id}/mark-paid`/`mark-failed`/`refund` (admin-only,
+  confirmación de dinero). Envuelve `DepositManager` de LibraGenda.
 - `app/auth.py`: reusa `libracore.auth.SessionAuth` (cookie firmada, ya
   probada en producción por Contalibra/Restolibra) para la mecánica de
   sesión — pero define sus propias dependencias FastAPI (`get_current_user`,
@@ -75,8 +92,10 @@
 
 ## Después del MVP
 
-- Recordatorios y preferencias de comunicación.
-- Señas y políticas de cancelación.
+- Canal real de notificaciones (email/SMS/WhatsApp) para reemplazar
+  `LoggingNotificationPort`.
+- Proveedor de pago real (MercadoPago u otro) para reemplazar
+  `ManualPaymentPort` y automatizar la confirmación de señas.
 - Dashboard y reportes operativos.
 
 ## Fuera de alcance
