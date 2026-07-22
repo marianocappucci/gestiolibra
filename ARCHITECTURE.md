@@ -40,7 +40,7 @@ trae su propia tabla de usuarios en su propio stack de persistencia (ver
 
 ## Persistencia e integración
 
-La aplicación configura LibraGenda mediante `LIBRAGENDA_DATABASE_URL` y usa PostgreSQL dedicado para Gestiolibra. Las migraciones de LibraGenda se ejecutan desde el repositorio upstream en el tag exacto pineado, antes de iniciar la API; no se usa `create_all()` en producción.
+La aplicación configura LibraGenda mediante `LIBRAGENDA_DATABASE_URL` y usa PostgreSQL dedicado para Gestiolibra. Dos cadenas de Alembic independientes corren contra la misma base, cada una con su propia tabla de versión: las de LibraGenda (schema del motor, ejecutadas desde el repositorio upstream en el tag exacto pineado) y las propias de Gestiolibra (`migrations/` de este repo, hoy solo la tabla `users`, tabla de versión `alembic_version_gestiolibra` para no colisionar con la de LibraGenda). `Base.metadata.create_all()` sigue existiendo en `create_app()` pero solo importa para los tests con SQLite en memoria — en producción es un no-op una vez que ambas cadenas de Alembic ya crearon el schema real.
 
 La lógica de negocio no debe duplicarse localmente cuando pertenece al motor genérico. Los routers traducen errores de dominio e integridad a respuestas HTTP.
 

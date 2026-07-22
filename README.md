@@ -37,23 +37,38 @@ base `gestiolibra` en el mismo Postgres 16 del VPS Donweb que aloja la de
 LibraGenda, migrada con las migraciones del propio paquete de LibraGenda
 (no se distribuyen en el wheel de pip; ver más abajo).
 
-## Migraciones de LibraGenda
+## Migraciones
 
-Las migraciones de Alembic de LibraGenda no viajan en el wheel instalado
-por pip (decisión documentada en el `CONVENTIONS.md` de LibraGenda). El
-paso de deploy de Gestiolibra debe correr, antes de levantar la API, el
-script `scripts/run_migrations.sh` del repo de LibraGenda en el mismo tag
-pineado en `pyproject.toml` (hoy `v0.5.0`):
+Dos cadenas de Alembic independientes corren contra la **misma** base
+`gestiolibra`, cada una con su propia tabla de versión (para no
+pisarse: `alembic_version` es de LibraGenda, `alembic_version_gestiolibra`
+es de Gestiolibra). El deploy corre ambas, en este orden, antes de levantar
+la API:
+
+**1. Migraciones de LibraGenda** (schema del motor: sucursales, recursos,
+servicios, clientes, turnos, disponibilidad...). No viajan en el wheel
+instalado por pip (decisión documentada en el `CONVENTIONS.md` de
+LibraGenda), así que se aplican clonando el repo en el tag pineado en
+`pyproject.toml` (hoy `v0.5.0`):
 
 ```bash
-LIBRAGENDA_REF=v0.5.0 DATABASE_URL="$LIBRAGENDA_DATABASE_URL" \
+LIBRAGENDA_REF=v0.5.0 DATABASE_URL="$DATABASE_URL" \
   bash path/a/libragenda/scripts/run_migrations.sh
 ```
 
-El script clona LibraGenda en ese tag a un directorio temporal y corre
-`alembic upgrade head` contra `DATABASE_URL` sin tocar `alembic.ini`. Es el
-mismo paso, reproducible, que reemplaza el sync manual por rsync usado en
-dev.
+**2. Migraciones propias de Gestiolibra** (tabla `users` — no pertenece al
+dominio de LibraGenda, ver `MODULES.md`). Viajan en este mismo repo, se
+aplican directamente:
+
+```bash
+DATABASE_URL="$DATABASE_URL" alembic upgrade head
+```
+
+`migrations/env.py` deja `target_metadata = None` a propósito: `UserRow`
+está registrado en el `Base` compartido de LibraGenda (mismo objeto
+SQLAlchemy), así que apuntar el autogenerate ahí vería también las tablas
+de LibraGenda como propias de esta cadena. Las migraciones de Gestiolibra
+se escriben a mano, mismo criterio que ya usa LibraGenda para las suyas.
 
 ## Documentación
 

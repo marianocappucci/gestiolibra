@@ -73,3 +73,28 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
 - Consecuencias: esquema simple y suficiente para el MVP; agregar roles más
   finos (ej. gerente de sucursal) queda para cuando aparezca una necesidad
   real, no se anticipa.
+
+## ADR-007 — Alembic propio de Gestiolibra, cadena independiente de la de LibraGenda
+
+- Estado: aceptada
+- Fecha: 2026-07-21
+- Contexto: la tabla `users` (y cualquier tabla futura que no pertenezca a
+  LibraGenda) solo se creaba vía `Base.metadata.create_all()` en
+  `create_app()` — sin efecto real en un deploy de producción, que no llama
+  a `create_all()` sino que corre las migraciones de LibraGenda (ver
+  ADR-003). Sin una migración propia, `users` nunca se hubiera creado fuera
+  de dev/tests.
+- Decisión: `migrations/` propio en este repo (mismo layout que LibraGenda:
+  `alembic.ini`, `env.py`, `versions/`), pero con dos diferencias
+  deliberadas: (1) `target_metadata = None` en vez de `Base.metadata` —
+  `UserRow` comparte el `Base` declarativo de LibraGenda, así que apuntar
+  el autogenerate ahí vería también las tablas del motor como propias de
+  esta cadena; las migraciones se escriben a mano, igual que ya hace
+  LibraGenda. (2) `version_table = "alembic_version_gestiolibra"` — ambas
+  cadenas corren contra la misma base física; con el nombre default
+  colisionarían.
+- Consecuencias: el deploy real de Gestiolibra corre dos pasos de Alembic
+  en vez de uno (LibraGenda primero, Gestiolibra después) — verificado
+  contra PostgreSQL real que las dos cadenas de versión conviven sin
+  pisarse. Cualquier tabla nueva propia de Gestiolibra (no de LibraGenda)
+  se agrega acá, nunca en el repo de LibraGenda.

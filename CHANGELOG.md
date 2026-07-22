@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Alembic propio (`migrations/`) para la tabla `users` — antes solo se
+  creaba vía `create_all()`, sin efecto en un deploy real. Cadena de
+  versión independiente (`alembic_version_gestiolibra`) para no colisionar
+  con la de LibraGenda sobre la misma base.
 - Login y roles básicos: `POST /auth/login`, `/auth/logout`, `GET /auth/me`,
   CRUD de usuarios admin-only en `/users`. Reusa `libracore.auth.SessionAuth`
   (cookie firmada); tabla `users` propia. Dos roles: `admin` (todo) y

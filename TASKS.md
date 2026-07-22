@@ -14,11 +14,6 @@ y roles — ver `ROADMAP.md`.
       como dependencia para `SessionAuth`; falta decidir si además se usa
       para caja/facturación).
 - [ ] Preparar recordatorios, señas y políticas de cancelación.
-- [ ] Gestiolibra todavía no tiene Alembic propio: la tabla `users` (y
-      cualquier tabla futura que no pertenezca a LibraGenda) solo se crea
-      vía `Base.metadata.create_all()` en `create_app()` — documentado como
-      "demo only" pero hoy es el único mecanismo real para sus propias
-      tablas. Definir migraciones propias antes de un deploy real.
 
 ## Después del MVP
 
@@ -29,6 +24,10 @@ y roles — ver `ROADMAP.md`.
 ## Bloqueadas
 
 Ninguna bloqueada registrada.
+
+Resuelto (2026-07-21): Alembic propio de Gestiolibra para la tabla `users`
+(`alembic_version_gestiolibra`, cadena independiente de la de LibraGenda
+sobre la misma base) — ver `README.md`.
 
 ## Notas de testing
 
