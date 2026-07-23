@@ -5,12 +5,15 @@ barberías, peluquerías, estética, lavaderos, talleres y similares.
 
 Compone:
 
-- LibraGenda `v0.6.0` — agenda, recursos, servicios, ciclo de vida de turnos,
-  disponibilidad/bloqueos/excepciones, feriados y timezone por sucursal,
-  recurrencias, recordatorios (puerto de notificaciones), señas (puerto de
-  pagos) y motivo opcional de cancelación/reprogramación.
-- LibraCore — solo `libracore.auth.SessionAuth` por ahora (login por cookie
-  firmada); administración/facturación/caja, cuando corresponda.
+- LibraGenda `v0.9.0` — agenda, recursos, servicios, ciclo de vida de turnos
+  (incluye `complete()`), disponibilidad/bloqueos/excepciones, feriados y
+  timezone por sucursal, recurrencias, recordatorios (puerto de
+  notificaciones + `list_sent()` para reportes), señas (puerto de pagos,
+  `medio_pago` opcional + `list_by_status()`) y motivo opcional de
+  cancelación/reprogramación.
+- LibraCore `v0.16.1` — `libracore.auth.SessionAuth` (login por cookie
+  firmada) y `libracore.arca_facturacion`/`libracore.db` (facturación
+  electrónica ARCA + caja, ver `DECISIONS.md` ADR-011).
 
 API: `/auth/login`, `/auth/logout`, `/auth/me` (sesión por cookie); CRUD de
 usuarios en `/users` (solo `admin`); CRUD real de `/branches` (incluye
@@ -77,10 +80,10 @@ la API:
 servicios, clientes, turnos, disponibilidad...). No viajan en el wheel
 instalado por pip (decisión documentada en el `CONVENTIONS.md` de
 LibraGenda), así que se aplican clonando el repo en el tag pineado en
-`pyproject.toml` (hoy `v0.6.0`):
+`pyproject.toml` (hoy `v0.9.0`):
 
 ```bash
-LIBRAGENDA_REF=v0.6.0 DATABASE_URL="sqlite:///data/gestiolibra.db" \
+LIBRAGENDA_REF=v0.9.0 DATABASE_URL="sqlite:///data/gestiolibra.db" \
   bash path/a/libragenda/scripts/run_migrations.sh
 ```
 
@@ -114,6 +117,64 @@ scoped **solo** a `libragenda` y `libracore`, permiso **Contents:
 Read-only**, y cargarlo como ese secret. Sin este secret, el paso "Install
 package + dev deps" falla (no un bug del workflow).
 
+## Planes y módulos
+
+Onboarding multi-negocio con enforcement real (ver `DECISIONS.md` ADR-013).
+`plans.py` (raíz del repo) define tres planes — Básico ($15k), Estándar
+($25k) y Premium ($40k) — y qué módulos gateables incluye cada uno.
+Catálogo y turnos son siempre gratis y nunca se gatean; lo que varía por
+plan es recordatorios, señas, facturación y dashboard.
+
+La tabla `modulos` (migración `0005_modulos`) guarda el estado real por
+instancia — se siembra con todo habilitado por defecto (una instancia sin
+plan asignado no bloquea nada) y `aplicar_plan_en_db()` la ajusta cuando
+se asigna un plan real. `require_module(nombre)` (`app/modules_gate.py`)
+devuelve 403 en los routers gateados si el módulo está deshabilitado;
+completar un turno (`POST /appointments/{id}/complete`) nunca se bloquea
+por plan — si "facturacion" está deshabilitado simplemente no factura.
+
+## Deploy
+
+Primera infraestructura de deploy de Gestiolibra (`Dockerfile`,
+`docker-compose.yml`, `app/asgi.py`, `scripts/{nuevo_cliente,panel_admin,
+npm_api,npm_setup}.py`) — mismo patrón que Contalibra/Restolibra
+(silo: una instancia + una base SQLite aislada por cliente, ver
+`DECISIONS.md` ADR-010/ADR-013), usando `libracore.provisioning` como
+motor genérico de alta de clientes.
+
+**Particularidad de Gestiolibra**: compone dos paquetes privados
+(LibraGenda y LibraCore) en lugar de uno solo, así que el build de Docker
+necesita autenticarse contra **dos repos** por SSH en el mismo paso
+(`RUN --mount=type=ssh`). `pyproject.toml` usa `git+https://` para ambas
+dependencias (necesario para el dev local en WSL, sin identidad SSH
+propia contra GitHub); el `Dockerfile` reescribe esas URLs a
+`ssh://git@github.com/` solo durante el build
+(`git config --global url."ssh://...".insteadOf "https://github.com/"`),
+sin tocar `pyproject.toml`.
+
+En el VPS esto requiere un `ssh-agent` persistente con **ambas** claves
+cargadas (el deploy key de LibraCore ya existente más uno nuevo
+de solo lectura para LibraGenda, `id_ed25519_libragenda`):
+
+```bash
+ssh-agent -a /root/.ssh/agent-multi-libra.sock > /root/.ssh/agent-multi-libra.env
+SSH_AUTH_SOCK=/root/.ssh/agent-multi-libra.sock ssh-add ~/.ssh/id_ed25519_libracore
+SSH_AUTH_SOCK=/root/.ssh/agent-multi-libra.sock ssh-add ~/.ssh/id_ed25519_libragenda
+```
+
+Y pasar ese socket como `LIBRACORE_SSH_KEY` al invocar
+`scripts/panel_admin.py` (que delega en
+`libracore.provisioning.panel_admin.cmd_actualizar`, hoy con un único
+`--ssh default=<...>` hardcodeado — ver limitación documentada en
+`TASKS.md`):
+
+```bash
+LIBRACORE_SSH_KEY=/root/.ssh/agent-multi-libra.sock python3 scripts/panel_admin.py actualizar <cliente>
+```
+
+`docker-compose.yml` levanta `gestiolibra-dev` en el puerto `8075`
+(puerto base para clientes reales vía provisioning: `8076`).
+
 ## Documentación
 
 - [ROADMAP.md](ROADMAP.md) — dirección estratégica.
@@ -131,8 +192,12 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
-uvicorn app.main:app --reload
+DATABASE_URL="sqlite:///./dev-data/gestiolibra.db" uvicorn app.asgi:app --reload
 ```
 
-Las migraciones de LibraGenda y las propias deben aplicarse (`alembic
-upgrade head` en ambas cadenas) antes de iniciar la aplicación real.
+`app/asgi.py` es el entrypoint que usa uvicorn en contenedor (Docker) o
+local — lee `DATABASE_URL` del entorno una sola vez al importar, porque
+`create_app()` requiere ese argumento y no puede usarse directo como
+factory de uvicorn. Las migraciones de LibraGenda y las propias deben
+aplicarse (`alembic upgrade head` en ambas cadenas) antes de iniciar la
+aplicación real.

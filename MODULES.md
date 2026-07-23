@@ -119,6 +119,28 @@
   agenda de turnos, sin tocar catálogo ni usuarios). Gating centralizado en
   `app/main.py` vía `dependencies=[Depends(require_admin)]`/
   `require_staff` al montar cada router, no repetido por endpoint.
+- `plans.py` (raíz del repo): `PLANES`/`PLAN_MODULOS`/`PLAN_PRECIOS`
+  (Básico/Estándar/Premium) + `aplicar_plan_en_db()`, mismo patrón que
+  `plans.py` de Contalibra. Catálogo/turnos siempre gratis; lo gateable
+  es recordatorios, señas, facturación y dashboard.
+- `app/services/modules.py`: `ModuleRepository` — lee/escribe la tabla
+  `modulos` (migración `0005_modulos`). `ensure_seeded()` habilita todo
+  por defecto (sin bloquear nada hasta que se asigne un plan real);
+  `is_enabled()` trata cualquier módulo fuera de `TODOS_LOS_MODULOS`
+  (catálogo/turnos) como siempre habilitado.
+- `app/modules_gate.py`: `require_module(nombre)` — dependency factory
+  que devuelve 403 si el módulo no está habilitado, mismo patrón que
+  `require_role` de `app/auth.py`. Aplicado a routers completos
+  (recordatorios/señas/facturación/dashboard); `complete()` de turno lo
+  chequea puntualmente para saltar la facturación sin bloquear el turno.
+- `Dockerfile`/`docker-compose.yml`/`app/asgi.py`: primera infraestructura
+  de deploy de Gestiolibra (nunca se había desplegado). Mismo patrón que
+  Contalibra/Restolibra (`--mount=type=ssh` con deploy key dedicada) —
+  `pyproject.toml` usa `git+https` para LibraGenda/LibraCore (necesario
+  para el dev local en WSL, sin identidad SSH contra GitHub), y el build
+  reescribe esas URLs a SSH en tiempo de build. `scripts/nuevo_cliente.py`/
+  `panel_admin.py`/`npm_api.py`/`npm_setup.py`: wrappers sobre
+  `libracore.provisioning`, mismo patrón que Contalibra/Restolibra.
 
 ## Después del MVP
 

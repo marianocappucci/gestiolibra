@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- **Onboarding multi-negocio**: sistema de planes con enforcement real
+  (`plans.py`: Básico/Estándar/Premium, $15k/$25k/$40k), tabla `modulos`
+  (migración `0005_modulos`), `require_module()` gatea recordatorios/
+  señas/facturación/dashboard con 403 (turnos y catálogo nunca se
+  gatean; completar un turno nunca se bloquea, solo se salta la
+  facturación si el plan no la incluye). Primera infraestructura de
+  deploy de Gestiolibra: `Dockerfile`, `docker-compose.yml`, `app/asgi.py`,
+  `scripts/{nuevo_cliente,panel_admin,npm_api,npm_setup}.py` (wrappers
+  sobre `libracore.provisioning`, mismo patrón que Contalibra/Restolibra).
+  Ver `DECISIONS.md` ADR-013.
 - **Dashboard**: `GET /dashboard?date_from=&date_to=` (admin-only) —
   turnos (total y por estado en el rango, turnos de hoy), clientes
   (total activos, altas nuevas en el rango vía `client_billing.

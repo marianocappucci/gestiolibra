@@ -278,3 +278,65 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   comparar un turno contra un rango de "hoy" calculado por separado
   falla cerca de medianoche UTC — el test deriva el rango de consulta
   de la fecha real del turno creado.
+
+## ADR-013 — Onboarding multi-negocio: planes con enforcement real + infraestructura de deploy
+
+- Estado: aceptada
+- Fecha: 2026-07-22
+- Contexto: "onboarding multi-negocio" venía anotado sin alcance en
+  `TASKS.md`/`ROADMAP.md` desde el scaffold. Antes de codificar se
+  resolvieron con el usuario (`AskUserQuestion`) tres decisiones reales:
+  (1) qué significa "onboarding" acá — infraestructura de deploy para
+  poder dar de alta el primer cliente real (no un wizard dentro de la
+  app); (2) si hace falta un sistema de planes ahora — sí, con
+  enforcement real (bloquear rutas según el plan), no solo una
+  definición informativa; (3) estructura de planes — Básico (catálogo/
+  turnos/clientes, siempre gratis) / Estándar (+ recordatorios/señas) /
+  Premium (+ facturación/dashboard), $15k/$25k/$40k (Gestiolibra apunta
+  a negocios más chicos que Contalibra, que arranca en $29k).
+- Decisión — planes y gating: `plans.py` en la raíz del repo (mismo
+  patrón exacto que Contalibra: `PLANES`, `PLAN_MODULOS`,
+  `aplicar_plan_en_db()` con `sqlite3` crudo). Tabla `modulos` propia
+  (migración `0005_modulos`) — a diferencia de Contalibra, que la crea
+  vía `init_db()` inline sin Alembic, acá se creó como cualquier otra
+  tabla de Gestiolibra. **Seed por defecto: todo habilitado**
+  (`habilitado=True`) hasta que se aplique un plan real — mismo criterio
+  que Contalibra, para no romper ningún flujo de dev/tests existente.
+  `require_module(nombre)` (dependency factory, mismo patrón que
+  `require_role`) gatea completo los routers de recordatorios/señas/
+  facturación/dashboard con 403; **turnos y catálogo nunca se gatean**.
+  El caso más delicado, `complete()` de turno, no se bloquea por plan —
+  si "facturacion" no está habilitado, simplemente no factura (el turno
+  igual se completa), nunca deja un turno atascado por una limitación
+  comercial.
+- Decisión — infraestructura de deploy: Gestiolibra no tenía Dockerfile
+  ni docker-compose.yml — nunca se había desplegado a ningún servidor.
+  Se construyó mirando el patrón ya probado de Contalibra/Restolibra
+  (`Dockerfile`, `docker-compose.yml` con servicio `-dev`, wrappers
+  `scripts/nuevo_cliente.py`/`panel_admin.py`/`npm_api.py`/
+  `npm_setup.py` sobre `libracore.provisioning`, genérico y ya probado
+  en producción real). **Hallazgo real en el camino**: Gestiolibra usa
+  `git+https://` para instalar LibraGenda/LibraCore en `pyproject.toml`
+  (así funciona el dev local en WSL, sin identidad SSH contra GitHub),
+  a diferencia de Contalibra/Restolibra que usan `git+ssh://` con una
+  deploy key. El build del Dockerfile reescribe esas URLs a SSH en
+  tiempo de build (`git config url."ssh://git@github.com/".insteadOf
+  "https://github.com/"`, descartado antes de terminar la capa) para no
+  tener que mantener dos manifiestos de dependencias. Como Gestiolibra
+  necesita **dos** repos privados (LibraGenda + LibraCore) y GitHub no
+  permite reusar una deploy key entre repos, se generó una deploy key
+  nueva de solo lectura para LibraGenda (`id_ed25519_libragenda`,
+  agregada por el usuario en GitHub) y se armó un ssh-agent persistente
+  en el VPS con ambas claves cargadas (`agent-multi-libra.sock`) — un
+  solo `--ssh default=<socket-del-agente>` en el build alcanza para las
+  dos, sin tocar `libracore.provisioning.panel_admin.cmd_actualizar`
+  (que sigue con un solo `--ssh default=<archivo>` hardcodeado, pensado
+  para un único repo — funciona igual si `LIBRACORE_SSH_KEY` apunta al
+  socket del agente en vez de un archivo de clave).
+- Consecuencias: 17 tests nuevos (130 en total). Verificado con la
+  suite completa (reruns para descartar el flake del reloj de WSL2) +
+  end-to-end contra un archivo SQLite real aplicando `aplicar_plan_en_db`
+  en vivo (Básico→Estándar, confirmando que los 403 cambian
+  correctamente en cada salto de plan). Deploy real a producción (primer
+  cliente de prueba en el VPS) documentado por separado una vez
+  completado — ver entrada siguiente o `TASKS.md`.

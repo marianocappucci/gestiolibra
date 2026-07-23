@@ -11,6 +11,7 @@ from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.sqlalchemy_repository import Base, SqlAlchemyAppointmentRepository
 
 from .auth import build_session_auth, require_admin, require_staff
+from .modules_gate import require_module
 from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
 from .routers import (
@@ -26,6 +27,7 @@ from .services.branches import BranchRepository
 from .services.business_settings import BusinessSettingsRepository
 from .services.clients import ClientRepository
 from .services.dashboard import DashboardService
+from .services.modules import ModuleRepository
 from .services.service_prices import ServicePriceRepository
 from .services.users import UserRepository, ensure_default_admin
 
@@ -44,6 +46,8 @@ def create_app(database_url: str) -> FastAPI:
     deposit_repository = SqlAlchemyDepositRepository(sessions)
     reminder_repository = SqlAlchemyReminderRepository(sessions)
     client_repository = ClientRepository(catalog, sessions)
+    module_repository = ModuleRepository(sessions)
+    module_repository.ensure_seeded()
     ensure_default_admin(user_repository)
 
     app = FastAPI(title="Gestiolibra")
@@ -68,6 +72,7 @@ def create_app(database_url: str) -> FastAPI:
     app.state.dashboard = DashboardService(
         appointment_repository, client_repository, reminder_repository, deposit_repository,
     )
+    app.state.modules = module_repository
 
     app.include_router(health.router)
     app.include_router(auth_router.router)
@@ -84,14 +89,26 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(availability.router, dependencies=admin_only)
     app.include_router(business_settings.router, dependencies=admin_only)
     app.include_router(users_router.router, dependencies=admin_only)
-    app.include_router(reminders.router, dependencies=admin_only)
-    app.include_router(deposits.admin_router, dependencies=admin_only)
-    app.include_router(billing_router.router, dependencies=admin_only)
-    app.include_router(dashboard_router.router, dependencies=admin_only)
+    # Recordatorios, señas, facturación y dashboard son módulos gateables
+    # por plan (ver plans.py) -- catálogo/turnos nunca se gatean.
+    app.include_router(
+        reminders.router, dependencies=admin_only + [Depends(require_module("recordatorios"))],
+    )
+    app.include_router(
+        deposits.admin_router, dependencies=admin_only + [Depends(require_module("senas"))],
+    )
+    app.include_router(
+        billing_router.router, dependencies=admin_only + [Depends(require_module("facturacion"))],
+    )
+    app.include_router(
+        dashboard_router.router, dependencies=admin_only + [Depends(require_module("dashboard"))],
+    )
     # Agenda surface: staff manages their own turnos too.
     staff_or_admin = [Depends(require_staff)]
     app.include_router(appointments.router, dependencies=staff_or_admin)
     app.include_router(agenda.router, dependencies=staff_or_admin)
-    app.include_router(deposits.request_router, dependencies=staff_or_admin)
+    app.include_router(
+        deposits.request_router, dependencies=staff_or_admin + [Depends(require_module("senas"))],
+    )
 
     return app

@@ -4,15 +4,23 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Ninguna en curso registrada. Fase 1 (MVP operativo) quedó completa con login
-y roles — ver `ROADMAP.md`.
+Onboarding multi-negocio (ver ADR-013): planes + enforcement + Dockerfile/
+docker-compose.yml + scripts de provisioning ya completos y verificados
+localmente. Queda pendiente el build real en el VPS y el alta del primer
+cliente de prueba (ver más abajo).
 
 ## Próximas
 
 - [ ] Dashboard: sumar facturación/caja (dejado fuera del primer corte
       a pedido explícito del usuario) — reutilizando
       `libracore.db.caja.get_caja_resumen()`, ya genérico.
-- [ ] Onboarding multi-negocio.
+- [ ] `libracore.provisioning.panel_admin.cmd_actualizar` tiene
+      hardcodeado un solo `--ssh default=<archivo>` — funciona para
+      Gestiolibra apuntando `LIBRACORE_SSH_KEY` al socket del ssh-agent
+      persistente del VPS (`agent-multi-libra.sock`, con las claves de
+      libracore y libragenda cargadas), pero valdría la pena que LibraCore
+      soporte esto de forma más explícita si aparece un tercer producto
+      con la misma necesidad (ver ADR-013).
 - [ ] Branding y dominio por cliente.
 - [ ] Upload real de certificado/clave ARCA (`PUT /config/arca` hoy acepta
       solo paths en el filesystem del servidor — ver ADR-011).
@@ -70,6 +78,21 @@ mismo alcance que MedLibra. `GET /dashboard?date_from=&date_to=`
 `0004_client_created_at`, nullable, sin backfill). `libragenda` a
 `v0.9.0` (`list_sent()`/`list_by_status()`). 7 tests nuevos (113 en
 total), verificado además end-to-end contra archivos SQLite reales.
+
+Resuelto (2026-07-22): sistema de planes con enforcement real (ver
+ADR-013). `plans.py` (Básico/Estándar/Premium, $15k/$25k/$40k), tabla
+`modulos` (migración `0005_modulos`, seed por defecto: todo habilitado
+hasta aplicar un plan). `require_module()` gatea recordatorios/señas/
+facturación/dashboard con 403 — turnos y catálogo nunca se gatean;
+`complete()` de turno nunca se bloquea por plan, solo salta la
+facturación si no corresponde. Dockerfile + docker-compose.yml +
+scripts/{nuevo_cliente,panel_admin,npm_api,npm_setup}.py (wrappers sobre
+`libracore.provisioning`) — primera infraestructura de deploy de
+Gestiolibra, nunca se había desplegado a ningún servidor. Deploy key
+nueva de solo lectura para LibraGenda (`id_ed25519_libragenda`) +
+ssh-agent persistente en el VPS con ambas claves. 17 tests nuevos (130
+en total), verificado además end-to-end contra un archivo SQLite real
+aplicando planes en vivo.
 
 ## Notas de testing
 
