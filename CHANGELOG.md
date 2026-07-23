@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- **Frontend desplegado en `dev.gestiolibra.com.ar`** (ver ADR-020):
+  primer build real de Docker con el stage de node — encontró que el
+  bind mount de dev (`./:/app`) tapaba el `frontend/dist` horneado en
+  la imagen con el directorio vacío del host, sirviendo 404 en
+  cualquier ruta no-API. Corregido con un volumen anónimo específico
+  para ese subpath en `docker-compose.yml`. Verificado con `curl` y en
+  el browser real contra el dominio público.
 - **Frontend: SPA en React+Vite, MVP de login + agenda** (ver ADR-019):
   primer frontend de Gestiolibra (`frontend/`), nunca antes existió
   ninguno. Login + vista de agenda por recurso/rango de fechas, alta de

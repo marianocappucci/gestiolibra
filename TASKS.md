@@ -4,11 +4,8 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Frontend (ver ADR-019): MVP de login + agenda construido y verificado
-manualmente en el browser (build de producción, `npm run build`, sin
-errores). Falta desplegarlo de verdad en el VPS (rebuild de imagen con
-el stage de node + confirmar que `dev.gestiolibra.com.ar` sirve la SPA
-en vez del JSON crudo de `/health`).
+Ninguna en curso — frontend MVP (ver ADR-019/ADR-020) desplegado y
+verificado en `dev.gestiolibra.com.ar` real, ver "Resuelto" más abajo.
 
 ## Próximas
 
@@ -141,6 +138,19 @@ WAL-safe de la DB vía `sqlite3.Connection.backup()`) → datos mutados a
 propósito → restore desde el backup → confirmado que la fila marcadora
 vuelve y la mutación posterior desaparece, contenedor sano tras el
 reinicio. Sin cambios de código.
+
+Resuelto (2026-07-23): frontend MVP desplegado y verificado en
+`dev.gestiolibra.com.ar` real (ver ADR-019/ADR-020). Primer build de
+Docker con el stage de node (`frontend-build`) en el VPS — terminó sin
+errores, pero el contenedor servía 404 en cualquier ruta no-API: el
+bind mount `./:/app` del `docker-compose.yml` de dev tapaba el
+`frontend/dist` horneado en la imagen con el directorio vacío del host
+(artefacto de build, gitignoreado, no existe fuera del stage de node).
+Corregido con un volumen anónimo para ese subpath específico. Verificado
+con `curl` (root sirve `index.html`, `/assets/*.js` 200, `/health` 200,
+ruta de cliente inexistente cae al fallback de la SPA) y en el browser
+real contra `dev.gestiolibra.com.ar` (login carga, error de credenciales
+inválidas se muestra correctamente, sin errores de consola).
 
 Resuelto (2026-07-23): lectura de catálogo abierta a staff (ver
 ADR-018). `branches`/`resources`/`services`/`clients` — `GET` pasa a

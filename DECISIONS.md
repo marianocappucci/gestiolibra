@@ -604,3 +604,42 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   de consola. `npm run build` (`tsc -b && vite build`) sin errores de
   tipos. Deploy real a `dev.gestiolibra.com.ar` documentado por
   separado una vez verificado el build de Docker — ver `TASKS.md`.
+
+## ADR-020 — Deploy real del frontend: bind mount de dev tapaba el build
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: primer build real de la imagen con el stage de node
+  (ADR-019) en el VPS. El build de Docker terminó sin errores (incluido
+  el stage `frontend-build`), pero al levantar el contenedor
+  `gestiolibra-dev`, cualquier ruta que no fuera de la API devolvía 404
+  en vez de la SPA — `docker exec gestiolibra-dev ls /app/frontend/dist`
+  confirmó que el directorio ni existía dentro del contenedor en
+  ejecución, pese a haberse copiado correctamente durante el build.
+- Causa raíz: `docker-compose.yml` de este servicio de dev monta
+  `./:/app` (bind mount del checkout completo del host, necesario para
+  que `--reload` de uvicorn vea cambios de código Python en vivo) — ese
+  mount se superpone a **todo** `/app` dentro del contenedor, incluido
+  `/app/frontend/dist`, que en el host **no existe** (es un artefacto de
+  build, gitignoreado, generado solo dentro del stage de node del
+  Dockerfile). El bind mount reemplazaba el build horneado en la imagen
+  por un directorio vacío del host.
+- Decisión: agregar `/app/frontend/dist` como volumen anónimo en
+  `docker-compose.yml`, listado *después* del bind mount — Docker
+  superpone volúmenes en orden, así que ese subpath específico preserva
+  el contenido de la imagen en vez de heredar el vacío del bind mount de
+  arriba, sin perder el hot-reload de Python para el resto de `/app`.
+  No afecta los `docker-compose.yml` que genera
+  `libracore.provisioning.nuevo_cliente` para clientes reales —esos
+  montan solo `./data`, nunca el código completo—, así que este bug era
+  exclusivo del contenedor de dev de este repo.
+- Consecuencias: verificado en `dev.gestiolibra.com.ar` real (HTTPS,
+  certificado válido): `/` sirve `index.html` de la SPA, `/assets/*.js`
+  sirve los estáticos (200), `/health` sigue respondiendo como API
+  (200), una ruta de cliente inexistente para el backend
+  (`/agenda`) cae en el fallback y también sirve la SPA (200) para que
+  `react-router-dom` la resuelva del lado del cliente. Probado además
+  en el browser real: la página de login carga y el flujo de error
+  (credenciales inválidas) se muestra correctamente, sin errores de
+  consola. Cierra el ítem "en curso" de `TASKS.md` para el MVP del
+  frontend.

@@ -152,9 +152,16 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   camino**: la lectura de catálogo (branches/resources/services/
   clients) era admin-only incluso en `GET`, bloqueando a un usuario
   staff de armar un turno — corregido, ver ADR-018.
+- Deploy real del frontend a `dev.gestiolibra.com.ar` (completo — ver
+  ADR-020). Primer build de Docker con el stage de node en el VPS:
+  terminó sin errores pero el contenedor servía 404 en cualquier ruta
+  no-API — el bind mount de dev (`./:/app`, necesario para el
+  `--reload` de Python) tapaba el `frontend/dist` horneado en la imagen
+  con el directorio vacío del host. Corregido con un volumen anónimo
+  específico para ese subpath en `docker-compose.yml`. Verificado con
+  `curl` y en el browser real contra el dominio público (login carga,
+  manejo de error de credenciales correcto, sin errores de consola).
 - Extender el frontend: clientes (alta/edición), dashboard, facturación.
 - Timezone de sucursal de punta a punta (hoy el horario que carga un
   turno se trata como UTC directo, sin convertir por la timezone de la
   sucursal — visible ahora con un frontend real, ver `TASKS.md`).
-- Deploy real del frontend a `dev.gestiolibra.com.ar` (build de Docker
-  con el stage de node, verificado en el VPS).
