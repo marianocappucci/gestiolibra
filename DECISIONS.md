@@ -480,3 +480,44 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   NPM — `NPMClient` no expone un método para eliminar certificados,
   y no vale la pena tocar la API cruda por un residuo sin costo ni
   efecto funcional.
+
+## ADR-017 — Cierre de Fase 3: flujo automático de dominio verificado + backups probados
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: pedido explícito del usuario de cerrar la Fase 3. De los
+  cuatro ítems, dos eran cerrables con trabajo de ingeniería sin
+  depender de un cliente real: verificar el flujo *automático* de
+  dominio+SSL (no el armado a mano de ADR-016) y verificar backups. El
+  cuarto ítem ("validación con primeros negocios reales") no se puede
+  cerrar así — necesita un negocio real usando el producto, y hoy no
+  hay ninguno (ni frontend para que lo use sin llamar la API a mano).
+  Se lo dejó explícitamente abierto en `ROADMAP.md` en vez de forzar un
+  cierre artificial.
+- Decisión — dominio automático: se corrigió el entendimiento de
+  ADR-016. Con el `forward_host` de `scripts/.npm_config.json` apuntando
+  a la gateway real de `stack_stack-net` (`172.18.0.1`, no el valor
+  copiado de Contalibra ni el default de la librería), se invocó
+  directamente `libracore.provisioning.nuevo_cliente._setup_npm_proxy()`
+  — la misma función que usa `crear_cliente(domain=..., setup_npm=True)`
+  para un alta real — contra el cliente `prueba`
+  (`prueba.gestiolibra.com.ar` → proxy + certificado Let's Encrypt,
+  puerto 8076 publicado al host). Funcionó sin ningún workaround ni
+  código nuevo, confirmando que el hallazgo de ADR-016 era un valor de
+  configuración copiado mal, **no un bug de `libracore.provisioning`** —
+  se corrige esa lectura en `TASKS.md`/wiki.
+- Decisión — backups: probado de punta a punta contra el cliente
+  `prueba` (ya existía la maquinaria, `libracore.provisioning.
+  panel_admin.cmd_backup`/`cmd_restore_db`, sin código nuevo): fila
+  marcadora insertada → `panel_admin.py backup prueba` (tar.gz completo
+  + copia WAL-safe de la DB) → datos mutados a propósito (fila borrada +
+  fila espuria insertada) → `panel_admin.py restore-db prueba
+  <backup>` → confirmado que la fila marcadora original vuelve, la
+  mutación desaparece, y el contenedor queda sano tras el reinicio que
+  hace el propio comando.
+- Consecuencias: Fase 3 queda con 3 de 4 ítems completos
+  (onboarding multi-negocio, branding y dominio por cliente, deploy/CI/
+  backups) y el cuarto (validación con negocios reales) explícitamente
+  abierto y fuera del alcance de una sesión de ingeniería — depende de
+  que exista un negocio real, o de decidir construir un frontend
+  primero. Ningún cambio de código en el repo en esta ronda.

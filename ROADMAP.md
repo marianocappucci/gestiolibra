@@ -117,13 +117,25 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   Build real y primer cliente de prueba verificados en el VPS — dos bugs
   reales encontrados y corregidos en el proceso (auth SSH multi-key,
   contrato de env vars de `libracore.provisioning`), ver `TASKS.md`.
-- Branding y dominio por cliente (completo para lo que aplica — ver
-  ADR-016). "Branding" más allá de dominio+SSL no aplica: Gestiolibra no
-  tiene frontend, y el logo/paleta por producto de Contalibra/Restolibra
-  no es configurable por cliente. `dev.gestiolibra.com.ar` con proxy NPM
-  + certificado Let's Encrypt real (reutilizando la misma instancia de
-  NPM de Contalibra/Restolibra, sin credenciales nuevas). Dominio por
-  cliente real queda para cuando se onboardee el primer cliente real —
-  la maquinaria (`scripts/npm_api.py`/`npm_setup.py`) ya está probada.
-- Deploy dev/prod, CI y backups verificados.
-- Validación con primeros negocios reales.
+- Branding y dominio por cliente (completo — ver ADR-016/ADR-017).
+  "Branding" más allá de dominio+SSL no aplica: Gestiolibra no tiene
+  frontend, y el logo/paleta por producto de Contalibra/Restolibra no es
+  configurable por cliente. `dev.gestiolibra.com.ar` con proxy NPM +
+  certificado Let's Encrypt real (reutilizando la misma instancia de NPM
+  de Contalibra/Restolibra, sin credenciales nuevas). El flujo automático
+  de alta (`_setup_npm_proxy()` de `libracore.provisioning`, el mismo que
+  usaría un cliente real) se probó de punta a punta contra el cliente
+  `prueba` (`prueba.gestiolibra.com.ar`) una vez corregido el
+  `forward_host` — confirmado que no era un bug de la librería, sino un
+  valor de configuración copiado mal desde Contalibra.
+- Deploy dev/prod, CI y backups verificados (completo). Deploy real y CI
+  ya verificados desde el onboarding multi-negocio. Backups: `panel_admin.py
+  backup`/`restore-db` probados de punta a punta contra el cliente
+  `prueba` (fila marcadora → backup → mutación → restore → confirmado
+  que vuelve el dato original) — ver ADR-017.
+- Validación con primeros negocios reales — el único ítem que no se
+  puede cerrar con trabajo de ingeniería: necesita un negocio real
+  usando el producto, y hoy solo hay una API JSON sin frontend (ver
+  `wiki/entities/gestiolibra.md` de la wiki del ecosistema). Queda
+  abierto hasta que haya un cliente real o se decida construir una
+  interfaz.

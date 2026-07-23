@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- **Cierre de Fase 3** (ver ADR-017): flujo automático de dominio+SSL
+  verificado de punta a punta contra el cliente `prueba`
+  (`_setup_npm_proxy()` real, sin workaround — confirma que el hallazgo
+  de ADR-016 era config, no bug) y backups probados end-to-end
+  (`panel_admin.py backup`/`restore-db`). Sin cambios de código. El
+  cuarto ítem de Fase 3 ("validación con primeros negocios reales")
+  queda explícitamente abierto — depende de tener un cliente real.
 - **Branding y dominio por cliente** (ver ADR-016): `dev.gestiolibra.com.ar`
   con proxy NPM + certificado Let's Encrypt real, reutilizando la misma
   instancia de NPM y credenciales que ya usan Contalibra/Restolibra. Sin

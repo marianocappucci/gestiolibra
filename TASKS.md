@@ -27,20 +27,6 @@ Ninguna en curso — onboarding multi-negocio (ver ADR-013) cerrado, ver
       Gestiolibra, es una condición de carrera genérica de
       `libracore.provisioning` — evaluar si vale la pena que esa función
       espere más o reintente, si aparece de nuevo con un tercer producto.
-- [ ] `libracore.provisioning.nuevo_cliente._setup_npm_proxy()` arma el
-      proxy con `forward_host_from_config()` (un valor fijo) + el puerto
-      **publicado al host** del cliente — en la topología real de este
-      VPS (NPM y los contenedores de producto comparten la red docker
-      `stack_stack-net`), lo correcto es apuntar directo al **nombre del
-      contenedor** en su **puerto interno** (`8000`), no a una IP fija +
-      puerto de host. Nadie lo usó todavía contra un cliente real (ni
-      Contalibra ni Restolibra tampoco) — se encontró al armar
-      `dev.gestiolibra.com.ar` a mano (ver ADR-016). Evaluar si vale la
-      pena tocar `libracore.provisioning` cuando se onboardee el primer
-      cliente real por este flujo automático.
-- [ ] Dominio real para un cliente onboardeado por `nuevo_cliente.py`
-      (con el hallazgo de arriba resuelto o evitado a mano) — pendiente
-      de tener un primer cliente real, no solo el de prueba.
 - [ ] Upload real de certificado/clave ARCA (`PUT /config/arca` hoy acepta
       solo paths en el filesystem del servidor — ver ADR-011).
 - [ ] Revisar el cálculo de IVA de facturación (21% fijo) con un contador
@@ -113,17 +99,34 @@ ssh-agent persistente en el VPS con ambas claves. 17 tests nuevos (130
 en total), verificado además end-to-end contra un archivo SQLite real
 aplicando planes en vivo.
 
-Resuelto (2026-07-23): branding y dominio por cliente, para lo que
-aplica (ver ADR-016). "Branding" más allá de dominio+SSL no aplica sin
-frontend. `dev.gestiolibra.com.ar` con proxy NPM + certificado Let's
-Encrypt real, reutilizando la misma instancia de NPM y credenciales que
-ya usan Contalibra/Restolibra (sin generar nada nuevo). Ningún cambio de
-código en el repo — la maquinaria (`scripts/npm_api.py`/`npm_setup.py`)
-ya existía desde el onboarding multi-negocio. Hallazgo real en el
-camino: copiar la config de Contalibra trajo un `forward_host` que no
-aplicaba a Gestiolibra; corregido a la gateway real de la red docker
-compartida (`stack_stack-net`). Dominio por cliente real (no solo dev)
-queda pendiente de un primer cliente real — ver "Próximas".
+Resuelto (2026-07-23): branding y dominio por cliente, incluido el
+flujo automático de alta contra un cliente real (ver ADR-016/ADR-017).
+"Branding" más allá de dominio+SSL no aplica sin frontend.
+`dev.gestiolibra.com.ar` con proxy NPM + certificado Let's Encrypt real,
+reutilizando la misma instancia de NPM y credenciales que ya usan
+Contalibra/Restolibra (sin generar nada nuevo). Ningún cambio de código
+en el repo — la maquinaria (`scripts/npm_api.py`/`npm_setup.py`) ya
+existía desde el onboarding multi-negocio. Hallazgo inicial: copiar la
+config de Contalibra trajo un `forward_host` (nombre de contenedor
+ajeno) que no aplicaba a Gestiolibra; corregido a la gateway real de la
+red docker compartida (`stack_stack-net`, `172.18.0.1`). **Con ese
+valor corregido, se probó el flujo automático real**
+(`libracore.provisioning.nuevo_cliente._setup_npm_proxy()`, la misma
+función que usaría un alta real) contra el cliente `prueba` —
+`prueba.gestiolibra.com.ar` quedó armado con proxy + SSL sin ningún
+código nuevo ni workaround manual, confirmando que no era un bug de
+`libracore.provisioning` sino un valor de configuración copiado mal.
+Ambos dominios verificados con `curl` (200, certificado válido).
+
+Resuelto (2026-07-23): backups verificados (cierra ese ítem de Fase 3,
+ver ADR-017). `panel_admin.py backup`/`restore-db` (wrappers sobre
+`libracore.provisioning.panel_admin.cmd_backup`/`cmd_restore_db`, ya
+existían, sin código nuevo) probados de punta a punta contra el cliente
+`prueba`: fila marcadora insertada → backup (tar.gz completo + copia
+WAL-safe de la DB vía `sqlite3.Connection.backup()`) → datos mutados a
+propósito → restore desde el backup → confirmado que la fila marcadora
+vuelve y la mutación posterior desaparece, contenedor sano tras el
+reinicio. Sin cambios de código.
 
 Resuelto (2026-07-23): dashboard suma facturación/caja (ver ADR-015).
 `GET /dashboard` incluye `facturacion.facturas_emitidas_en_periodo` y
