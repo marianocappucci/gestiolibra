@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, STATUS_LABELS, type DashboardSummary } from '../api'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
@@ -42,65 +46,106 @@ export function Dashboard() {
   }
 
   return (
-    <div className="dashboard-page">
-      <div className="page-header">
-        <h2>Dashboard</h2>
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Dashboard</h2>
+        <div className="flex items-end gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="date-from">Desde</Label>
+            <Input id="date-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="date-to">Hasta</Label>
+            <Input id="date-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
+          </div>
+        </div>
       </div>
 
-      <section className="filters">
-        <label>
-          Desde
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </label>
-        <label>
-          Hasta
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </label>
-      </section>
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {error && <p className="error">{error}</p>}
-      {loading && <p>Cargando…</p>}
+      {loading && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-40" />
+          ))}
+        </div>
+      )}
 
       {summary && (
-        <div className="dashboard-cards">
-          <article className="card">
-            <h3>Turnos</h3>
-            <p className="big-number">{summary.turnos.total_en_periodo}</p>
-            <p className="muted">en el rango — {summary.turnos.hoy} hoy</p>
-            <ul>
-              {Object.entries(summary.turnos.por_estado)
-                .filter(([, count]) => count > 0)
-                .map(([status, count]) => (
-                  <li key={status}>
-                    {STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status}: {count}
-                  </li>
-                ))}
-            </ul>
-          </article>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader>
+              <CardDescription>Turnos</CardDescription>
+              <CardTitle className="text-3xl">{summary.turnos.total_en_periodo}</CardTitle>
+              <CardDescription>en el rango — {summary.turnos.hoy} hoy</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                {Object.entries(summary.turnos.por_estado)
+                  .filter(([, count]) => count > 0)
+                  .map(([status, count]) => (
+                    <li key={status} className="flex justify-between">
+                      <span>{STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status}</span>
+                      <span className="font-medium text-foreground">{count}</span>
+                    </li>
+                  ))}
+              </ul>
+            </CardContent>
+          </Card>
 
-          <article className="card">
-            <h3>Clientes</h3>
-            <p className="big-number">{summary.clientes.total_activos}</p>
-            <p className="muted">activos — {summary.clientes.nuevos_en_periodo} nuevos en el rango</p>
-          </article>
+          <Card>
+            <CardHeader>
+              <CardDescription>Clientes</CardDescription>
+              <CardTitle className="text-3xl">{summary.clientes.total_activos}</CardTitle>
+              <CardDescription>activos — {summary.clientes.nuevos_en_periodo} nuevos en el rango</CardDescription>
+            </CardHeader>
+          </Card>
 
-          <article className="card">
-            <h3>Recordatorios y señas</h3>
-            <p>{summary.recordatorios_enviados_en_periodo} recordatorios enviados en el rango</p>
-            <p>{summary.senas_pendientes} señas pendientes</p>
-          </article>
+          <Card>
+            <CardHeader>
+              <CardDescription>Recordatorios y señas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li className="flex justify-between">
+                  <span>Recordatorios enviados</span>
+                  <span className="font-medium text-foreground">{summary.recordatorios_enviados_en_periodo}</span>
+                </li>
+                <li className="flex justify-between">
+                  <span>Señas pendientes</span>
+                  <span className="font-medium text-foreground">{summary.senas_pendientes}</span>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
 
-          <article className="card">
-            <h3>Facturación</h3>
-            <p className="big-number">{summary.facturacion.facturas_emitidas_en_periodo}</p>
-            <p className="muted">facturas emitidas en el rango</p>
-            <ul>
-              <li>Ingresos del período: {formatCurrency(summary.facturacion.caja.ingresos_en_periodo)}</li>
-              <li>Egresos del período: {formatCurrency(summary.facturacion.caja.egresos_en_periodo)}</li>
-              <li>Saldo del período: {formatCurrency(summary.facturacion.caja.saldo_periodo)}</li>
-              <li>Saldo total: {formatCurrency(summary.facturacion.caja.saldo_total)}</li>
-            </ul>
-          </article>
+          <Card>
+            <CardHeader>
+              <CardDescription>Facturación</CardDescription>
+              <CardTitle className="text-3xl">{summary.facturacion.facturas_emitidas_en_periodo}</CardTitle>
+              <CardDescription>facturas emitidas en el rango</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li className="flex justify-between">
+                  <span>Ingresos del período</span>
+                  <span className="font-medium text-foreground">{formatCurrency(summary.facturacion.caja.ingresos_en_periodo)}</span>
+                </li>
+                <li className="flex justify-between">
+                  <span>Egresos del período</span>
+                  <span className="font-medium text-foreground">{formatCurrency(summary.facturacion.caja.egresos_en_periodo)}</span>
+                </li>
+                <li className="flex justify-between">
+                  <span>Saldo del período</span>
+                  <span className="font-medium text-foreground">{formatCurrency(summary.facturacion.caja.saldo_periodo)}</span>
+                </li>
+                <li className="flex justify-between">
+                  <span>Saldo total</span>
+                  <span className="font-medium text-foreground">{formatCurrency(summary.facturacion.caja.saldo_total)}</span>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

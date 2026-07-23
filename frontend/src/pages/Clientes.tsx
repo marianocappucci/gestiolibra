@@ -1,6 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, type Client } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
 
 const CONDICIONES_IVA = [
   'Responsable Inscripto',
@@ -112,91 +122,114 @@ export function Clientes() {
   }
 
   return (
-    <div className="clientes-page">
-      <div className="page-header">
-        <h2>Clientes</h2>
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Clientes</h2>
         {isAdmin && editingId === null && (
-          <button onClick={startCreate}>+ Nuevo cliente</button>
+          <Button onClick={startCreate}>+ Nuevo cliente</Button>
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {isAdmin && editingId !== null && (
-        <form className="client-form" onSubmit={handleSubmit}>
-          <input
-            placeholder="Nombre"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
-          <input
-            placeholder="Teléfono"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
-          <input
-            placeholder="Email"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <input
-            placeholder="CUIT"
-            value={form.cuit}
-            onChange={(e) => setForm({ ...form, cuit: e.target.value })}
-          />
-          <select
-            value={form.condicion_iva}
-            onChange={(e) => setForm({ ...form, condicion_iva: e.target.value })}
-          >
-            <option value="">Condición de IVA…</option>
-            {CONDICIONES_IVA.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <button type="submit" disabled={saving}>
-            {saving ? 'Guardando…' : editingId === 'new' ? 'Crear' : 'Guardar'}
-          </button>
-          <button type="button" onClick={cancelEdit}>Cancelar</button>
-        </form>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{editingId === 'new' ? 'Nuevo cliente' : 'Editar cliente'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="flex flex-wrap items-end gap-3" onSubmit={handleSubmit}>
+              <Input
+                placeholder="Nombre"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+                className="w-48"
+              />
+              <Input
+                placeholder="Teléfono"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="w-40"
+              />
+              <Input
+                placeholder="Email"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-52"
+              />
+              <Input
+                placeholder="CUIT"
+                value={form.cuit}
+                onChange={(e) => setForm({ ...form, cuit: e.target.value })}
+                className="w-36"
+              />
+              <Select
+                value={form.condicion_iva}
+                onValueChange={(value) => setForm({ ...form, condicion_iva: value })}
+              >
+                <SelectTrigger className="w-52">
+                  <SelectValue placeholder="Condición de IVA…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONDICIONES_IVA.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Guardando…' : editingId === 'new' ? 'Crear' : 'Guardar'}
+              </Button>
+              <Button type="button" variant="outline" onClick={cancelEdit}>Cancelar</Button>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
-      {loading ? (
-        <p>Cargando…</p>
-      ) : clients.length === 0 ? (
-        <p>Sin clientes todavía.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Teléfono</th>
-              <th>Email</th>
-              <th>CUIT</th>
-              <th>Condición IVA</th>
-              <th>Estado</th>
-              {isAdmin && <th>Acciones</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
-                <td>{c.phone ?? '—'}</td>
-                <td>{c.email ?? '—'}</td>
-                <td>{c.cuit ?? '—'}</td>
-                <td>{c.condicion_iva ?? '—'}</td>
-                <td>{c.active ? 'Activo' : 'Inactivo'}</td>
-                {isAdmin && (
-                  <td className="actions">
-                    <button onClick={() => startEdit(c)}>Editar</button>
-                    <button onClick={() => handleDelete(c)}>Eliminar</button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <Card>
+        <CardContent>
+          {loading ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>
+          ) : clients.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Sin clientes todavía.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Teléfono</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>CUIT</TableHead>
+                  <TableHead>Condición IVA</TableHead>
+                  <TableHead>Estado</TableHead>
+                  {isAdmin && <TableHead className="text-right">Acciones</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clients.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell>{c.phone ?? '—'}</TableCell>
+                    <TableCell>{c.email ?? '—'}</TableCell>
+                    <TableCell>{c.cuit ?? '—'}</TableCell>
+                    <TableCell>{c.condicion_iva ?? '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant={c.active ? 'default' : 'outline'}>
+                        {c.active ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => startEdit(c)}>Editar</Button>
+                        <Button size="sm" variant="outline" onClick={() => handleDelete(c)}>Eliminar</Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- **Rediseño visual del frontend: Tailwind CSS + shadcn/ui** (ver
+  ADR-025): sidebar de navegación colapsable reemplaza el nav superior,
+  cards con sombra, tablas y badges de estado, avatar con iniciales.
+  Mismo comportamiento y llamadas a la API — cambio puramente visual,
+  sin tocar el backend. Verificado manualmente en el browser (estilos
+  reales confirmados por `getComputedStyle`, sidebar interactivo, sin
+  errores de consola en las tres páginas). 136 tests de backend sin
+  cambios.
 - **El id de cliente se genera solo si no se manda** (ver ADR-024):
   `POST /clients` acepta `id` opcional, generado con `uuid4()` cuando
   se omite. El formulario de alta del frontend ya no pide un ID a

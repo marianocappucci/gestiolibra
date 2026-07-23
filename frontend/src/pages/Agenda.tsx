@@ -1,8 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   api, ApiError, STATUS_LABELS,
-  type Appointment, type Client, type Resource, type Service,
+  type Appointment, type AppointmentStatus, type Client, type Resource, type Service,
 } from '../api'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
@@ -12,6 +23,15 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleString('es-AR', {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
   })
+}
+
+const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  pending: 'outline',
+  confirmed: 'secondary',
+  in_progress: 'secondary',
+  completed: 'default',
+  cancelled: 'destructive',
+  no_show: 'destructive',
 }
 
 export function Agenda() {
@@ -109,101 +129,133 @@ export function Agenda() {
   }
 
   return (
-    <div className="agenda-page">
-      <section className="filters">
-        <label>
-          Recurso
-          <select value={resourceId} onChange={(e) => setResourceId(e.target.value)}>
-            {resources.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Desde
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </label>
-        <label>
-          Hasta
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </label>
-      </section>
-
-      {error && <p className="error">{error}</p>}
-
-      <section className="new-appointment">
-        <h2>Nuevo turno</h2>
-        <form onSubmit={handleCreate}>
-          <select value={newService} onChange={(e) => setNewService(e.target.value)} required>
-            <option value="" disabled>Servicio…</option>
-            {services.map((s) => (
-              <option key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</option>
-            ))}
-          </select>
-          <select value={newClient} onChange={(e) => setNewClient(e.target.value)} required>
-            <option value="" disabled>Cliente…</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <input
-            type="datetime-local"
-            value={newStartsAt}
-            onChange={(e) => setNewStartsAt(e.target.value)}
-            required
-          />
-          <button type="submit" disabled={creating || !resourceId}>
-            {creating ? 'Creando…' : 'Crear turno'}
-          </button>
-        </form>
-      </section>
-
-      <section className="appointments">
-        {loading ? (
-          <p>Cargando…</p>
-        ) : appointments.length === 0 ? (
-          <p>Sin turnos en el rango seleccionado.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Horario</th>
-                <th>Cliente</th>
-                <th>Servicio</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {appointments.map((a) => (
-                <tr key={a.id}>
-                  <td>{formatTime(a.starts_at)}</td>
-                  <td>{clientName(a.client_id)}</td>
-                  <td>{serviceName(a.service_id)}</td>
-                  <td>{STATUS_LABELS[a.status] ?? a.status}</td>
-                  <td className="actions">
-                    {a.status === 'pending' && (
-                      <button onClick={() => handleAction(() => api.post(`/appointments/${a.id}/confirm`))}>
-                        Confirmar
-                      </button>
-                    )}
-                    {(a.status === 'pending' || a.status === 'confirmed') && (
-                      <button onClick={() => handleAction(() => api.post(`/appointments/${a.id}/cancel`))}>
-                        Cancelar
-                      </button>
-                    )}
-                    {a.status === 'confirmed' && (
-                      <button onClick={() => handleAction(() => api.post(`/appointments/${a.id}/complete`))}>
-                        Completar
-                      </button>
-                    )}
-                  </td>
-                </tr>
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="grid gap-1.5">
+          <Label>Recurso</Label>
+          <Select value={resourceId} onValueChange={setResourceId}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Recurso…" />
+            </SelectTrigger>
+            <SelectContent>
+              {resources.map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
               ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="date-from">Desde</Label>
+          <Input id="date-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="date-to">Hasta</Label>
+          <Input id="date-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Nuevo turno</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-wrap items-end gap-3" onSubmit={handleCreate}>
+            <div className="grid gap-1.5">
+              <Label>Servicio</Label>
+              <Select value={newService} onValueChange={setNewService}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Servicio…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {services.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Cliente</Label>
+              <Select value={newClient} onValueChange={setNewClient}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Cliente…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="starts-at">Horario</Label>
+              <Input
+                id="starts-at"
+                type="datetime-local"
+                value={newStartsAt}
+                onChange={(e) => setNewStartsAt(e.target.value)}
+                required
+                className="w-56"
+              />
+            </div>
+            <Button type="submit" disabled={creating || !resourceId}>
+              {creating ? 'Creando…' : 'Crear turno'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          {loading ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>
+          ) : appointments.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Sin turnos en el rango seleccionado.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Horario</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Servicio</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {appointments.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell>{formatTime(a.starts_at)}</TableCell>
+                    <TableCell>{clientName(a.client_id)}</TableCell>
+                    <TableCell>{serviceName(a.service_id)}</TableCell>
+                    <TableCell>
+                      <Badge variant={STATUS_BADGE_VARIANT[a.status]}>{STATUS_LABELS[a.status]}</Badge>
+                    </TableCell>
+                    <TableCell className="flex flex-wrap justify-end gap-2">
+                      {a.status === 'pending' && (
+                        <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/confirm`))}>
+                          Confirmar
+                        </Button>
+                      )}
+                      {(a.status === 'pending' || a.status === 'confirmed') && (
+                        <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/cancel`))}>
+                          Cancelar
+                        </Button>
+                      )}
+                      {a.status === 'confirmed' && (
+                        <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/complete`))}>
+                          Completar
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

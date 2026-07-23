@@ -787,3 +787,52 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   sin id consecutivas generan ids distintos). Verificado manualmente en
   el browser: alta de cliente sin ningún campo de id, confirmado por
   API que se generó un UUID real y quedó guardado correctamente.
+
+## ADR-025 — Rediseño visual del frontend: Tailwind CSS + shadcn/ui
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: el usuario pidió un frontend "más llamativo", mostrando
+  como referencia un dashboard admin con sidebar de navegación, cards
+  con sombra, badges de estado, avatar, etc. (estilo shadcn/ui). Se
+  consultaron dos decisiones antes de tocar código: stack de estilos
+  (Tailwind CSS + shadcn/ui, el stack real de la referencia, vs. CSS
+  propio imitando el look) y alcance (layout + las 3 páginas existentes,
+  sin sumar elementos nuevos de producto como buscador/notificaciones/
+  toggle de tema — eso no existía antes y no se pidió).
+- Decisión — stack: Tailwind CSS v4 (`@tailwindcss/vite`, sin
+  `tailwind.config.js` ni PostCSS separado — la v4 se configura desde
+  el propio `vite.config.ts` + `@theme` en CSS) + componentes shadcn/ui
+  (`npx shadcn@latest add ...`, código fuente propio en
+  `src/components/ui/`, no una dependencia de npm con lógica oculta —
+  así funciona shadcn por diseño). Alias de import `@/*` → `src/*`
+  agregado en `vite.config.ts` + ambos `tsconfig*.json` (requerido por
+  las convenciones de shadcn). `npx shadcn@latest init` no funcionó de
+  entrada (necesita Tailwind + alias ya configurados para detectarlos)
+  — se armó `components.json` a mano con la config por defecto
+  ("new-york", neutral, CSS variables) y se instalaron los componentes
+  directo, sin pasar por el wizard interactivo.
+- Decisión — layout: `Layout.tsx` reemplaza el nav superior por un
+  `Sidebar` colapsable (componente `sidebar.tsx` de shadcn, el más
+  completo de la librería — incluye modo mobile con `Sheet`, atajo de
+  teclado, persistencia de estado en cookie). Mismo contenido que antes
+  (Agenda/Clientes/Dashboard, Dashboard oculto para staff) más logo,
+  avatar con iniciales del usuario, y logout como ícono en vez de botón
+  de texto — matching la referencia.
+- Decisión — páginas: `Login` como `Card` centrada; `Agenda`/`Clientes`
+  usan el componente `Table` de shadcn + `Badge` para estado (turnos:
+  variante por estado; clientes: activo/inactivo) + `Select` de Radix
+  en vez de `<select>` nativo; `Dashboard` como grid de `Card`s
+  (`CardDescription`/`CardTitle` grande/detalle), con `Skeleton` en vez
+  de "Cargando…" en texto plano. Mismo comportamiento y llamadas a la
+  API que antes — cambio puramente visual, sin tocar lógica de negocio
+  ni el backend.
+- Consecuencias: `npm run build` sin errores de tipos (tsconfig
+  necesitó sacar `baseUrl` — deprecado en la versión de TypeScript de
+  este proyecto, `paths` solo alcanza sin él). Verificado manualmente
+  en el browser: estilos de Tailwind/shadcn confirmados por
+  `getComputedStyle` (border-radius, box-shadow, colores reales, no
+  clases sin efecto), sidebar colapsa/expande correctamente, las tres
+  páginas renderizan con la nueva UI sin errores de consola. 136 tests
+  de backend sin cambios (ninguno tocado en esta ronda). Deploy real al
+  VPS pendiente, ver `TASKS.md`.

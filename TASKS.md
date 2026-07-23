@@ -4,8 +4,10 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Ninguna en curso — frontend MVP (ver ADR-019/ADR-020) desplegado y
-verificado en `dev.gestiolibra.com.ar` real, ver "Resuelto" más abajo.
+Rediseño visual del frontend con Tailwind CSS + shadcn/ui (ver
+ADR-025): construido y verificado manualmente en local. Falta
+desplegarlo a `dev.gestiolibra.com.ar` (rebuild de imagen + confirmar
+en el dominio público).
 
 ## Próximas
 
