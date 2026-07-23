@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- **Stack de frontend normalizado: TanStack Table + React Hook Form +
+  Zod** (ver ADR-026): `src/components/data-table.tsx` nuevo (wrapper
+  genérico y reutilizable sobre TanStack Table + primitivos shadcn),
+  usado en Agenda y Clientes con sorting real por columna. Formularios
+  de alta/edición de cliente y de turno migrados a React Hook Form +
+  schemas Zod (`clientSchema`, `appointmentSchema`) vía el componente
+  `Form` de shadcn — validación declarativa por campo, mismos payloads
+  que antes. Verificado manualmente en el browser (errores de
+  validación, sorting, altas exitosas). 136 tests de backend sin
+  cambios.
 - **Rediseño visual del frontend: Tailwind CSS + shadcn/ui** (ver
   ADR-025): sidebar de navegación colapsable reemplaza el nav superior,
   cards con sombra, tablas y badges de estado, avatar con iniciales.

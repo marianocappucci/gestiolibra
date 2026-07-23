@@ -147,22 +147,28 @@
   `panel_admin.py`/`npm_api.py`/`npm_setup.py`: wrappers sobre
   `libracore.provisioning`, mismo patrón que Contalibra/Restolibra.
 
-- `frontend/`: primer frontend de Gestiolibra (ver ADR-019/ADR-021,
-  UI rediseñada con Tailwind CSS + shadcn/ui en ADR-025) — SPA en
-  React 19 + TypeScript + Vite. `src/api.ts` (cliente HTTP delgado
-  sobre la API, cookie de sesión via `credentials: "include"`, tipos +
-  `STATUS_LABELS` compartidos), `src/context/AuthContext.tsx` (estado
-  de sesión, `GET /auth/me` al montar), `src/components/Layout.tsx`
-  (sidebar colapsable con `src/components/ui/sidebar.tsx` de shadcn —
-  el link Dashboard solo se muestra a `role === "admin"`),
-  `src/components/ui/` (componentes shadcn: card, table, badge,
-  avatar, button, input, label, select, separator, dropdown-menu,
-  skeleton, sidebar, sheet, tooltip — código fuente propio, no una
-  dependencia de npm), `src/pages/Login.tsx` (Card centrada),
-  `src/pages/Agenda.tsx` (selector de recurso + rango de fechas, alta
-  de turno, confirmar/cancelar/completar, Badge por estado),
-  `src/pages/Clientes.tsx` (lista para staff+admin; alta/edición/baja
-  solo admin, refleja el gating de ADR-018 en la propia UI),
+- `frontend/`: primer frontend de Gestiolibra (ver ADR-019/ADR-021, UI
+  rediseñada con Tailwind CSS + shadcn/ui en ADR-025, stack
+  normalizado con TanStack Table + React Hook Form + Zod en ADR-026)
+  — SPA en React 19 + TypeScript + Vite. `src/api.ts` (cliente HTTP
+  delgado sobre la API, cookie de sesión via `credentials: "include"`,
+  tipos + `STATUS_LABELS` compartidos), `src/context/AuthContext.tsx`
+  (estado de sesión, `GET /auth/me` al montar), `src/components/
+  Layout.tsx` (sidebar colapsable con `src/components/ui/sidebar.tsx`
+  de shadcn — el link Dashboard solo se muestra a `role === "admin"`),
+  `src/components/data-table.tsx` (wrapper genérico reutilizable sobre
+  `@tanstack/react-table` + los primitivos `Table` de shadcn — sorting
+  real por columna, usado en Agenda y Clientes; incluye el helper
+  `sortableHeader()`), `src/components/ui/` (componentes shadcn: card,
+  table, badge, avatar, button, input, label, select, separator,
+  dropdown-menu, skeleton, sidebar, sheet, tooltip, form — código
+  fuente propio, no una dependencia de npm), `src/pages/Login.tsx`
+  (Card centrada), `src/pages/Agenda.tsx` (selector de recurso + rango
+  de fechas, alta de turno vía React Hook Form + Zod
+  (`appointmentSchema`), confirmar/cancelar/completar, Badge por
+  estado), `src/pages/Clientes.tsx` (lista para staff+admin;
+  alta/edición vía React Hook Form + Zod (`clientSchema`), baja solo
+  admin, refleja el gating de ADR-018 en la propia UI),
   `src/pages/Dashboard.tsx` (mismo resumen que `GET /dashboard`, grid
   de Cards; un 403 —rol no-admin o módulo deshabilitado por plan— se
   muestra como mensaje explicativo). `vite.config.ts` proxea los

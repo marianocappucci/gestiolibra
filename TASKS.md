@@ -4,12 +4,17 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Ninguna en curso — rediseño visual del frontend (ver ADR-025)
-desplegado y verificado en `dev.gestiolibra.com.ar` real, ver
-"Resuelto" más abajo.
+Stack de frontend normalizado con TanStack Table + React Hook Form +
+Zod (ver ADR-026): Agenda/Clientes migrados y verificados en local.
+Falta desplegarlo a `dev.gestiolibra.com.ar` (rebuild de imagen +
+confirmar en el dominio público).
 
 ## Próximas
 
+- [ ] El bundle del frontend creció a ~552 KB (gzip ~169 KB) al sumar
+      TanStack Table + React Hook Form + Zod — advertencia de tamaño de
+      Vite, no un error. Evaluar code-splitting (`dynamic import()`)
+      si sigue creciendo con las páginas que faltan (facturación).
 - [ ] `gestiolibra.com.ar` (dominio pelado, sin subdominio) no tiene
       proxy host en NPM ni certificado — HTTPS falla el handshake
       directamente, HTTP cae en el fallback default de NPM. Solo

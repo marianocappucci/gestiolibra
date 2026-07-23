@@ -1,4 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { type ColumnDef } from '@tanstack/react-table'
 import { api, ApiError, type Client } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,8 +13,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+} from '@/components/ui/form'
+import { DataTable, sortableHeader } from '@/components/data-table'
 
 const CONDICIONES_IVA = [
   'Responsable Inscripto',
@@ -20,15 +25,17 @@ const CONDICIONES_IVA = [
   'No Alcanzado',
 ]
 
-type FormState = {
-  name: string
-  phone: string
-  email: string
-  cuit: string
-  condicion_iva: string
-}
+const clientSchema = z.object({
+  name: z.string().trim().min(1, 'El nombre es obligatorio'),
+  phone: z.string().trim().optional(),
+  email: z.string().trim().email('Email inválido').optional().or(z.literal('')),
+  cuit: z.string().trim().optional(),
+  condicion_iva: z.string().optional(),
+})
 
-const EMPTY_FORM: FormState = { name: '', phone: '', email: '', cuit: '', condicion_iva: '' }
+type ClientFormValues = z.infer<typeof clientSchema>
+
+const EMPTY_VALUES: ClientFormValues = { name: '', phone: '', email: '', cuit: '', condicion_iva: '' }
 
 export function Clientes() {
   const { user } = useAuth()
@@ -37,10 +44,13 @@ export function Clientes() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+
+  const form = useForm<ClientFormValues>({
+    resolver: zodResolver(clientSchema),
+    defaultValues: EMPTY_VALUES,
+  })
 
   useEffect(() => {
     loadClients()
@@ -66,12 +76,12 @@ export function Clientes() {
 
   function startCreate() {
     setEditingId('new')
-    setForm(EMPTY_FORM)
+    form.reset(EMPTY_VALUES)
   }
 
   function startEdit(client: Client) {
     setEditingId(client.id)
-    setForm({
+    form.reset({
       name: client.name,
       phone: client.phone ?? '',
       email: client.email ?? '',
@@ -82,19 +92,18 @@ export function Clientes() {
 
   function cancelEdit() {
     setEditingId(null)
-    setForm(EMPTY_FORM)
+    form.reset(EMPTY_VALUES)
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault()
+  async function handleSubmit(values: ClientFormValues) {
     setSaving(true)
     setError(null)
     const payload = {
-      name: form.name,
-      phone: form.phone || null,
-      email: form.email || null,
-      cuit: form.cuit || null,
-      condicion_iva: form.condicion_iva || null,
+      name: values.name,
+      phone: values.phone || null,
+      email: values.email || null,
+      cuit: values.cuit || null,
+      condicion_iva: values.condicion_iva || null,
     }
     try {
       if (editingId === 'new') {
@@ -121,6 +130,39 @@ export function Clientes() {
     }
   }
 
+  const columns = useMemo<ColumnDef<Client>[]>(() => {
+    const base: ColumnDef<Client>[] = [
+      { accessorKey: 'name', header: sortableHeader('Nombre'), cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
+      { accessorKey: 'phone', header: 'Teléfono', cell: ({ row }) => row.original.phone ?? '—' },
+      { accessorKey: 'email', header: 'Email', cell: ({ row }) => row.original.email ?? '—' },
+      { accessorKey: 'cuit', header: 'CUIT', cell: ({ row }) => row.original.cuit ?? '—' },
+      { accessorKey: 'condicion_iva', header: 'Condición IVA', cell: ({ row }) => row.original.condicion_iva ?? '—' },
+      {
+        accessorKey: 'active',
+        header: 'Estado',
+        cell: ({ row }) => (
+          <Badge variant={row.original.active ? 'default' : 'outline'}>
+            {row.original.active ? 'Activo' : 'Inactivo'}
+          </Badge>
+        ),
+      },
+    ]
+    if (isAdmin) {
+      base.push({
+        id: 'actions',
+        header: () => <div className="text-right">Acciones</div>,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => startEdit(row.original)}>Editar</Button>
+            <Button size="sm" variant="outline" onClick={() => handleDelete(row.original)}>Eliminar</Button>
+          </div>
+        ),
+      })
+    }
+    return base
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
@@ -138,49 +180,88 @@ export function Clientes() {
             <CardTitle className="text-base">{editingId === 'new' ? 'Nuevo cliente' : 'Editar cliente'}</CardTitle>
           </CardHeader>
           <CardContent>
-            <form className="flex flex-wrap items-end gap-3" onSubmit={handleSubmit}>
-              <Input
-                placeholder="Nombre"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-                className="w-48"
-              />
-              <Input
-                placeholder="Teléfono"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="w-40"
-              />
-              <Input
-                placeholder="Email"
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-52"
-              />
-              <Input
-                placeholder="CUIT"
-                value={form.cuit}
-                onChange={(e) => setForm({ ...form, cuit: e.target.value })}
-                className="w-36"
-              />
-              <Select
-                value={form.condicion_iva}
-                onValueChange={(value) => setForm({ ...form, condicion_iva: value })}
-              >
-                <SelectTrigger className="w-52">
-                  <SelectValue placeholder="Condición de IVA…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONDICIONES_IVA.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button type="submit" disabled={saving}>
-                {saving ? 'Guardando…' : editingId === 'new' ? 'Crear' : 'Guardar'}
-              </Button>
-              <Button type="button" variant="outline" onClick={cancelEdit}>Cancelar</Button>
-            </form>
+            <Form {...form}>
+              <form className="flex flex-wrap items-start gap-3" onSubmit={form.handleSubmit(handleSubmit)}>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre</FormLabel>
+                      <FormControl>
+                        <Input {...field} className="w-48" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Teléfono</FormLabel>
+                      <FormControl>
+                        <Input {...field} className="w-40" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" {...field} className="w-52" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cuit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CUIT</FormLabel>
+                      <FormControl>
+                        <Input {...field} className="w-36" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="condicion_iva"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Condición de IVA</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-52">
+                            <SelectValue placeholder="Condición de IVA…" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {CONDICIONES_IVA.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex gap-2 pt-6">
+                  <Button type="submit" disabled={saving}>
+                    {saving ? 'Guardando…' : editingId === 'new' ? 'Crear' : 'Guardar'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={cancelEdit}>Cancelar</Button>
+                </div>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       )}
@@ -189,44 +270,8 @@ export function Clientes() {
         <CardContent>
           {loading ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>
-          ) : clients.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">Sin clientes todavía.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>CUIT</TableHead>
-                  <TableHead>Condición IVA</TableHead>
-                  <TableHead>Estado</TableHead>
-                  {isAdmin && <TableHead className="text-right">Acciones</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clients.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c.phone ?? '—'}</TableCell>
-                    <TableCell>{c.email ?? '—'}</TableCell>
-                    <TableCell>{c.cuit ?? '—'}</TableCell>
-                    <TableCell>{c.condicion_iva ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={c.active ? 'default' : 'outline'}>
-                        {c.active ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => startEdit(c)}>Editar</Button>
-                        <Button size="sm" variant="outline" onClick={() => handleDelete(c)}>Eliminar</Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable columns={columns} data={clients} emptyMessage="Sin clientes todavía." />
           )}
         </CardContent>
       </Card>

@@ -1,4 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { type ColumnDef } from '@tanstack/react-table'
 import {
   api, ApiError, STATUS_LABELS,
   type Appointment, type AppointmentStatus, type Client, type Resource, type Service,
@@ -12,8 +16,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+} from '@/components/ui/form'
+import { DataTable, sortableHeader } from '@/components/data-table'
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
@@ -34,6 +39,14 @@ const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 
   no_show: 'destructive',
 }
 
+const appointmentSchema = z.object({
+  service_id: z.string().min(1, 'Elegí un servicio'),
+  client_id: z.string().min(1, 'Elegí un cliente'),
+  starts_at: z.string().min(1, 'Elegí un horario'),
+})
+
+type AppointmentFormValues = z.infer<typeof appointmentSchema>
+
 export function Agenda() {
   const [resources, setResources] = useState<Resource[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -44,11 +57,12 @@ export function Agenda() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-
-  const [newService, setNewService] = useState('')
-  const [newClient, setNewClient] = useState('')
-  const [newStartsAt, setNewStartsAt] = useState('')
   const [creating, setCreating] = useState(false)
+
+  const form = useForm<AppointmentFormValues>({
+    resolver: zodResolver(appointmentSchema),
+    defaultValues: { service_id: '', client_id: '', starts_at: '' },
+  })
 
   useEffect(() => {
     Promise.all([
@@ -89,19 +103,17 @@ export function Agenda() {
     }
   }
 
-  async function handleCreate(event: FormEvent) {
-    event.preventDefault()
-    if (!newService || !newClient || !newStartsAt) return
+  async function handleCreate(values: AppointmentFormValues) {
     setCreating(true)
     setError(null)
     try {
       await api.post('/appointments', {
         resource_id: resourceId,
-        service_id: newService,
-        client_id: newClient,
-        starts_at: newStartsAt,
+        service_id: values.service_id,
+        client_id: values.client_id,
+        starts_at: values.starts_at,
       })
-      setNewStartsAt('')
+      form.reset({ service_id: '', client_id: '', starts_at: '' })
       await loadAgenda()
     } catch (err) {
       setError(describeError(err))
@@ -127,6 +139,46 @@ export function Agenda() {
   function serviceName(id: string): string {
     return services.find((s) => s.id === id)?.name ?? id
   }
+
+  const columns = useMemo<ColumnDef<Appointment>[]>(() => [
+    { accessorKey: 'starts_at', header: sortableHeader('Horario'), cell: ({ row }) => formatTime(row.original.starts_at) },
+    { id: 'client', header: 'Cliente', cell: ({ row }) => clientName(row.original.client_id) },
+    { id: 'service', header: 'Servicio', cell: ({ row }) => serviceName(row.original.service_id) },
+    {
+      accessorKey: 'status',
+      header: 'Estado',
+      cell: ({ row }) => (
+        <Badge variant={STATUS_BADGE_VARIANT[row.original.status]}>{STATUS_LABELS[row.original.status]}</Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <div className="text-right">Acciones</div>,
+      cell: ({ row }) => {
+        const a = row.original
+        return (
+          <div className="flex flex-wrap justify-end gap-2">
+            {a.status === 'pending' && (
+              <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/confirm`))}>
+                Confirmar
+              </Button>
+            )}
+            {(a.status === 'pending' || a.status === 'confirmed') && (
+              <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/cancel`))}>
+                Cancelar
+              </Button>
+            )}
+            {a.status === 'confirmed' && (
+              <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/complete`))}>
+                Completar
+              </Button>
+            )}
+          </div>
+        )
+      },
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [clients, services])
 
   return (
     <div className="grid gap-4">
@@ -161,48 +213,70 @@ export function Agenda() {
           <CardTitle className="text-base">Nuevo turno</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-wrap items-end gap-3" onSubmit={handleCreate}>
-            <div className="grid gap-1.5">
-              <Label>Servicio</Label>
-              <Select value={newService} onValueChange={setNewService}>
-                <SelectTrigger className="w-56">
-                  <SelectValue placeholder="Servicio…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {services.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Cliente</Label>
-              <Select value={newClient} onValueChange={setNewClient}>
-                <SelectTrigger className="w-56">
-                  <SelectValue placeholder="Cliente…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="starts-at">Horario</Label>
-              <Input
-                id="starts-at"
-                type="datetime-local"
-                value={newStartsAt}
-                onChange={(e) => setNewStartsAt(e.target.value)}
-                required
-                className="w-56"
+          <Form {...form}>
+            <form className="flex flex-wrap items-start gap-3" onSubmit={form.handleSubmit(handleCreate)}>
+              <FormField
+                control={form.control}
+                name="service_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Servicio</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="w-56">
+                          <SelectValue placeholder="Servicio…" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {services.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <Button type="submit" disabled={creating || !resourceId}>
-              {creating ? 'Creando…' : 'Crear turno'}
-            </Button>
-          </form>
+              <FormField
+                control={form.control}
+                name="client_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cliente</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="w-56">
+                          <SelectValue placeholder="Cliente…" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {clients.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="starts_at"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Horario</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} className="w-56" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={creating || !resourceId} className="mt-6">
+                {creating ? 'Creando…' : 'Crear turno'}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 
@@ -210,49 +284,8 @@ export function Agenda() {
         <CardContent>
           {loading ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>
-          ) : appointments.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">Sin turnos en el rango seleccionado.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Horario</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {appointments.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell>{formatTime(a.starts_at)}</TableCell>
-                    <TableCell>{clientName(a.client_id)}</TableCell>
-                    <TableCell>{serviceName(a.service_id)}</TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_BADGE_VARIANT[a.status]}>{STATUS_LABELS[a.status]}</Badge>
-                    </TableCell>
-                    <TableCell className="flex flex-wrap justify-end gap-2">
-                      {a.status === 'pending' && (
-                        <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/confirm`))}>
-                          Confirmar
-                        </Button>
-                      )}
-                      {(a.status === 'pending' || a.status === 'confirmed') && (
-                        <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/cancel`))}>
-                          Cancelar
-                        </Button>
-                      )}
-                      {a.status === 'confirmed' && (
-                        <Button size="sm" variant="outline" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/complete`))}>
-                          Completar
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable columns={columns} data={appointments} emptyMessage="Sin turnos en el rango seleccionado." />
           )}
         </CardContent>
       </Card>

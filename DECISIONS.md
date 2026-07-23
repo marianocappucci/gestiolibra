@@ -836,3 +836,44 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   páginas renderizan con la nueva UI sin errores de consola. 136 tests
   de backend sin cambios (ninguno tocado en esta ronda). Deploy real al
   VPS pendiente, ver `TASKS.md`.
+
+## ADR-026 — Normalizar el stack de frontend: TanStack Table + React Hook Form + Zod
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: el usuario propuso un stack de frontend estándar para la
+  familia (FastAPI/REST, React, Tailwind, shadcn/ui, Lucide — ya en uso
+  desde ADR-019/ADR-025 — más TanStack Table y React Hook Form + Zod,
+  que Gestiolibra todavía no usaba: las tablas eran HTML plano con los
+  primitivos de shadcn sin lógica de sorting, y los formularios eran
+  `useState` controlado a mano sin validación declarativa). Pidió
+  migrar Agenda/Clientes para que el stack real coincida con el
+  declarado, no solo parcialmente.
+- Decisión — tablas: `src/components/data-table.tsx` nuevo, wrapper
+  genérico y reutilizable sobre `@tanstack/react-table` (lógica de
+  sorting vía `useReactTable`/`getSortedRowModel`) + los primitivos
+  `Table`/`TableHeader`/`TableBody`/`TableRow`/`TableCell` de shadcn
+  (presentación) — un componente único en vez de repetir el mismo
+  boilerplate en cada página. `sortableHeader(label)` (helper también
+  en ese archivo) arma un botón de header ordenable con ícono
+  `ArrowUpDown` de lucide-react, reutilizado en ambas tablas migradas.
+- Decisión — formularios: `src/components/ui/form.tsx` (componente
+  shadcn oficial para React Hook Form: `Form`, `FormField`, `FormItem`,
+  `FormLabel`, `FormControl`, `FormMessage`) + un schema `zod` por
+  formulario (`clientSchema` en `Clientes.tsx`, `appointmentSchema` en
+  `Agenda.tsx`) resuelto vía `@hookform/resolvers/zod`. Mismos campos y
+  mismo payload enviado a la API que antes — el cambio es puramente de
+  mecanismo de formulario (validación declarativa por campo, mensajes
+  de error automáticos) y de tabla (sorting), no de reglas de negocio
+  ni de contrato con el backend.
+- Consecuencias: verificado manualmente en el browser — validación de
+  Zod mostrando "El nombre es obligatorio"/"Email inválido"/"Elegí un
+  servicio/cliente/horario" campo por campo; alta de cliente y de turno
+  exitosas después de corregir los errores (confirmado contra la API
+  real); sorting de la columna "Nombre"/"Horario" invierte el orden
+  correctamente al hacer click dos veces. Sin errores de consola.
+  `npm run build` sin errores de tipos (el bundle creció a ~552 KB
+  gzip ~169 KB por las librerías nuevas — advertencia de tamaño de
+  Vite, no un error; no se hizo code-splitting todavía, queda anotado
+  en `TASKS.md` si hace falta más adelante). 136 tests de backend sin
+  cambios (ninguno tocado en esta ronda).
