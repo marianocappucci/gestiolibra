@@ -56,7 +56,7 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   Gating centralizado al montar los routers en `app/main.py`, no repetido
   por endpoint. Suma `libracore` como dependencia nueva de Gestiolibra.
 
-## Fase 2 — operación comercial (en curso)
+## Fase 2 — operación comercial (completa)
 
 - Configuración comercial del negocio (completo). Tres piezas, alcance
   acordado con el usuario antes de codificar: (1) horario comercial por
@@ -92,11 +92,12 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   tiene precio configurado — una sola factura (tipo A/B según condición
   de IVA), seña y saldo como movimientos de caja separados sobre la
   misma factura. `libragenda` a `v0.8.0`, `libracore` a `v0.16.1`.
-- Dashboard (completo, primer corte). Mismo alcance que MedLibra
-  (`AskUserQuestion`: mismo diseño): turnos (total y por estado en un
+- Dashboard (completo). Mismo alcance que MedLibra (`AskUserQuestion`:
+  mismo diseño) en el primer corte: turnos (total y por estado en un
   rango, turnos de hoy), clientes (total activos, altas nuevas en el
   rango) y recordatorios enviados/señas pendientes — facturación/caja
-  queda fuera de este corte. `GET /dashboard?date_from=&date_to=`
+  quedó fuera de ese corte y se sumó después (ver ADR-015).
+  `GET /dashboard?date_from=&date_to=`
   (admin-only), puro de lectura sobre repositorios ya existentes más
   `SentReminderRepository.list_sent()`/`DepositRepository.
   list_by_status()` de LibraGenda `v0.9.0`. Ver `DECISIONS.md` ADR-012.
