@@ -9,6 +9,16 @@ verificado en `dev.gestiolibra.com.ar` real, ver "Resuelto" más abajo.
 
 ## Próximas
 
+- [ ] `gestiolibra.com.ar` (dominio pelado, sin subdominio) no tiene
+      proxy host en NPM ni certificado — HTTPS falla el handshake
+      directamente, HTTP cae en el fallback default de NPM. Solo
+      `dev.gestiolibra.com.ar`/`prueba.gestiolibra.com.ar` están
+      armados hoy. Decisión explícita del usuario (2026-07-23): dejarlo
+      así hasta que haya una instancia de producción real o un sitio de
+      marketing propio (mismo patrón que `contalibra.com.ar`/
+      `restolibra.com.ar` → contenedor `-web`) — no es un bug, no
+      apurar un proxy provisorio. Para entrar hoy, usar
+      `https://dev.gestiolibra.com.ar`.
 - [ ] Extender el frontend con facturación (config ARCA, ver factura
       por turno completado) — clientes y dashboard ya se sumaron
       (ver ADR-021).
