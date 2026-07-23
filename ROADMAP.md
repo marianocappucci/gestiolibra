@@ -133,9 +133,28 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   backup`/`restore-db` probados de punta a punta contra el cliente
   `prueba` (fila marcadora → backup → mutación → restore → confirmado
   que vuelve el dato original) — ver ADR-017.
-- Validación con primeros negocios reales — el único ítem que no se
-  puede cerrar con trabajo de ingeniería: necesita un negocio real
-  usando el producto, y hoy solo hay una API JSON sin frontend (ver
-  `wiki/entities/gestiolibra.md` de la wiki del ecosistema). Queda
-  abierto hasta que haya un cliente real o se decida construir una
-  interfaz.
+- Validación con primeros negocios reales (en curso — se decidió
+  construir una interfaz, ver Fase 4). Sigue sin cerrarse: todavía no
+  hay un negocio real usando el producto, pero el bloqueador estructural
+  (API sin frontend) ya se está resolviendo.
+
+## Fase 4 — frontend
+
+- MVP: login + agenda/turnos (completo — ver ADR-019). Primer frontend
+  de Gestiolibra: SPA en React 19 + TypeScript + Vite (`frontend/`),
+  nunca antes existió ninguno (Gestiolibra fue API JSON pura a
+  propósito hasta acá). Login, selector de recurso + rango de fechas,
+  alta de turno, confirmar/cancelar/completar. Consume la API existente
+  sin cambios (cookie de sesión), mismo origen en dev (proxy de Vite) y
+  en producción (servido desde el mismo proceso FastAPI vía
+  `app/asgi.py`, sin contenedor nuevo). Verificado manualmente en el
+  browser con ambos roles (admin y staff). **Hallazgo real en el
+  camino**: la lectura de catálogo (branches/resources/services/
+  clients) era admin-only incluso en `GET`, bloqueando a un usuario
+  staff de armar un turno — corregido, ver ADR-018.
+- Extender el frontend: clientes (alta/edición), dashboard, facturación.
+- Timezone de sucursal de punta a punta (hoy el horario que carga un
+  turno se trata como UTC directo, sin convertir por la timezone de la
+  sucursal — visible ahora con un frontend real, ver `TASKS.md`).
+- Deploy real del frontend a `dev.gestiolibra.com.ar` (build de Docker
+  con el stage de node, verificado en el VPS).

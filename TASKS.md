@@ -4,11 +4,25 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Ninguna en curso — onboarding multi-negocio (ver ADR-013) cerrado, ver
-"Resuelto" más abajo.
+Frontend (ver ADR-019): MVP de login + agenda construido y verificado
+manualmente en el browser (build de producción, `npm run build`, sin
+errores). Falta desplegarlo de verdad en el VPS (rebuild de imagen con
+el stage de node + confirmar que `dev.gestiolibra.com.ar` sirve la SPA
+en vez del JSON crudo de `/health`).
 
 ## Próximas
 
+- [ ] Extender el frontend más allá del MVP: clientes (alta/edición),
+      dashboard, facturación — hoy solo cubre login + agenda/turnos.
+- [ ] El input de horario del formulario de turno (`datetime-local`)
+      manda la hora tal cual la eligió el usuario en su navegador, y el
+      backend la trata como UTC directo (`_as_utc()`, sin conversión de
+      timezone de sucursal — limitación preexistente, no introducida
+      por el frontend). Con un frontend real esto se vuelve visible para
+      un usuario de verdad, no solo para tests: un negocio fuera de UTC
+      va a ver/cargar turnos con la hora corrida. Resolverlo requiere
+      timezone de sucursal de punta a punta (LibraGenda ya expone
+      `Branch.timezone`, no está conectado al frontend todavía).
 - [ ] `libracore.provisioning.panel_admin.cmd_actualizar` tiene
       hardcodeado un solo `--ssh default=<archivo>` — funciona para
       Gestiolibra apuntando `LIBRACORE_SSH_KEY` al socket del ssh-agent
@@ -127,6 +141,13 @@ WAL-safe de la DB vía `sqlite3.Connection.backup()`) → datos mutados a
 propósito → restore desde el backup → confirmado que la fila marcadora
 vuelve y la mutación posterior desaparece, contenedor sano tras el
 reinicio. Sin cambios de código.
+
+Resuelto (2026-07-23): lectura de catálogo abierta a staff (ver
+ADR-018). `branches`/`resources`/`services`/`clients` — `GET` pasa a
+staff+admin, `POST`/`PUT`/`DELETE` siguen admin-only. Encontrado al
+construir el frontend: sin esto, un usuario staff no podía ni siquiera
+listar recursos/servicios/clientes para armar un turno. 4 tests nuevos
+(135 en total).
 
 Resuelto (2026-07-23): dashboard suma facturación/caja (ver ADR-015).
 `GET /dashboard` incluye `facturacion.facturas_emitidas_en_periodo` y

@@ -147,6 +147,16 @@
   `panel_admin.py`/`npm_api.py`/`npm_setup.py`: wrappers sobre
   `libracore.provisioning`, mismo patrón que Contalibra/Restolibra.
 
+- `frontend/`: primer frontend de Gestiolibra (ver ADR-019) — SPA en
+  React 19 + TypeScript + Vite. `src/api.ts` (cliente HTTP delgado sobre
+  la API, cookie de sesión via `credentials: "include"`), `src/context/
+  AuthContext.tsx` (estado de sesión, `GET /auth/me` al montar),
+  `src/pages/Login.tsx`, `src/pages/Agenda.tsx` (selector de recurso +
+  rango de fechas, alta de turno, confirmar/cancelar/completar).
+  `vite.config.ts` proxea los prefijos de la API al backend en dev
+  (mismo origen, sin CORS). Alcance del MVP: login + agenda/turnos —
+  clientes/dashboard/facturación quedan para después.
+
 ## Después del MVP
 
 - Canal real de notificaciones (email/SMS/WhatsApp) para reemplazar

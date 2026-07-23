@@ -72,3 +72,13 @@ def test_cannot_delete_a_client_with_an_appointment_pointing_at_it(admin_client:
     assert created.status_code == 201
     response = client.delete("/clients/client-1")
     assert response.status_code == 409
+
+
+def test_staff_can_read_clients_but_not_write(admin_client: TestClient, staff_client: TestClient):
+    admin_client.post("/clients", json={"id": "client-1", "name": "Ana"})
+
+    assert staff_client.get("/clients").status_code == 200
+    assert staff_client.get("/clients/client-1").status_code == 200
+    assert staff_client.post("/clients", json={"id": "client-2", "name": "Otra"}).status_code == 403
+    assert staff_client.put("/clients/client-1", json={"name": "Renombrada"}).status_code == 403
+    assert staff_client.delete("/clients/client-1").status_code == 403

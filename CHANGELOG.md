@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+- **Frontend: SPA en React+Vite, MVP de login + agenda** (ver ADR-019):
+  primer frontend de Gestiolibra (`frontend/`), nunca antes existió
+  ninguno. Login + vista de agenda por recurso/rango de fechas, alta de
+  turno, confirmar/cancelar/completar. Consume la API JSON existente sin
+  cambios (cookie de sesión, proxy de Vite en dev, servido desde el
+  mismo proceso FastAPI en producción vía `app/asgi.py`). Dockerfile con
+  stage nuevo de build de node. Verificado manualmente end-to-end en el
+  browser (login admin y staff, alta y ciclo de vida completo de un
+  turno, sin errores de consola).
+- **Lectura de catálogo abierta a staff** (ver ADR-018):
+  `branches`/`resources`/`services`/`clients` pasan de admin-only a
+  staff+admin en sus endpoints `GET` (escritura sigue admin-only) —
+  necesario para que el frontend funcione también logueado como staff,
+  no solo admin. 4 tests nuevos (135 en total).
 - **Cierre de Fase 3** (ver ADR-017): flujo automático de dominio+SSL
   verificado de punta a punta contra el cliente `prueba`
   (`_setup_npm_proxy()` real, sin workaround — confirma que el hallazgo

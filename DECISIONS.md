@@ -521,3 +521,86 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   abierto y fuera del alcance de una sesión de ingeniería — depende de
   que exista un negocio real, o de decidir construir un frontend
   primero. Ningún cambio de código en el repo en esta ronda.
+
+## ADR-018 — Lectura de catálogo (branches/resources/services/clients) abierta a staff
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: al construir el frontend (ver ADR-019), la página de agenda
+  necesita listar recursos/servicios/clientes para armar los selectores
+  del formulario de turno — pero los cuatro routers de catálogo
+  (`branches`, `resources`, `services`, `clients`) estaban montados
+  enteros con `dependencies=[Depends(require_admin)]`, incluidas sus
+  rutas `GET`. Un usuario `staff` (que el modelo de roles ya distingue
+  explícitamente para manejar su propia agenda, ver `app/auth.py`)
+  recibía 403 al intentar leer el catálogo, aunque sí puede crear/
+  confirmar/cancelar/completar turnos. Consultado con el usuario antes
+  de tocar permisos.
+- Decisión: en los cuatro routers, el punto de montaje en `app/main.py`
+  pasa de `admin_only` a `staff_or_admin_catalog` (`require_staff` —
+  que ya significa "admin o staff", pese al nombre). Cada endpoint
+  mutante (`POST`/`PUT`/`DELETE`) de esos cuatro archivos ahora declara
+  `dependencies=[Depends(require_admin)]` explícito en el propio
+  decorador, sumándose al del router (FastAPI acumula dependencias, no
+  las reemplaza) — el resultado neto es lectura abierta a staff+admin,
+  escritura solo admin. `branch_hours`, `service_prices`, `availability`,
+  `business_settings` y `users` quedan sin cambios (admin-only
+  completo) — no los necesita el MVP de agenda.
+- Consecuencias: 4 tests nuevos (uno por router, confirmando 200 en
+  lectura / 403 en escritura para staff) + 1 test existente corregido
+  (`test_staff_can_manage_own_appointments_but_not_catalog` asumía la
+  restricción vieja). 135 tests en total.
+
+## ADR-019 — Frontend: SPA en React+Vite, MVP de login + agenda
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: cerrada la Fase 3 (ver ADR-017), el usuario pidió arrancar
+  un frontend para destrabar "validación con negocios reales" — hasta
+  ahora Gestiolibra era, deliberadamente, una API JSON pura sin ninguna
+  página (`app/auth.py` explica por qué: los 401/403 planos en vez de
+  redirects a `/login` fueron una decisión consciente para una API, no
+  un descuido). Se consultó con el usuario antes de codificar: tipo de
+  frontend (SPA en React+Vite separada — primera vez en la familia,
+  vs. server-rendered Jinja2 como Contalibra/Restolibra) y alcance del
+  MVP (login + agenda/turnos, dejando clientes/dashboard/facturación
+  para después).
+- Decisión — ubicación y stack: `frontend/` dentro de este mismo repo
+  (un solo lugar para versionar API+UI), React 19 + TypeScript + Vite,
+  `react-router-dom` para las dos rutas (`/login`, `/agenda`). Sin
+  librería de componentes ni CSS framework — alcance chico, CSS propio
+  minimal.
+- Decisión — auth y same-origin: la SPA consume la API existente tal
+  cual (cookie de sesión `gl_session`, sin tocar `libracore.auth`).
+  Para que la cookie funcione sin pelear con CORS/`SameSite` cross-origin
+  (complejidad real: cookies de sesión cross-origin necesitan
+  `SameSite=None; Secure`, HTTPS obligatorio incluso en dev), se
+  mantiene todo en el mismo origen en ambos entornos: en dev, el proxy
+  de Vite (`vite.config.ts`, lista explícita de prefijos de la API)
+  reenvía las llamadas al backend FastAPI corriendo aparte; en
+  producción, el build de la SPA (`frontend/dist`) se sirve desde el
+  mismo proceso FastAPI (`app/asgi.py` monta `/assets` como estáticos +
+  una ruta catch-all `GET /{full_path:path}` que sirve `index.html`
+  para cualquier ruta no reconocida por la API, registrada *después* de
+  `create_app()` así los routers de la API siempre matchean primero).
+  El mount se salta solo si `frontend/dist` no existe, así que
+  `uvicorn app.asgi:app` local sin buildear el frontend sigue
+  funcionando como API pura.
+- Decisión — build en Docker: stage nuevo `frontend-build` (imagen
+  `node:20-slim`, no viaja a la imagen final) que corre `npm ci && npm
+  run build`; la imagen final de Python solo copia `frontend/dist` ya
+  compilado. `.dockerignore` nuevo excluye `frontend/node_modules`/
+  `frontend/dist` del contexto de build (no tiene sentido copiar un
+  build local viejo ni instalar node_modules dos veces).
+- **Hallazgo real en el camino** (ver ADR-018): construir la agenda
+  reveló que `branches`/`resources`/`services`/`clients` eran
+  admin-only incluso en lectura, un gap real del diseño de roles
+  para un usuario `staff` — resuelto ahí, no en este ADR.
+- Consecuencias: MVP verificado manualmente end-to-end en el browser
+  real (no solo con `pytest`, que no cubre el frontend): login como
+  admin y como staff, catálogo cargando en los selectores para ambos
+  roles, alta de turno, y el ciclo completo confirmar→completar
+  reflejando el estado en la tabla sin recargar la página. Sin errores
+  de consola. `npm run build` (`tsc -b && vite build`) sin errores de
+  tipos. Deploy real a `dev.gestiolibra.com.ar` documentado por
+  separado una vez verificado el build de Docker — ver `TASKS.md`.

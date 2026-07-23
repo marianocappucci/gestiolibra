@@ -59,3 +59,13 @@ def test_cannot_delete_a_branch_with_a_resource_pointing_at_it(admin_client: Tes
     client.post("/resources", json={"id": "resource-1", "name": "Box 1", "branch_id": "branch-1"})
     response = client.delete("/branches/branch-1")
     assert response.status_code == 409
+
+
+def test_staff_can_read_branches_but_not_write(admin_client: TestClient, staff_client: TestClient):
+    admin_client.post("/branches", json={"id": "branch-1", "name": "Centro"})
+
+    assert staff_client.get("/branches").status_code == 200
+    assert staff_client.get("/branches/branch-1").status_code == 200
+    assert staff_client.post("/branches", json={"id": "branch-2", "name": "Otra"}).status_code == 403
+    assert staff_client.put("/branches/branch-1", json={"name": "Renombrada"}).status_code == 403
+    assert staff_client.delete("/branches/branch-1").status_code == 403

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from ..auth import require_admin
 from ..dependencies import get_client_repository
 from ..services.clients import ClientRepository
 
@@ -37,7 +38,7 @@ class ClientOut(BaseModel):
     condicion_iva: str | None
 
 
-@router.post("", status_code=201, response_model=ClientOut)
+@router.post("", status_code=201, response_model=ClientOut, dependencies=[Depends(require_admin)])
 def create_client(
     data: ClientCreate, clients: ClientRepository = Depends(get_client_repository),
 ):
@@ -65,7 +66,7 @@ def get_client(client_id: str, clients: ClientRepository = Depends(get_client_re
     return client
 
 
-@router.put("/{client_id}", response_model=ClientOut)
+@router.put("/{client_id}", response_model=ClientOut, dependencies=[Depends(require_admin)])
 def update_client(
     client_id: str, data: ClientUpdate,
     clients: ClientRepository = Depends(get_client_repository),
@@ -81,7 +82,7 @@ def update_client(
         raise HTTPException(404, "client not found")
 
 
-@router.delete("/{client_id}", status_code=204)
+@router.delete("/{client_id}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_client(client_id: str, clients: ClientRepository = Depends(get_client_repository)):
     try:
         clients.delete(client_id)

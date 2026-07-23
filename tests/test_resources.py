@@ -50,3 +50,13 @@ def test_cannot_delete_a_resource_with_an_appointment_pointing_at_it(admin_clien
     assert created.status_code == 201
     response = client.delete("/resources/resource-1")
     assert response.status_code == 409
+
+
+def test_staff_can_read_resources_but_not_write(admin_client: TestClient, staff_client: TestClient):
+    admin_client.post("/resources", json={"id": "resource-1", "name": "Box 1"})
+
+    assert staff_client.get("/resources").status_code == 200
+    assert staff_client.get("/resources/resource-1").status_code == 200
+    assert staff_client.post("/resources", json={"id": "resource-2", "name": "Box 2"}).status_code == 403
+    assert staff_client.put("/resources/resource-1", json={"name": "Renombrado"}).status_code == 403
+    assert staff_client.delete("/resources/resource-1").status_code == 403

@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from libragenda import Resource
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 
+from ..auth import require_admin
 from ..dependencies import get_catalog_repository
 
 router = APIRouter(prefix="/resources", tags=["resources"])
@@ -37,7 +38,7 @@ def _to_out(resource: Resource) -> ResourceOut:
     )
 
 
-@router.post("", status_code=201, response_model=ResourceOut)
+@router.post("", status_code=201, response_model=ResourceOut, dependencies=[Depends(require_admin)])
 def create_resource(
     data: ResourceCreate, catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository)
 ):
@@ -67,7 +68,7 @@ def get_resource(
     return _to_out(resource)
 
 
-@router.put("/{resource_id}", response_model=ResourceOut)
+@router.put("/{resource_id}", response_model=ResourceOut, dependencies=[Depends(require_admin)])
 def update_resource(
     resource_id: str,
     data: ResourceUpdate,
@@ -84,7 +85,7 @@ def update_resource(
     return _to_out(resource)
 
 
-@router.delete("/{resource_id}", status_code=204)
+@router.delete("/{resource_id}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_resource(
     resource_id: str, catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository)
 ):

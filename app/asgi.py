@@ -11,8 +11,19 @@ generic contract `libracore.provisioning` writes for real clients
 Restolibra already read directly, see wiki/entities/libracore.md). When
 DATA_DIR is present it takes precedence for anything not already set
 explicitly, so a provisioned client container needs no Gestiolibra-
-specific env vars at all."""
+specific env vars at all.
+
+Also serves the built frontend SPA (`frontend/dist`, produced by the
+Dockerfile's node build stage) if present -- API routes are already
+registered by `create_app()` and take priority; anything else falls
+through to `index.html` for client-side routing (see ADR-019). Running
+`uvicorn app.asgi:app` locally without ever building the frontend still
+works as a pure API -- the mount is skipped silently."""
 import os
+from pathlib import Path
+
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .main import create_app
 
@@ -31,3 +42,14 @@ else:
     database_url = os.environ["DATABASE_URL"]
 
 app = create_app(database_url)
+
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if FRONTEND_DIST.is_dir():
+    app.mount(
+        "/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="frontend-assets"
+    )
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        del full_path  # unused: catch-all for client-side routing
+        return FileResponse(FRONTEND_DIST / "index.html")

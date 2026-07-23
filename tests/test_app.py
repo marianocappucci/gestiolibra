@@ -193,7 +193,10 @@ def test_staff_can_manage_own_appointments_but_not_catalog(seeded_client: TestCl
         f"/appointments/{appointment_id}/cancel", json={"reason": "no vino"},
     ).status_code == 200
 
-    assert staff_client.get("/branches").status_code == 403
+    # Lectura de catalogo (branches/resources/services/clients) esta abierta
+    # a staff -- necesaria para que el frontend arme selectores de turno sin
+    # ser admin (ver DECISIONS.md ADR-018). Escritura sigue admin-only.
+    assert staff_client.get("/branches").status_code == 200
     assert staff_client.post("/resources", json={"id": "r2", "name": "Box 2"}).status_code == 403
     assert staff_client.get("/users").status_code == 403
 

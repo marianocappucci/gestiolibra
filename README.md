@@ -208,3 +208,34 @@ local — lee `DATABASE_URL` del entorno una sola vez al importar, porque
 factory de uvicorn. Las migraciones de LibraGenda y las propias deben
 aplicarse (`alembic upgrade head` en ambas cadenas) antes de iniciar la
 aplicación real.
+
+## Frontend
+
+Primer frontend de Gestiolibra (ver `DECISIONS.md` ADR-019): SPA en
+React + TypeScript + Vite, en `frontend/`. MVP: login + agenda/turnos
+(clientes, dashboard y facturación quedan para más adelante). Consume
+la API JSON de este mismo repo sin cambios — misma cookie de sesión
+(`gl_session`).
+
+```bash
+cd frontend
+npm install
+npm run dev       # servidor de dev en http://localhost:5173
+```
+
+El backend FastAPI (`uvicorn app.asgi:app --reload`) tiene que estar
+corriendo en el puerto 8000 al mismo tiempo — `vite.config.ts` proxea
+los prefijos de la API (`/auth`, `/branches`, `/appointments`, etc.) al
+backend, así todo queda en el mismo origen (`localhost:5173`) y la
+cookie de sesión funciona sin pelear con CORS/`SameSite` cross-origin.
+
+En producción no hay un segundo contenedor: el `Dockerfile` tiene un
+stage de build con `node:20-slim` que corre `npm run build`, y la
+imagen final de Python solo copia el resultado (`frontend/dist`).
+`app/asgi.py` sirve esos estáticos desde el mismo proceso FastAPI —
+`/assets` como archivos estáticos y una ruta catch-all que devuelve
+`index.html` para cualquier path no reconocido por la API, así el
+routing del lado del cliente (`react-router-dom`) funciona en cualquier
+URL. Si `frontend/dist` no existe (por ejemplo, corriendo `uvicorn
+app.asgi:app` local sin haber buildeado el frontend), el mount se salta
+solo y la app sigue funcionando como API pura.

@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from libragenda import Service
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 
+from ..auth import require_admin
 from ..dependencies import get_catalog_repository
 
 router = APIRouter(prefix="/services", tags=["services"])
@@ -39,7 +40,7 @@ def _to_out(service: Service) -> ServiceOut:
     )
 
 
-@router.post("", status_code=201, response_model=ServiceOut)
+@router.post("", status_code=201, response_model=ServiceOut, dependencies=[Depends(require_admin)])
 def create_service(
     data: ServiceCreate, catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository)
 ):
@@ -69,7 +70,7 @@ def get_service(
     return _to_out(service)
 
 
-@router.put("/{service_id}", response_model=ServiceOut)
+@router.put("/{service_id}", response_model=ServiceOut, dependencies=[Depends(require_admin)])
 def update_service(
     service_id: str,
     data: ServiceUpdate,
@@ -86,7 +87,7 @@ def update_service(
     return _to_out(service)
 
 
-@router.delete("/{service_id}", status_code=204)
+@router.delete("/{service_id}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_service(
     service_id: str, catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository)
 ):

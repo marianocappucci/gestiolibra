@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from ..auth import require_admin
 from ..dependencies import get_branch_repository
 from ..services.branches import BranchRepository
 
@@ -34,7 +35,7 @@ class BranchOut(BaseModel):
     address: str | None
 
 
-@router.post("", status_code=201, response_model=BranchOut)
+@router.post("", status_code=201, response_model=BranchOut, dependencies=[Depends(require_admin)])
 def create_branch(data: BranchCreate, branches: BranchRepository = Depends(get_branch_repository)):
     try:
         return branches.create(
@@ -59,7 +60,7 @@ def get_branch(branch_id: str, branches: BranchRepository = Depends(get_branch_r
     return branch
 
 
-@router.put("/{branch_id}", response_model=BranchOut)
+@router.put("/{branch_id}", response_model=BranchOut, dependencies=[Depends(require_admin)])
 def update_branch(
     branch_id: str,
     data: BranchUpdate,
@@ -75,7 +76,7 @@ def update_branch(
         raise HTTPException(404, "branch not found")
 
 
-@router.delete("/{branch_id}", status_code=204)
+@router.delete("/{branch_id}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_branch(branch_id: str, branches: BranchRepository = Depends(get_branch_repository)):
     try:
         branches.delete(branch_id)

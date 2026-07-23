@@ -80,12 +80,17 @@ def create_app(database_url: str) -> FastAPI:
     # clients, availability, hours, prices, business settings and other users
     # -- staff only touches turnos.
     admin_only = [Depends(require_admin)]
-    app.include_router(branches.router, dependencies=admin_only)
+    staff_or_admin_catalog = [Depends(require_staff)]
+    # branches/resources/services/clients: lectura abierta a staff+admin
+    # (necesaria para que el frontend arme selectores de turno sin ser
+    # admin), escritura (create/update/delete) admin-only via dependencies
+    # puestas en cada endpoint mutante de esos routers.
+    app.include_router(branches.router, dependencies=staff_or_admin_catalog)
     app.include_router(branch_hours.router, dependencies=admin_only)
-    app.include_router(resources.router, dependencies=admin_only)
-    app.include_router(services.router, dependencies=admin_only)
+    app.include_router(resources.router, dependencies=staff_or_admin_catalog)
+    app.include_router(services.router, dependencies=staff_or_admin_catalog)
     app.include_router(service_prices.router, dependencies=admin_only)
-    app.include_router(clients.router, dependencies=admin_only)
+    app.include_router(clients.router, dependencies=staff_or_admin_catalog)
     app.include_router(availability.router, dependencies=admin_only)
     app.include_router(business_settings.router, dependencies=admin_only)
     app.include_router(users_router.router, dependencies=admin_only)

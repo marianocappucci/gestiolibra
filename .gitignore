@@ -12,3 +12,8 @@ dev-data/
 
 # Config de NPM (credenciales de Nginx Proxy Manager para scripts/npm_*.py).
 scripts/.npm_config.json
+
+# Frontend (ver ADR-019): node_modules y el build no se versionan --
+# el build de produccion lo genera el Dockerfile (stage node:20-slim).
+frontend/node_modules/
+frontend/dist/
