@@ -12,6 +12,7 @@ from .services.branch_hours import BranchHoursRepository
 from .services.branches import BranchRepository
 from .services.business_settings import BusinessSettingsRepository
 from .services.clients import ClientRepository
+from .services.dashboard import DashboardService
 from .services.service_prices import ServicePriceRepository
 from .services.users import UserRepository
 
@@ -62,3 +63,7 @@ def get_deposit_manager(request: Request) -> DepositManager:
 
 def get_deposit_repository(request: Request) -> DepositRepository:
     return request.app.state.deposits
+
+
+def get_dashboard_service(request: Request) -> DashboardService:
+    return request.app.state.dashboard

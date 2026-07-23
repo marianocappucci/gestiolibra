@@ -30,7 +30,8 @@
   opcional en el body; `create`/`reschedule` validan además el horario
   comercial de la sucursal del recurso, si está configurado; `complete`
   factura con LibraCore si el servicio tiene precio configurado, ver
-  ADR-011), `billing.py` (`/config/arca`, admin-only), `agenda.py` —
+  ADR-011), `billing.py` (`/config/arca`, admin-only), `dashboard.py`
+  (`GET /dashboard?date_from=&date_to=`, admin-only), `agenda.py` —
   traducen excepciones de dominio y `IntegrityError`/`KeyError` a códigos
   HTTP (404/409/422). Reemplazó al `/demo/seed` placeholder.
 - `app/services/branches.py`: `BranchRepository` — coordina el `Branch`
@@ -54,6 +55,17 @@
   LibraCore), seña ya cobrada y saldo restante como dos movimientos de
   caja separados apuntando a la misma factura. Mismo diseño exacto que
   MedLibra (ver ADR-011).
+- `app/services/dashboard.py`: `DashboardService` — resumen de lectura
+  pura sobre repositorios ya existentes, sin tabla ni estado propio.
+  Turnos (total y por estado en el rango pedido, turnos de **hoy** —
+  fecha real del servidor, no del rango), clientes (total activos vía
+  `ClientRepository.count_active()`, altas nuevas en el rango vía
+  `count_created_between()`, que lee `client_billing.created_at`), y
+  recordatorios enviados en el rango (`SentReminderRepository.
+  list_sent()` de LibraGenda `v0.9.0`) + señas pendientes sin acotar
+  por fecha (`DepositRepository.list_by_status()`, misma versión).
+  Facturación/caja queda fuera de este primer corte (decisión del
+  usuario, mismo alcance que MedLibra) — ver `DECISIONS.md` ADR-012.
 - `app/services/branch_hours.py`: `BranchHoursRepository` — horario
   comercial semanal por sucursal. **Opt-in**: una sucursal sin horario
   configurado no gatea nada (mismo comportamiento que siempre hubo); solo

@@ -15,8 +15,8 @@ from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
 from .routers import (
     agenda, appointments, availability, billing as billing_router, branch_hours, branches,
-    business_settings, clients, deposits, health, reminders, resources, service_prices,
-    services, users as users_router,
+    business_settings, clients, dashboard as dashboard_router, deposits, health, reminders,
+    resources, service_prices, services, users as users_router,
 )
 from .routers import auth as auth_router
 from .services import billing
@@ -25,6 +25,7 @@ from .services.branch_hours import BranchHoursRepository
 from .services.branches import BranchRepository
 from .services.business_settings import BusinessSettingsRepository
 from .services.clients import ClientRepository
+from .services.dashboard import DashboardService
 from .services.service_prices import ServicePriceRepository
 from .services.users import UserRepository, ensure_default_admin
 
@@ -41,6 +42,8 @@ def create_app(database_url: str) -> FastAPI:
     user_repository = UserRepository(sessions)
     branch_hours_repository = BranchHoursRepository(sessions)
     deposit_repository = SqlAlchemyDepositRepository(sessions)
+    reminder_repository = SqlAlchemyReminderRepository(sessions)
+    client_repository = ClientRepository(catalog, sessions)
     ensure_default_admin(user_repository)
 
     app = FastAPI(title="Gestiolibra")
@@ -50,18 +53,21 @@ def create_app(database_url: str) -> FastAPI:
     app.state.branch_hours = branch_hours_repository
     app.state.service_prices = ServicePriceRepository(sessions)
     app.state.business_settings = BusinessSettingsRepository(sessions)
-    app.state.clients = ClientRepository(catalog, sessions)
+    app.state.clients = client_repository
     app.state.appointment_service = AppointmentService(
         catalog, appointment_repository, availability_repository, branch_hours_repository,
     )
     app.state.users = user_repository
     app.state.session_auth = build_session_auth(user_repository)
     app.state.reminder_dispatcher = ReminderDispatcher(
-        appointment_repository, SqlAlchemyReminderRepository(sessions),
+        appointment_repository, reminder_repository,
         LoggingNotificationPort(), DEFAULT_REMINDER_POLICIES,
     )
     app.state.deposits = deposit_repository
     app.state.deposit_manager = DepositManager(deposit_repository, ManualPaymentPort())
+    app.state.dashboard = DashboardService(
+        appointment_repository, client_repository, reminder_repository, deposit_repository,
+    )
 
     app.include_router(health.router)
     app.include_router(auth_router.router)
@@ -81,6 +87,7 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(reminders.router, dependencies=admin_only)
     app.include_router(deposits.admin_router, dependencies=admin_only)
     app.include_router(billing_router.router, dependencies=admin_only)
+    app.include_router(dashboard_router.router, dependencies=admin_only)
     # Agenda surface: staff manages their own turnos too.
     staff_or_admin = [Depends(require_staff)]
     app.include_router(appointments.router, dependencies=staff_or_admin)

@@ -9,7 +9,9 @@ y roles — ver `ROADMAP.md`.
 
 ## Próximas
 
-- [ ] Dashboard y reportes operativos.
+- [ ] Dashboard: sumar facturación/caja (dejado fuera del primer corte
+      a pedido explícito del usuario) — reutilizando
+      `libracore.db.caja.get_caja_resumen()`, ya genérico.
 - [ ] Onboarding multi-negocio.
 - [ ] Branding y dominio por cliente.
 - [ ] Upload real de certificado/clave ARCA (`PUT /config/arca` hoy acepta
@@ -58,6 +60,16 @@ opcional en depósitos). Mismo diseño exacto que MedLibra, portado casi
 verbatim — ver `DECISIONS.md` de ese repo (ADR-016) para el detalle
 completo. 30 tests nuevos, verificado además end-to-end contra
 archivos SQLite reales.
+
+Resuelto (2026-07-22): dashboard — turnos (total y por estado en un
+rango, turnos de hoy), clientes (total activos, altas nuevas en el
+rango) y recordatorios enviados/señas pendientes (ver ADR-012).
+Facturación/caja quedó fuera de este primer corte a pedido del usuario,
+mismo alcance que MedLibra. `GET /dashboard?date_from=&date_to=`
+(admin-only). `client_billing.created_at` (migración
+`0004_client_created_at`, nullable, sin backfill). `libragenda` a
+`v0.9.0` (`list_sent()`/`list_by_status()`). 7 tests nuevos (113 en
+total), verificado además end-to-end contra archivos SQLite reales.
 
 ## Notas de testing
 

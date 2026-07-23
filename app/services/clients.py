@@ -4,7 +4,9 @@ El motor sigue sin saber nada de facturacion; la extension coordina el
 Client de LibraGenda (identidad/agenda) con estos dos campos propios de
 Gestiolibra en el borde de la API, dos tablas en vez de una sola.
 """
-from sqlalchemy import ForeignKey, String, select
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, ForeignKey, String, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 
 from libragenda import Client
@@ -18,6 +20,7 @@ class ClientBillingRow(Base):
     id: Mapped[str] = mapped_column(ForeignKey("clients.id"), primary_key=True)
     cuit: Mapped[str | None] = mapped_column(String(20), nullable=True)
     condicion_iva: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ClientRepository:
@@ -34,8 +37,28 @@ class ClientRepository:
         client = Client(id, name, phone, email, active)
         self.catalog.add_client(client)  # raises IntegrityError on duplicate id
         with self.session_factory.begin() as session:
-            session.add(ClientBillingRow(id=id, cuit=cuit, condicion_iva=condicion_iva))
+            session.add(ClientBillingRow(
+                id=id, cuit=cuit, condicion_iva=condicion_iva,
+                created_at=datetime.now(timezone.utc),
+            ))
         return self._to_out(client, cuit, condicion_iva)
+
+    def count_active(self) -> int:
+        return sum(1 for client in self.catalog.list_clients() if client.active)
+
+    def count_created_between(self, date_from: datetime, date_to: datetime) -> int:
+        """Cantidad de clientes dados de alta en el rango -- para el
+        dashboard. Clientes preexistentes a esta feature no tienen
+        `created_at` (columna agregada después, sin backfill) y quedan
+        fuera de cualquier rango, nunca cuentan como "nuevos"."""
+        with self.session_factory() as session:
+            return session.scalar(
+                select(func.count(ClientBillingRow.id)).where(
+                    ClientBillingRow.created_at.is_not(None),
+                    ClientBillingRow.created_at >= date_from,
+                    ClientBillingRow.created_at <= date_to,
+                )
+            ) or 0
 
     def get(self, client_id: str) -> dict | None:
         client = self.catalog.get_client(client_id)

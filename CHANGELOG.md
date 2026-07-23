@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- **Dashboard**: `GET /dashboard?date_from=&date_to=` (admin-only) —
+  turnos (total y por estado en el rango, turnos de hoy), clientes
+  (total activos, altas nuevas en el rango vía `client_billing.
+  created_at` nuevo, migración `0004_client_created_at`) y
+  recordatorios enviados/señas pendientes. Facturación/caja queda para
+  una entrega futura (mismo alcance que MedLibra). `libragenda` a
+  `v0.9.0` (agrega `list_sent()`/`list_by_status()`). Ver
+  `DECISIONS.md` ADR-012.
 - **Facturación/caja con LibraCore**: `client_billing` extiende `Client`
   con `cuit`/`condicion_iva` (migración `0003_client_billing`, primera
   extensión propia de Client), `PUT`/`GET /config/arca` (config ARCA de

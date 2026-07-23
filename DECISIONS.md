@@ -243,3 +243,38 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   de LibraGenda aplicada primero). Mismas simplificaciones documentadas
   que MedLibra, no bloqueantes: IVA fijo al 21%, certificado/clave ARCA
   como paths de texto en vez de upload multipart.
+
+## ADR-012 — Dashboard: mismo diseño que MedLibra (turnos, clientes en vez de facturación/caja)
+
+- Estado: aceptada
+- Fecha: 2026-07-22
+- Contexto: mismo alcance que MedLibra confirmó para su propio
+  dashboard el mismo día — el usuario eligió replicarlo tal cual acá
+  (`AskUserQuestion`): turnos, clientes y recordatorios/señas.
+  **Facturación/caja queda afuera** de este primer corte (entrega
+  futura, aunque `libracore.db.caja.get_caja_resumen()` ya existiría
+  lista para reusar).
+- Decisión: `GET /dashboard?date_from=&date_to=` (admin-only, fechas
+  requeridas). Turnos (total en el rango, conteo por estado, turnos de
+  **hoy** — fecha real del servidor, no del rango pedido), clientes
+  (total activos, altas nuevas en el rango vía `client_billing.
+  created_at` nuevo — migración `0004_client_created_at`, nullable, sin
+  backfill) y recordatorios enviados en el rango + señas pendientes sin
+  acotar por fecha. `DashboardService` portado casi verbatim desde
+  MedLibra (única diferencia real: "clientes" en vez de "pacientes" en
+  los nombres — el resto de la lógica es idéntica, ninguna decisión de
+  negocio distinta). Reutiliza `SentReminderRepository.list_sent()`/
+  `DepositRepository.list_by_status()` de LibraGenda `v0.9.0` (ADR-008
+  de ese repo), agregados el mismo día para esta misma necesidad en
+  MedLibra.
+- Consecuencias: `libragenda` bumpeado a `v0.9.0`. 7 tests nuevos (113
+  en total). Verificado con la suite completa (con reruns para
+  descartar el flake ya documentado del reloj de WSL2) + end-to-end
+  contra archivos SQLite reales. Migración `0004` verificada con el
+  ciclo `upgrade`→`downgrade`→`upgrade` contra un archivo real (con la
+  cadena de LibraGenda aplicada primero). Mismo hallazgo de proceso que
+  MedLibra tuvo en su propio test (no repetido acá porque el test se
+  escribió ya con la corrección incorporada desde el principio):
+  comparar un turno contra un rango de "hoy" calculado por separado
+  falla cerca de medianoche UTC — el test deriva el rango de consulta
+  de la fecha real del turno creado.
