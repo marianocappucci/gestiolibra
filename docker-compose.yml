@@ -19,6 +19,14 @@ services:
       - "8075:8000"
     volumes:
       - ./:/app
+      # El bind mount de arriba (necesario para --reload en vivo del
+      # codigo Python) tapa el frontend/dist ya compilado que quedo
+      # horneado en la imagen (el checkout del host no tiene ese build,
+      # se genera en el stage de node del Dockerfile) -- este volumen
+      # anonimo preserva el contenido de la imagen para ese subpath en
+      # vez de mostrar el directorio vacio del host. Ver DECISIONS.md
+      # ADR-019/ADR-020.
+      - /app/frontend/dist
     command: uvicorn app.asgi:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - SECRET_KEY=${SECRET_KEY:-gestiolibra-dev-secret}
