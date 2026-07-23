@@ -724,3 +724,40 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   patrón (Contalibra/Restolibra, si alguna vez agregan un stage de
   build tipo node/frontend a su propio contenedor de dev) debería
   copiar el artefacto fuera del árbol bind-monteado desde el principio.
+
+## ADR-023 — Ruta `/dashboard` del frontend colisionaba con el endpoint `GET /dashboard` de la API
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: verificando el fix de ADR-022, navegar directo (carga de
+  página completa, no ruteo del lado del cliente) a
+  `https://dev.gestiolibra.com.ar/dashboard` devolvía el JSON crudo de
+  error de FastAPI (`date_from`/`date_to` faltantes) en vez de la SPA.
+  `/agenda` y `/clientes` funcionaban bien con el mismo patrón de
+  navegación directa.
+- Causa raíz: la SPA y la API viven en el mismo origen y el mismo
+  espacio de rutas (sin prefijo `/api`, ver ADR-019) — la página del
+  frontend se llamó `/dashboard`, el mismo string exacto que el
+  endpoint real `GET /dashboard`. Como los routers de la API se montan
+  en `create_app()` **antes** que el catch-all de `app/asgi.py`, la
+  ruta real de la API gana siempre que coincide exacto. Con ruteo del
+  lado del cliente (click en el link del nav) nunca se nota, porque
+  `react-router-dom` intercepta la navegación sin que el browser emita
+  un GET nuevo — el bug solo aparece con una carga de página completa
+  (URL escrita a mano, F5, un link externo).
+- Decisión: renombrar la ruta de la SPA de `/dashboard` a `/reportes`
+  (`App.tsx`, `Layout.tsx`) — el componente y el archivo siguen
+  llamándose `Dashboard`/`Dashboard.tsx`, solo cambia la URL. La llamada
+  a la API dentro de `Dashboard.tsx` (`GET /dashboard?date_from=...`)
+  no cambia, es el endpoint real. No se tocó la API ni se le agregó un
+  prefijo `/api` general (cambio mucho más grande, afectaría todo lo ya
+  documentado/probado) — un rename puntual del lado del frontend
+  alcanza para las tres páginas que existen hoy.
+- Consecuencias: `/agenda`, `/clientes` y `/reportes` verificados con
+  navegación directa (carga completa) sin colisión. Riesgo que queda
+  documentado para el futuro: cualquier página nueva del frontend cuyo
+  nombre de ruta coincida exacto con un path de nivel superior ya
+  existente en la API (`auth`, `branches`, `resources`, `services`,
+  `clients`, `business`, `users`, `reminders`, `deposits`, `config`,
+  `dashboard`, `appointments`, `health`) va a pisarse de la misma
+  forma — revisar esta lista antes de nombrar una ruta nueva de la SPA.

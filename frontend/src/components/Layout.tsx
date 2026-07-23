@@ -17,7 +17,7 @@ export function Layout({ children }: { children: ReactNode }) {
             Clientes
           </NavLink>
           {user?.role === 'admin' && (
-            <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
+            <NavLink to="/reportes" className={({ isActive }) => isActive ? 'active' : ''}>
               Dashboard
             </NavLink>
           )}

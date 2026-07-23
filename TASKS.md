@@ -150,6 +150,16 @@ propósito → restore desde el backup → confirmado que la fila marcadora
 vuelve y la mutación posterior desaparece, contenedor sano tras el
 reinicio. Sin cambios de código.
 
+Resuelto (2026-07-23): la ruta `/dashboard` del frontend colisionaba
+con el endpoint real `GET /dashboard` de la API (mismo origen, mismo
+espacio de rutas, sin prefijo `/api` — ver ADR-023). Navegación directa
+(F5, URL escrita a mano) a esa página devolvía el JSON de error de la
+API en vez de la SPA; con el nav (ruteo del lado del cliente) nunca se
+notaba. Renombrada la ruta del frontend a `/reportes` — el endpoint de
+la API sigue igual. Riesgo documentado para páginas futuras: evitar
+nombres de ruta que coincidan con paths de nivel superior existentes
+en la API.
+
 Resuelto (2026-07-23): el frontend quedaba congelado en el primer
 build (ver ADR-022). El usuario reportó que `dev.gestiolibra.com.ar`
 no mostraba las páginas de Clientes/Dashboard recién agregadas pese a

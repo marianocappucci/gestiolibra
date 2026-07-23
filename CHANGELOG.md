@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- **Fix: ruta `/dashboard` del frontend colisionaba con la API**
+  (ver ADR-023): navegación directa (F5, URL a mano) a `/dashboard`
+  devolvía el error crudo del endpoint `GET /dashboard` en vez de la
+  SPA, porque frontend y API comparten origen y espacio de rutas sin
+  prefijo. Renombrada la ruta del frontend a `/reportes` (el endpoint
+  de la API no cambia). Solo se nota con carga de página completa, no
+  con navegación por el nav (por eso no se vio al verificar ADR-021).
 - **Fix real: el frontend quedaba congelado en el primer build**
   (ver ADR-022): el volumen anónimo de ADR-020 (pensado para que el
   bind mount de dev no tapara `frontend/dist`) solo siembra desde la
