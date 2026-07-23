@@ -4,10 +4,9 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Rediseño visual del frontend con Tailwind CSS + shadcn/ui (ver
-ADR-025): construido y verificado manualmente en local. Falta
-desplegarlo a `dev.gestiolibra.com.ar` (rebuild de imagen + confirmar
-en el dominio público).
+Ninguna en curso — rediseño visual del frontend (ver ADR-025)
+desplegado y verificado en `dev.gestiolibra.com.ar` real, ver
+"Resuelto" más abajo.
 
 ## Próximas
 
@@ -151,6 +150,14 @@ WAL-safe de la DB vía `sqlite3.Connection.backup()`) → datos mutados a
 propósito → restore desde el backup → confirmado que la fila marcadora
 vuelve y la mutación posterior desaparece, contenedor sano tras el
 reinicio. Sin cambios de código.
+
+Resuelto (2026-07-23): rediseño visual del frontend con Tailwind CSS +
+shadcn/ui (ver ADR-025). Sidebar colapsable, cards con sombra,
+tablas/badges de estado, avatar — mismo comportamiento, sin tocar el
+backend. Verificado en el browser local y desplegado a
+`dev.gestiolibra.com.ar` real (rebuild de imagen + recreate,
+`getComputedStyle` confirmó los estilos reales, sin errores de
+consola). 136 tests de backend sin cambios.
 
 Resuelto (2026-07-23): id de cliente autogenerado si se omite (ver
 ADR-024). `POST /clients` acepta `id` opcional (`uuid4()` si no se
