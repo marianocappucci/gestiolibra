@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- **Fix real: el frontend quedaba congelado en el primer build**
+  (ver ADR-022): el volumen anónimo de ADR-020 (pensado para que el
+  bind mount de dev no tapara `frontend/dist`) solo siembra desde la
+  imagen la primera vez que se crea — cualquier rebuild posterior
+  seguía sirviendo el build viejo sin avisar. `Dockerfile` ahora hornea
+  el build en `/opt/frontend-dist`, fuera del árbol bind-monteado;
+  `app/asgi.py` lo busca ahí primero. Encontrado porque el usuario
+  reportó que el sitio no reflejaba las páginas de Clientes/Dashboard
+  recién agregadas.
 - **Frontend: páginas de Clientes y Dashboard** (ver ADR-021): extiende
   el MVP de login+agenda. Clientes (lista para staff+admin, alta/
   edición/baja solo admin, reflejando el gating ya existente en la

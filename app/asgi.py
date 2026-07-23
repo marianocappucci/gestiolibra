@@ -13,12 +13,23 @@ DATA_DIR is present it takes precedence for anything not already set
 explicitly, so a provisioned client container needs no Gestiolibra-
 specific env vars at all.
 
-Also serves the built frontend SPA (`frontend/dist`, produced by the
-Dockerfile's node build stage) if present -- API routes are already
+Also serves the built frontend SPA if present -- API routes are already
 registered by `create_app()` and take priority; anything else falls
 through to `index.html` for client-side routing (see ADR-019). Running
 `uvicorn app.asgi:app` locally without ever building the frontend still
-works as a pure API -- the mount is skipped silently."""
+works as a pure API -- the mount is skipped silently.
+
+Looks in `/opt/frontend-dist` first (where the Dockerfile bakes the
+node build stage's output, see ADR-022) before falling back to the
+repo-relative `frontend/dist` (for building+previewing locally without
+Docker). The Dockerfile deliberately does NOT put the build inside
+`/app`: this repo's dev `docker-compose.yml` bind-mounts `./:/app`
+entirely for Python's `--reload`, which would shadow anything copied
+under `/app` with the host checkout (no `frontend/dist` there, it's
+gitignored) -- baking it outside that tree sidesteps the problem
+instead of trying to preserve it with a volume (tried first, but an
+anonymous volume only seeds from the image once and then freezes the
+frontend at that first build forever, see ADR-022)."""
 import os
 from pathlib import Path
 
@@ -43,7 +54,11 @@ else:
 
 app = create_app(database_url)
 
-FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+_DOCKER_FRONTEND_DIST = Path("/opt/frontend-dist")
+_LOCAL_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+FRONTEND_DIST = (
+    _DOCKER_FRONTEND_DIST if _DOCKER_FRONTEND_DIST.is_dir() else _LOCAL_FRONTEND_DIST
+)
 if FRONTEND_DIST.is_dir():
     app.mount(
         "/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="frontend-assets"

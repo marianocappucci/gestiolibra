@@ -40,7 +40,16 @@ RUN mkdir -p -m 0700 /root/.ssh \
     && chmod 600 /root/.ssh/config /root/.ssh/id_libracore.pub /root/.ssh/id_libragenda.pub
 
 COPY . .
-COPY --from=frontend-build /frontend/dist ./frontend/dist
+# Horneado FUERA de /app a proposito (ver ADR-022): el docker-compose.yml
+# de dev monta ./:/app entero para el --reload de Python, lo que taparia
+# cualquier build copiado dentro de /app con el checkout del host (que no
+# tiene frontend/dist, es un artefacto gitignoreado). Un volumen anonimo
+# para tapar ESE problema puntual resulto peor: Docker solo inicializa un
+# volumen anonimo desde la imagen la PRIMERA vez que se crea, despues lo
+# reusa tal cual en cada rebuild siguiente -- congelando el frontend en
+# la version del primer build para siempre. Copiarlo fuera del arbol
+# bind-mounteado evita el problema de raiz, sin volumenes.
+COPY --from=frontend-build /frontend/dist /opt/frontend-dist
 RUN --mount=type=ssh \
     git config --global url."ssh://git@github-libracore/marianocappucci/libracore.git".insteadOf "https://github.com/marianocappucci/libracore.git" \
     && git config --global url."ssh://git@github-libragenda/marianocappucci/libragenda.git".insteadOf "https://github.com/marianocappucci/libragenda.git" \

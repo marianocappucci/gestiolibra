@@ -150,6 +150,21 @@ propósito → restore desde el backup → confirmado que la fila marcadora
 vuelve y la mutación posterior desaparece, contenedor sano tras el
 reinicio. Sin cambios de código.
 
+Resuelto (2026-07-23): el frontend quedaba congelado en el primer
+build (ver ADR-022). El usuario reportó que `dev.gestiolibra.com.ar`
+no mostraba las páginas de Clientes/Dashboard recién agregadas pese a
+un rebuild+recreate aparentemente exitoso — el volumen anónimo de
+ADR-020 solo se siembra desde la imagen la primera vez que se crea, un
+rebuild posterior no lo actualiza. `Dockerfile` ahora hornea el build
+en `/opt/frontend-dist` (fuera de `/app`, que el compose de dev
+bind-montea entero); `app/asgi.py` lo busca ahí primero, cae al
+`frontend/dist` del repo si no existe (build local sin Docker).
+Verificado con rebuild `--no-cache` + recreate real: el bundle servido
+coincide con el hash del build recién generado. De paso se encontró y
+corrigió que el usuario admin del contenedor de dev había quedado con
+una contraseña vieja (bootstrap solo corre una vez, no se actualiza
+en rebuilds) — reseteado para coincidir con `.env` actual.
+
 Resuelto (2026-07-23): frontend extendido con Clientes y Dashboard
 (ver ADR-021). Clientes: lista para staff+admin, alta/edición/baja
 solo admin (refleja el gating que ya existía en la API, ADR-018).

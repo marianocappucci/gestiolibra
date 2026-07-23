@@ -680,3 +680,47 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   `npm run build` sin errores de tipos. Sin cambios en el backend — el
   MVP anterior (ADR-018) ya había resuelto el único gap de permisos que
   hacía falta.
+
+## ADR-022 — El fix de ADR-020 (volumen anónimo) congelaba el frontend en el primer build
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: el usuario reportó que `dev.gestiolibra.com.ar`, después de
+  loguearse, seguía mostrando el layout viejo (sin nav, sin las páginas
+  de Clientes/Dashboard) pese a que ADR-021 ya se había desplegado con
+  un rebuild + recreate aparentemente exitoso. Investigando: el archivo
+  JS servido (`index-CvAcwije.js`, 239 KB) coincidía con el **primer**
+  build del frontend (el de ADR-019/ADR-020), no con el build actual
+  (`index-BeEH0MKe.js`, 246 KB, confirmado corriendo `npm run build`
+  local). Un rebuild con `--no-cache` sí generó el bundle correcto —
+  pero **después de recrear el contenedor con esa imagen, `/app/
+  frontend/dist` seguía teniendo el archivo viejo**.
+- Causa raíz: el volumen anónimo agregado en ADR-020
+  (`- /app/frontend/dist` en `docker-compose.yml`, para que el bind
+  mount `./:/app` no tapara el build con el directorio vacío del host)
+  tiene un problema de fondo que no se vio en su momento porque nunca
+  se probó un *segundo* rebuild real: Docker solo siembra un volumen
+  anónimo con el contenido de la imagen **la primera vez que se crea**
+  — en cualquier recreate posterior, sea cual sea el contenido nuevo de
+  la imagen, Compose reutiliza el volumen ya existente tal cual quedó.
+  El fix de ADR-020 no reparó el bind mount, lo reemplazó por un
+  congelamiento silencioso en la versión del primer build.
+- Decisión: el `Dockerfile` ahora copia el resultado del stage de node
+  a `/opt/frontend-dist`, **fuera** del árbol `/app` que bind-montea el
+  compose de dev — sidestepea el problema de raíz en vez de intentar
+  preservar nada con un volumen. `app/asgi.py` busca primero en
+  `/opt/frontend-dist` (la ubicación que hornea el Dockerfile) y cae a
+  `frontend/dist` relativo al repo (para levantar el build local sin
+  Docker, ej. tras correr `npm run build` a mano). El volumen anónimo
+  de ADR-020 se eliminó de `docker-compose.yml`.
+- Consecuencias: verificado con un rebuild `--no-cache` + recreate real
+  contra el VPS — el bundle servido coincide con el hash del build
+  recién generado (`index-BeEH0MKe.js`), no con ningún build anterior.
+  135 tests de backend sin cambios (el problema era exclusivamente de
+  la capa de infraestructura de Docker, no de código Python). Lección
+  para la familia: un volumen anónimo no es un mecanismo válido para
+  "preservar contenido de una imagen que un bind mount taparía" más
+  allá del primerísimo build — cualquier producto que reutilice este
+  patrón (Contalibra/Restolibra, si alguna vez agregan un stage de
+  build tipo node/frontend a su propio contenedor de dev) debería
+  copiar el artefacto fuera del árbol bind-monteado desde el principio.
