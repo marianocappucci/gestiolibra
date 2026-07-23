@@ -150,6 +150,13 @@ propósito → restore desde el backup → confirmado que la fila marcadora
 vuelve y la mutación posterior desaparece, contenedor sano tras el
 reinicio. Sin cambios de código.
 
+Resuelto (2026-07-23): id de cliente autogenerado si se omite (ver
+ADR-024). `POST /clients` acepta `id` opcional (`uuid4()` si no se
+manda) — sacado el campo del formulario de alta del frontend, fricción
+real para una operación que pasa todo el tiempo (a diferencia del
+catálogo, armado una sola vez por un admin). 1 test nuevo (136 en
+total), verificado además en el browser contra la API real.
+
 Resuelto (2026-07-23): la ruta `/dashboard` del frontend colisionaba
 con el endpoint real `GET /dashboard` de la API (mismo origen, mismo
 espacio de rutas, sin prefijo `/api` — ver ADR-023). Navegación directa

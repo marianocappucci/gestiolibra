@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- **El id de cliente se genera solo si no se manda** (ver ADR-024):
+  `POST /clients` acepta `id` opcional, generado con `uuid4()` cuando
+  se omite. El formulario de alta del frontend ya no pide un ID a
+  mano — fricción real que no existía para sucursales/recursos/
+  servicios (catálogo armado una vez por un admin, no en la operación
+  diaria). 1 test nuevo (136 en total).
 - **Fix: ruta `/dashboard` del frontend colisionaba con la API**
   (ver ADR-023): navegación directa (F5, URL a mano) a `/dashboard`
   devolvía el error crudo del endpoint `GET /dashboard` en vez de la

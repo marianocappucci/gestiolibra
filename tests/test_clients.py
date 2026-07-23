@@ -57,6 +57,19 @@ def test_client_duplicate_id_returns_409(admin_client: TestClient):
     assert response.status_code == 409
 
 
+def test_client_id_is_auto_generated_when_omitted(admin_client: TestClient):
+    client = admin_client
+    created = client.post("/clients", json={"name": "Ana"})
+    assert created.status_code == 201
+    assert created.json()["id"]
+
+    created_2 = client.post("/clients", json={"name": "Beto"})
+    assert created_2.status_code == 201
+    assert created_2.json()["id"] != created.json()["id"]
+
+    assert len(client.get("/clients").json()) == 2
+
+
 def test_cannot_delete_a_client_with_an_appointment_pointing_at_it(admin_client: TestClient):
     client = admin_client
     client.post("/resources", json={"id": "resource-1", "name": "Box 1"})

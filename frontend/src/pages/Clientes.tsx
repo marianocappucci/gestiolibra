@@ -11,7 +11,6 @@ const CONDICIONES_IVA = [
 ]
 
 type FormState = {
-  id: string
   name: string
   phone: string
   email: string
@@ -19,7 +18,7 @@ type FormState = {
   condicion_iva: string
 }
 
-const EMPTY_FORM: FormState = { id: '', name: '', phone: '', email: '', cuit: '', condicion_iva: '' }
+const EMPTY_FORM: FormState = { name: '', phone: '', email: '', cuit: '', condicion_iva: '' }
 
 export function Clientes() {
   const { user } = useAuth()
@@ -63,7 +62,6 @@ export function Clientes() {
   function startEdit(client: Client) {
     setEditingId(client.id)
     setForm({
-      id: client.id,
       name: client.name,
       phone: client.phone ?? '',
       email: client.email ?? '',
@@ -90,7 +88,7 @@ export function Clientes() {
     }
     try {
       if (editingId === 'new') {
-        await api.post('/clients', { id: form.id, ...payload })
+        await api.post('/clients', payload)
       } else if (editingId) {
         await api.put(`/clients/${editingId}`, payload)
       }
@@ -126,14 +124,6 @@ export function Clientes() {
 
       {isAdmin && editingId !== null && (
         <form className="client-form" onSubmit={handleSubmit}>
-          {editingId === 'new' && (
-            <input
-              placeholder="ID"
-              value={form.id}
-              onChange={(e) => setForm({ ...form, id: e.target.value })}
-              required
-            />
-          )}
           <input
             placeholder="Nombre"
             value={form.name}

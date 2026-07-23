@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
@@ -10,7 +12,7 @@ router = APIRouter(prefix="/clients", tags=["clients"])
 
 
 class ClientCreate(BaseModel):
-    id: str
+    id: str | None = None
     name: str
     phone: str | None = None
     email: str | None = None
@@ -42,9 +44,16 @@ class ClientOut(BaseModel):
 def create_client(
     data: ClientCreate, clients: ClientRepository = Depends(get_client_repository),
 ):
+    """`id` es opcional: a diferencia de sucursales/recursos/servicios
+    (catálogo que arma un admin una vez, con slugs pensados a mano),
+    clientes se dan de alta todo el tiempo durante la operación diaria
+    -- pedirle a quien atiende que invente un id único para cada
+    cliente nuevo es friccion real sin ningún beneficio. Sigue
+    aceptándose explícito para uso scripteado que ya lo pase."""
+    client_id = data.id or str(uuid4())
     try:
         return clients.create(
-            data.id, data.name, data.phone, data.email, data.active,
+            client_id, data.name, data.phone, data.email, data.active,
             data.cuit, data.condicion_iva,
         )
     except ValueError as exc:

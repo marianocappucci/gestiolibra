@@ -761,3 +761,29 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   `clients`, `business`, `users`, `reminders`, `deposits`, `config`,
   `dashboard`, `appointments`, `health`) va a pisarse de la misma
   forma — revisar esta lista antes de nombrar una ruta nueva de la SPA.
+
+## ADR-024 — Client.id se genera solo si no se manda
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: el usuario notó que el formulario de alta de cliente del
+  frontend pedía un `id` a mano — a diferencia de sucursales/recursos/
+  servicios (catálogo que un admin arma una vez, con slugs pensados
+  deliberadamente), los clientes se dan de alta todo el tiempo durante
+  la operación diaria; pedirle a quien atiende que invente un
+  identificador único para cada cliente nuevo es fricción real sin
+  ningún beneficio (el cliente no lo ve ni lo necesita en ningún lado).
+- Decisión: `ClientCreate.id` pasa de obligatorio a opcional
+  (`str | None = None`) en `app/routers/clients.py`. Si se omite,
+  `create_client()` genera uno con `uuid4()`. Sigue aceptándose
+  explícito si se manda (uso scripteado/pruebas que ya lo pasan, sin
+  romper nada existente). No se tocó `libragenda.Client` (el dominio
+  compartido no exige ni prohíbe ningún formato de id más allá de "no
+  vacío") ni el resto del catálogo (`branches`/`resources`/`services`
+  siguen pidiendo id explícito a propósito — los arma un admin una sola
+  vez, no es la misma fricción). El campo "ID" se sacó del formulario
+  de alta del frontend (`Clientes.tsx`); edición nunca lo mostró.
+- Consecuencias: 1 test nuevo (136 en total — confirma que dos altas
+  sin id consecutivas generan ids distintos). Verificado manualmente en
+  el browser: alta de cliente sin ningún campo de id, confirmado por
+  API que se generó un UUID real y quedó guardado correctamente.
