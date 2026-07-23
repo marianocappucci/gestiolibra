@@ -12,10 +12,6 @@ verificado en `dev.gestiolibra.com.ar` real, ver "Resuelto" más abajo.
 - [ ] Extender el frontend con facturación (config ARCA, ver factura
       por turno completado) — clientes y dashboard ya se sumaron
       (ver ADR-021).
-- [ ] Deploy real de la extensión Clientes/Dashboard a
-      `dev.gestiolibra.com.ar` (por ahora solo se verificó localmente
-      contra el backend de dev, no se rebuildeó la imagen del VPS con
-      este cambio todavía).
 - [ ] El input de horario del formulario de turno (`datetime-local`)
       manda la hora tal cual la eligió el usuario en su navegador, y el
       backend la trata como UTC directo (`_as_utc()`, sin conversión de
@@ -153,7 +149,9 @@ staff, 403 mostrado como mensaje explicativo. `Layout.tsx` nuevo
 en el browser con ambos roles (CRUD completo de clientes probado
 contra la API real, dashboard con datos reales del rango
 seleccionado), sin errores de consola. Sin cambios de backend.
-Todavía no desplegado al VPS (queda en "Próximas").
+Desplegado a `dev.gestiolibra.com.ar` (rebuild de imagen + recreate del
+contenedor), verificado con `curl` y en el browser real sin errores de
+consola.
 
 Resuelto (2026-07-23): frontend MVP desplegado y verificado en
 `dev.gestiolibra.com.ar` real (ver ADR-019/ADR-020). Primer build de
