@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+- **Deploy real verificado en el VPS** (cierra el onboarding
+  multi-negocio de ADR-013, ver ADR-014): build de `gestiolibra:latest`
+  y primer cliente de prueba (`prueba`, puerto 8076, plan Premium)
+  provisionados con éxito. Dos bugs reales encontrados y corregidos —
+  ninguno visible en desarrollo local, sin Docker en WSL: (1) auth SSH
+  con el ssh-agent multi-key del VPS rompía el clone de LibraGenda
+  dentro del build (GitHub autentica con la primera key que acepte, sin
+  reintentar) — `Dockerfile` ahora usa un alias de `Host` SSH dedicado
+  por dependencia con `IdentitiesOnly`; (2) `app/asgi.py` no entendía
+  el contrato de env vars que genera `libracore.provisioning`
+  (`DATA_DIR`/`ADMIN_USER` en vez de `DATABASE_URL`/`GESTIOLIBRA_*`) —
+  ahora deriva uno del otro cuando corresponde. Deploy key dedicada de
+  solo lectura para el propio repo Gestiolibra (`id_ed25519_gestiolibra`).
 - **Onboarding multi-negocio**: sistema de planes con enforcement real
   (`plans.py`: Básico/Estándar/Premium, $15k/$25k/$40k), tabla `modulos`
   (migración `0005_modulos`), `require_module()` gatea recordatorios/

@@ -4,10 +4,8 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Onboarding multi-negocio (ver ADR-013): planes + enforcement + Dockerfile/
-docker-compose.yml + scripts de provisioning ya completos y verificados
-localmente. Queda pendiente el build real en el VPS y el alta del primer
-cliente de prueba (ver más abajo).
+Ninguna en curso — onboarding multi-negocio (ver ADR-013) cerrado, ver
+"Resuelto" más abajo.
 
 ## Próximas
 
@@ -21,6 +19,17 @@ cliente de prueba (ver más abajo).
       libracore y libragenda cargadas), pero valdría la pena que LibraCore
       soporte esto de forma más explícita si aparece un tercer producto
       con la misma necesidad (ver ADR-013).
+- [ ] `libracore.provisioning.nuevo_cliente._esperar_db_lista()` puede
+      agotar su timeout antes de que el contenedor recién creado termine
+      de crear la tabla `modulos` (nos pasó con el primer alta real,
+      aunque por una causa puntual — el contenedor crasheaba por el bug
+      de `asgi.py` ya resuelto, no por lentitud real) — cuando eso pasa,
+      el plan elegido no se aplica solo, hay que correr
+      `plans.aplicar_plan_en_db(db_path, plan)` a mano una vez sí levantó.
+      El mensaje `[WARN]` que emite ya avisa de esto. No es un bug de
+      Gestiolibra, es una condición de carrera genérica de
+      `libracore.provisioning` — evaluar si vale la pena que esa función
+      espere más o reintente, si aparece de nuevo con un tercer producto.
 - [ ] Branding y dominio por cliente.
 - [ ] Upload real de certificado/clave ARCA (`PUT /config/arca` hoy acepta
       solo paths en el filesystem del servidor — ver ADR-011).
@@ -93,6 +102,37 @@ nueva de solo lectura para LibraGenda (`id_ed25519_libragenda`) +
 ssh-agent persistente en el VPS con ambas claves. 17 tests nuevos (130
 en total), verificado además end-to-end contra un archivo SQLite real
 aplicando planes en vivo.
+
+Resuelto (2026-07-22): deploy real a producción en el VPS + alta del
+primer cliente de prueba (cierra el onboarding multi-negocio de
+ADR-013). Dos bugs reales encontrados y corregidos recién en el primer
+build/alta real (invisibles en el desarrollo local):
+1. GitHub autentica toda la conexión SSH con la primera key del agente
+   que acepte y no reintenta con otra si esa key no tiene acceso al
+   repo pedido — con el ssh-agent multi-key del VPS eso rompía el clone
+   de LibraGenda dentro del build (`Repository not found` pese a tener
+   su propia deploy key cargada). Arreglado en el `Dockerfile`: cada
+   dependencia usa su propio alias de `Host` SSH con `IdentitiesOnly` +
+   su public key específica (no son secreto, se hornean en la imagen),
+   forzando qué identidad del agente se ofrece por alias.
+2. `app/asgi.py` esperaba `DATABASE_URL`/`GESTIOLIBRA_*` (las env vars
+   del `docker-compose.yml` de dev de este repo) pero
+   `libracore.provisioning` genera un `docker-compose.yml` por cliente
+   con el contrato genérico que Contalibra/Restolibra ya leen
+   directamente (`DATA_DIR`/`ADMIN_USER`/`ADMIN_PASSWORD`/
+   `ADMIN_NOMBRE`) — el contenedor del primer cliente crasheaba con
+   `KeyError: DATABASE_URL`. `asgi.py` ahora deriva `DATABASE_URL` y
+   `GESTIOLIBRA_LIBRACORE_DB_PATH` de `DATA_DIR` cuando está presente,
+   sin tocar `libracore.provisioning`.
+
+El propio repo Gestiolibra se clonó al VPS con una deploy key nueva y
+dedicada (`id_ed25519_gestiolibra`, solo lectura) — separada de las dos
+keys que ya autentican las dependencias LibraGenda/LibraCore durante el
+build. Cliente de prueba (`prueba`, puerto 8076, plan Premium)
+levantado y verificado: build de imagen real, contenedor healthy,
+tablas creadas, plan aplicado (a mano, ver el punto de
+`_esperar_db_lista()` en "Próximas"), login admin funcionando. Queda
+corriendo en el VPS como evidencia del pipeline completo.
 
 ## Notas de testing
 

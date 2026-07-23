@@ -103,7 +103,7 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
 
 ## Fase 3 — producto
 
-- Onboarding multi-negocio (en curso — ver ADR-013). Sistema de planes
+- Onboarding multi-negocio (completo — ver ADR-013). Sistema de planes
   con enforcement real (Básico/Estándar/Premium, `plans.py` + tabla
   `modulos`, `require_module()` gatea recordatorios/señas/facturación/
   dashboard con 403 — turnos y catálogo nunca se gatean). Primera
@@ -113,7 +113,9 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   Restolibra). Deploy key nueva de solo lectura para LibraGenda + ssh-agent
   persistente en el VPS con ambas claves (Gestiolibra es el primer
   producto que necesita dos deploy keys a la vez en el mismo build).
-  Falta el build real en el VPS y el alta del primer cliente de prueba.
+  Build real y primer cliente de prueba verificados en el VPS — dos bugs
+  reales encontrados y corregidos en el proceso (auth SSH multi-key,
+  contrato de env vars de `libracore.provisioning`), ver `TASKS.md`.
 - Branding y dominio por cliente.
 - Deploy dev/prod, CI y backups verificados.
 - Validación con primeros negocios reales.

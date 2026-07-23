@@ -340,3 +340,58 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   correctamente en cada salto de plan). Deploy real a producción (primer
   cliente de prueba en el VPS) documentado por separado una vez
   completado — ver entrada siguiente o `TASKS.md`.
+
+## ADR-014 — Deploy real verificado en el VPS: dos bugs invisibles en local
+
+- Estado: aceptada
+- Fecha: 2026-07-22
+- Contexto: cerrando ADR-013, se hizo el primer build de Docker y la
+  primera alta de cliente real en el VPS (nunca antes probado — no hay
+  Docker en el entorno de desarrollo local en WSL). Aparecieron dos
+  bugs reales, ninguno cubierto por la suite de tests local porque
+  ambos solo existen en la capa de infraestructura de deploy:
+  1. **Auth SSH con agente multi-key**: GitHub autentica la conexión
+     SSH completa con la primera key del agente que acepte, y no
+     reintenta con otra si esa key no tiene acceso al repo pedido. El
+     ssh-agent persistente del VPS (`agent-multi-libra.sock`, con las
+     deploy keys de LibraCore y LibraGenda cargadas, ver ADR-013) hacía
+     que la key de LibraCore autenticara primero el transporte y el
+     clone de LibraGenda fallara con `Repository not found` — con
+     identidad de transporte correcta pero sin permiso a nivel de repo.
+     Arreglado en el `Dockerfile`: cada dependencia usa su propio alias
+     de `Host` SSH (`github-libracore`/`github-libragenda`) con
+     `IdentitiesOnly yes` + su public key específica horneada en la
+     imagen (las public keys no son secreto), forzando qué identidad
+     del agente se ofrece por alias — sin tocar
+     `libracore.provisioning` ni el ssh-agent del VPS.
+  2. **Contrato de env vars de `libracore.provisioning`**: el
+     `docker-compose.yml` que genera para cada cliente usa el mismo
+     contrato genérico que ya leen Contalibra/Restolibra directamente
+     (`DATA_DIR`/`ADMIN_USER`/`ADMIN_PASSWORD`/`ADMIN_NOMBRE`/
+     `SECRET_KEY`/`DOCS_AUTH_SECRET`) — no el `DATABASE_URL`/
+     `GESTIOLIBRA_*` que usa el `docker-compose.yml` de *dev* de este
+     repo (escrito antes de conocer ese contrato). El primer contenedor
+     de cliente crasheaba con `KeyError: DATABASE_URL`. Arreglado en
+     `app/asgi.py`: deriva `DATABASE_URL`/`GESTIOLIBRA_LIBRACORE_DB_PATH`
+     de `DATA_DIR` y mapea `ADMIN_USER`/`ADMIN_PASSWORD` a los nombres
+     que ya lee `create_app()`, solo cuando `DATA_DIR` está presente —
+     el `docker-compose.yml` de dev (que setea `DATABASE_URL`/
+     `GESTIOLIBRA_*` explícito) sigue funcionando sin cambios.
+  Efecto de paso: la propia clonación del repo Gestiolibra al VPS
+  necesitó también su propia deploy key dedicada
+  (`id_ed25519_gestiolibra`, solo lectura, agregada por el usuario) —
+  separada de las dos que autentican las dependencias durante el build,
+  siguiendo el mismo patrón que Contalibra (deploy key dedicada para el
+  propio repo) en vez del PAT embebido en la URL que usa Restolibra.
+- Consecuencias: imagen `gestiolibra:latest` construida con éxito vía
+  `panel_admin.py actualizar` (el mismo comando que un deploy real
+  usaría). Cliente de prueba (`prueba`, puerto 8076, plan Premium)
+  provisionado con `nuevo_cliente.py`/`crear_cliente()`: contenedor
+  healthy, tablas creadas (`Base.metadata.create_all()`, sin correr las
+  cadenas de Alembic — mismo criterio ya documentado en `README.md` como
+  "demo only" pero suficiente para un archivo SQLite nuevo), plan
+  aplicado a mano (ver limitación de `_esperar_db_lista()` en
+  `TASKS.md`), login admin verificado. Queda corriendo en el VPS como
+  evidencia del pipeline completo. Ninguno de los dos bugs requirió
+  tocar `libracore.provisioning` ni ningún código compartido con
+  Contalibra/Restolibra.
