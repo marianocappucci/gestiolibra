@@ -117,6 +117,13 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   Build real y primer cliente de prueba verificados en el VPS — dos bugs
   reales encontrados y corregidos en el proceso (auth SSH multi-key,
   contrato de env vars de `libracore.provisioning`), ver `TASKS.md`.
-- Branding y dominio por cliente.
+- Branding y dominio por cliente (completo para lo que aplica — ver
+  ADR-016). "Branding" más allá de dominio+SSL no aplica: Gestiolibra no
+  tiene frontend, y el logo/paleta por producto de Contalibra/Restolibra
+  no es configurable por cliente. `dev.gestiolibra.com.ar` con proxy NPM
+  + certificado Let's Encrypt real (reutilizando la misma instancia de
+  NPM de Contalibra/Restolibra, sin credenciales nuevas). Dominio por
+  cliente real queda para cuando se onboardee el primer cliente real —
+  la maquinaria (`scripts/npm_api.py`/`npm_setup.py`) ya está probada.
 - Deploy dev/prod, CI y backups verificados.
 - Validación con primeros negocios reales.

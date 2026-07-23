@@ -27,7 +27,20 @@ Ninguna en curso — onboarding multi-negocio (ver ADR-013) cerrado, ver
       Gestiolibra, es una condición de carrera genérica de
       `libracore.provisioning` — evaluar si vale la pena que esa función
       espere más o reintente, si aparece de nuevo con un tercer producto.
-- [ ] Branding y dominio por cliente.
+- [ ] `libracore.provisioning.nuevo_cliente._setup_npm_proxy()` arma el
+      proxy con `forward_host_from_config()` (un valor fijo) + el puerto
+      **publicado al host** del cliente — en la topología real de este
+      VPS (NPM y los contenedores de producto comparten la red docker
+      `stack_stack-net`), lo correcto es apuntar directo al **nombre del
+      contenedor** en su **puerto interno** (`8000`), no a una IP fija +
+      puerto de host. Nadie lo usó todavía contra un cliente real (ni
+      Contalibra ni Restolibra tampoco) — se encontró al armar
+      `dev.gestiolibra.com.ar` a mano (ver ADR-016). Evaluar si vale la
+      pena tocar `libracore.provisioning` cuando se onboardee el primer
+      cliente real por este flujo automático.
+- [ ] Dominio real para un cliente onboardeado por `nuevo_cliente.py`
+      (con el hallazgo de arriba resuelto o evitado a mano) — pendiente
+      de tener un primer cliente real, no solo el de prueba.
 - [ ] Upload real de certificado/clave ARCA (`PUT /config/arca` hoy acepta
       solo paths en el filesystem del servidor — ver ADR-011).
 - [ ] Revisar el cálculo de IVA de facturación (21% fijo) con un contador
@@ -99,6 +112,18 @@ nueva de solo lectura para LibraGenda (`id_ed25519_libragenda`) +
 ssh-agent persistente en el VPS con ambas claves. 17 tests nuevos (130
 en total), verificado además end-to-end contra un archivo SQLite real
 aplicando planes en vivo.
+
+Resuelto (2026-07-23): branding y dominio por cliente, para lo que
+aplica (ver ADR-016). "Branding" más allá de dominio+SSL no aplica sin
+frontend. `dev.gestiolibra.com.ar` con proxy NPM + certificado Let's
+Encrypt real, reutilizando la misma instancia de NPM y credenciales que
+ya usan Contalibra/Restolibra (sin generar nada nuevo). Ningún cambio de
+código en el repo — la maquinaria (`scripts/npm_api.py`/`npm_setup.py`)
+ya existía desde el onboarding multi-negocio. Hallazgo real en el
+camino: copiar la config de Contalibra trajo un `forward_host` que no
+aplicaba a Gestiolibra; corregido a la gateway real de la red docker
+compartida (`stack_stack-net`). Dominio por cliente real (no solo dev)
+queda pendiente de un primer cliente real — ver "Próximas".
 
 Resuelto (2026-07-23): dashboard suma facturación/caja (ver ADR-015).
 `GET /dashboard` incluye `facturacion.facturas_emitidas_en_periodo` y

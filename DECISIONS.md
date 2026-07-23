@@ -425,3 +425,58 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   end-to-end contra un archivo SQLite real (turno completado con precio
   configurado → factura emitida → dashboard del día refleja la factura
   y el ingreso de caja correspondiente).
+
+## ADR-016 — Branding y dominio por cliente: dominio+SSL real, sin código nuevo
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: siguiente ítem de Fase 3 en `ROADMAP.md`, sin alcance
+  detallado (mismo patrón que "onboarding multi-negocio" antes de
+  ADR-013). Investigado antes de codificar: la maquinaria de dominio+SSL
+  por cliente (`scripts/npm_api.py`/`npm_setup.py`, wrappers sobre
+  `libracore.npm_api`/`libracore.provisioning.nuevo_cliente._setup_npm_proxy`)
+  ya existía completa desde la ronda de onboarding multi-negocio — nunca
+  se había ejercido contra la instancia real de NPM. "Branding" más allá
+  de dominio+SSL no aplica: Contalibra/Restolibra tienen logo por
+  instancia + paleta de color hardcodeada por producto, ninguno
+  configurable por cliente, y ambos requieren un frontend que Gestiolibra
+  no tiene — se descartó como fuera de alcance.
+- Decisión: reutilizar la instancia de NPM ya usada por Contalibra/
+  Restolibra (mismo VPS, mismas credenciales admin) en vez de levantar
+  una nueva — se copió su `scripts/.npm_config.json` a Gestiolibra tal
+  cual, sin generar credenciales nuevas. Se armó `dev.gestiolibra.com.ar`
+  (dominio ya registrado con un wildcard DNS `*.gestiolibra.com.ar` ya
+  apuntando a este VPS, confirmado con `nslookup` — no hizo falta tocar
+  DNS) → proxy host + certificado Let's Encrypt real, mismo patrón que
+  `dev.contalibra.com.ar`/`dev.restolibra.com.ar`.
+- **Hallazgo real al crear el primer proxy**: copiar el
+  `.npm_config.json` de Contalibra trajo también su valor de
+  `forward_host` (`"contalibra-dev"`, un nombre de contenedor que no
+  significa nada para Gestiolibra) — el primer proxy quedó mal apuntado
+  y hubo que borrarlo y recrearlo. Investigando el motivo se confirmó
+  que NPM y los contenedores de producto comparten la misma red docker
+  (`stack_stack-net`), así que el proxy correcto apunta directo al
+  **nombre del contenedor** en su **puerto interno** (`gestiolibra-dev`,
+  `8000`) — no a una IP de gateway + el puerto publicado al host. Se
+  corrigió el `forward_host` guardado en la config de Gestiolibra a la
+  gateway real de esa red (`172.18.0.1`) en vez del nombre de contenedor
+  heredado, aunque **ese campo no es realmente el mecanismo correcto para
+  el flujo automático de alta de cliente real**: `_setup_npm_proxy()` en
+  `libracore.provisioning.nuevo_cliente` arma el proxy con
+  `forward_host_from_config()` (un valor fijo) + el puerto **publicado al
+  host** del cliente (ej. `8076`) — para que eso funcione de verdad
+  necesitaría ser `172.18.0.1:<puerto publicado>`, no
+  `<nombre-de-contenedor>:8000` (que sí funciona, pero requeriría pasar
+  el nombre de cada contenedor, no un `forward_host` fijo). No se tocó
+  `libracore.provisioning` — mismo criterio que otros hallazgos en código
+  compartido esta sesión: se documenta en `TASKS.md`, no se arregla sin
+  necesidad concreta (ninguno de los tres productos onboardeó todavía un
+  cliente real vía este flujo automático).
+- Consecuencias: `dev.gestiolibra.com.ar` sirviendo tráfico real por
+  HTTPS con certificado Let's Encrypt válido (verificado con `curl`,
+  200 en `/health`), sin cambios de código en el repo (`.npm_config.json`
+  vive gitignoreado, igual que en Contalibra/Restolibra). Un certificado
+  huérfano (del primer intento mal configurado) quedó sin borrar en
+  NPM — `NPMClient` no expone un método para eliminar certificados,
+  y no vale la pena tocar la API cruda por un residuo sin costo ni
+  efecto funcional.

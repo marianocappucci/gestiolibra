@@ -173,7 +173,14 @@ LIBRACORE_SSH_KEY=/root/.ssh/agent-multi-libra.sock python3 scripts/panel_admin.
 ```
 
 `docker-compose.yml` levanta `gestiolibra-dev` en el puerto `8075`
-(puerto base para clientes reales vía provisioning: `8076`).
+(puerto base para clientes reales vía provisioning: `8076`). Expuesto
+además en `https://dev.gestiolibra.com.ar` (proxy NPM + certificado
+Let's Encrypt real, mismo patrón que `dev.contalibra.com.ar` — ver
+`DECISIONS.md` ADR-016). `scripts/npm_api.py`/`npm_setup.py` (wrappers
+sobre `libracore.npm_api`/`libracore.provisioning`) arman el proxy +
+certificado por dominio; reutilizan la misma instancia de NPM y
+credenciales que ya usan Contalibra/Restolibra (config en
+`scripts/.npm_config.json`, gitignoreado).
 
 ## Documentación
 

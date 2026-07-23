@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- **Branding y dominio por cliente** (ver ADR-016): `dev.gestiolibra.com.ar`
+  con proxy NPM + certificado Let's Encrypt real, reutilizando la misma
+  instancia de NPM y credenciales que ya usan Contalibra/Restolibra. Sin
+  cambios de código — la maquinaria (`scripts/npm_api.py`/`npm_setup.py`)
+  ya existía. "Branding" más allá de dominio+SSL no aplica sin frontend.
 - **Dashboard: sumar facturación/caja** (ver ADR-015): `GET /dashboard`
   ahora incluye `facturacion.facturas_emitidas_en_periodo` y
   `facturacion.caja` (ingresos/egresos/saldo del período + saldo total),
