@@ -9,8 +9,13 @@ verificado en `dev.gestiolibra.com.ar` real, ver "Resuelto" más abajo.
 
 ## Próximas
 
-- [ ] Extender el frontend más allá del MVP: clientes (alta/edición),
-      dashboard, facturación — hoy solo cubre login + agenda/turnos.
+- [ ] Extender el frontend con facturación (config ARCA, ver factura
+      por turno completado) — clientes y dashboard ya se sumaron
+      (ver ADR-021).
+- [ ] Deploy real de la extensión Clientes/Dashboard a
+      `dev.gestiolibra.com.ar` (por ahora solo se verificó localmente
+      contra el backend de dev, no se rebuildeó la imagen del VPS con
+      este cambio todavía).
 - [ ] El input de horario del formulario de turno (`datetime-local`)
       manda la hora tal cual la eligió el usuario en su navegador, y el
       backend la trata como UTC directo (`_as_utc()`, sin conversión de
@@ -138,6 +143,17 @@ WAL-safe de la DB vía `sqlite3.Connection.backup()`) → datos mutados a
 propósito → restore desde el backup → confirmado que la fila marcadora
 vuelve y la mutación posterior desaparece, contenedor sano tras el
 reinicio. Sin cambios de código.
+
+Resuelto (2026-07-23): frontend extendido con Clientes y Dashboard
+(ver ADR-021). Clientes: lista para staff+admin, alta/edición/baja
+solo admin (refleja el gating que ya existía en la API, ADR-018).
+Dashboard: mismo resumen que `GET /dashboard`, oculto del nav para
+staff, 403 mostrado como mensaje explicativo. `Layout.tsx` nuevo
+(header+nav compartido, antes solo en Agenda). Verificado manualmente
+en el browser con ambos roles (CRUD completo de clientes probado
+contra la API real, dashboard con datos reales del rango
+seleccionado), sin errores de consola. Sin cambios de backend.
+Todavía no desplegado al VPS (queda en "Próximas").
 
 Resuelto (2026-07-23): frontend MVP desplegado y verificado en
 `dev.gestiolibra.com.ar` real (ver ADR-019/ADR-020). Primer build de

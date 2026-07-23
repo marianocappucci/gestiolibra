@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- **Frontend: páginas de Clientes y Dashboard** (ver ADR-021): extiende
+  el MVP de login+agenda. Clientes (lista para staff+admin, alta/
+  edición/baja solo admin, reflejando el gating ya existente en la
+  API) y Dashboard (mismo resumen que expone `GET /dashboard`, oculto
+  del nav para staff). `src/components/Layout.tsx` nuevo (header +
+  nav compartidos, antes vivía solo en la página de agenda). Verificado
+  manualmente en el browser con ambos roles, sin errores de consola.
+  Sin cambios de backend.
 - **Frontend desplegado en `dev.gestiolibra.com.ar`** (ver ADR-020):
   primer build real de Docker con el stage de node — encontró que el
   bind mount de dev (`./:/app`) tapaba el `frontend/dist` horneado en

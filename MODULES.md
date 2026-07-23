@@ -147,15 +147,22 @@
   `panel_admin.py`/`npm_api.py`/`npm_setup.py`: wrappers sobre
   `libracore.provisioning`, mismo patrón que Contalibra/Restolibra.
 
-- `frontend/`: primer frontend de Gestiolibra (ver ADR-019) — SPA en
-  React 19 + TypeScript + Vite. `src/api.ts` (cliente HTTP delgado sobre
-  la API, cookie de sesión via `credentials: "include"`), `src/context/
-  AuthContext.tsx` (estado de sesión, `GET /auth/me` al montar),
-  `src/pages/Login.tsx`, `src/pages/Agenda.tsx` (selector de recurso +
-  rango de fechas, alta de turno, confirmar/cancelar/completar).
+- `frontend/`: primer frontend de Gestiolibra (ver ADR-019/ADR-021) —
+  SPA en React 19 + TypeScript + Vite. `src/api.ts` (cliente HTTP
+  delgado sobre la API, cookie de sesión via `credentials: "include"`,
+  tipos + `STATUS_LABELS` compartidos), `src/context/AuthContext.tsx`
+  (estado de sesión, `GET /auth/me` al montar), `src/components/
+  Layout.tsx` (header + nav compartidos — el link Dashboard solo se
+  muestra a `role === "admin"`), `src/pages/Login.tsx`,
+  `src/pages/Agenda.tsx` (selector de recurso + rango de fechas, alta
+  de turno, confirmar/cancelar/completar), `src/pages/Clientes.tsx`
+  (lista para staff+admin; alta/edición/baja solo admin, refleja el
+  gating de ADR-018 en la propia UI), `src/pages/Dashboard.tsx` (mismo
+  resumen que `GET /dashboard`; un 403 —rol no-admin o módulo
+  deshabilitado por plan— se muestra como mensaje explicativo).
   `vite.config.ts` proxea los prefijos de la API al backend en dev
-  (mismo origen, sin CORS). Alcance del MVP: login + agenda/turnos —
-  clientes/dashboard/facturación quedan para después.
+  (mismo origen, sin CORS). Alcance actual: login, agenda/turnos,
+  clientes, dashboard — facturación queda para después.
 
 ## Después del MVP
 

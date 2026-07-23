@@ -161,7 +161,14 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   específico para ese subpath en `docker-compose.yml`. Verificado con
   `curl` y en el browser real contra el dominio público (login carga,
   manejo de error de credenciales correcto, sin errores de consola).
-- Extender el frontend: clientes (alta/edición), dashboard, facturación.
+- Extender el frontend con clientes y dashboard (completo — ver
+  ADR-021). Página Clientes (lista para staff+admin, alta/edición/baja
+  solo admin — refleja el gating que ya existía en la API desde
+  ADR-018) y página Dashboard (mismo resumen que `GET /dashboard`,
+  oculta del nav para staff, 403 mostrado como mensaje explicativo en
+  vez de error crudo). `Layout.tsx` nuevo con header+nav compartido.
+  Verificado manualmente con ambos roles contra la API real. Falta
+  facturación y el deploy de este cambio al VPS.
 - Timezone de sucursal de punta a punta (hoy el horario que carga un
   turno se trata como UTC directo, sin convertir por la timezone de la
   sucursal — visible ahora con un frontend real, ver `TASKS.md`).

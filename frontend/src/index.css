@@ -88,21 +88,42 @@ input, select {
 .login-card h1 { margin: 0 0 8px; font-size: 22px; text-align: center; }
 .login-card label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--text-muted); }
 
-/* Agenda */
-.agenda-page {
+/* Layout / nav */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.app-header h1 { font-size: 18px; margin: 0; }
+.app-header nav { display: flex; gap: 16px; flex: 1; }
+.app-header nav a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+}
+.app-header nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+.user-info { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-muted); }
+
+.app-main {
   max-width: 960px;
   margin: 0 auto;
   padding: 24px 16px 60px;
 }
-.agenda-header {
+
+.page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
-.agenda-header h1 { font-size: 20px; margin: 0; }
-.user-info { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-muted); }
+.page-header h2 { margin: 0; font-size: 20px; }
 
+/* Agenda */
 .filters, .new-appointment form {
   display: flex;
   flex-wrap: wrap;
@@ -121,15 +142,45 @@ input, select {
 .new-appointment { margin-bottom: 28px; }
 .new-appointment h2 { font-size: 16px; margin: 0 0 10px; }
 
-.appointments table {
+table {
   width: 100%;
   border-collapse: collapse;
 }
-.appointments th, .appointments td {
+th, td {
   text-align: left;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
 }
-.appointments td.actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.appointments td.actions button { padding: 4px 10px; font-size: 13px; }
+td.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+td.actions button { padding: 4px 10px; font-size: 13px; }
+
+/* Clientes */
+.client-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Dashboard */
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.card {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.card h3 { margin: 0 0 8px; font-size: 14px; color: var(--text-muted); }
+.card .big-number { font-size: 28px; font-weight: 600; margin: 0; }
+.card .muted { font-size: 13px; color: var(--text-muted); margin: 2px 0 8px; }
+.card ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }

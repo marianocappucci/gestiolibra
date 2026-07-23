@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError, type Appointment, type Client, type Resource, type Service } from '../api'
-import { useAuth } from '../context/AuthContext'
+import {
+  api, ApiError, STATUS_LABELS,
+  type Appointment, type Client, type Resource, type Service,
+} from '../api'
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
@@ -12,18 +14,7 @@ function formatTime(iso: string): string {
   })
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendiente',
-  confirmed: 'Confirmado',
-  in_progress: 'En curso',
-  completed: 'Completado',
-  cancelled: 'Cancelado',
-  no_show: 'No se presentó',
-}
-
 export function Agenda() {
-  const { user, logout } = useAuth()
-
   const [resources, setResources] = useState<Resource[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -119,14 +110,6 @@ export function Agenda() {
 
   return (
     <div className="agenda-page">
-      <header className="agenda-header">
-        <h1>Gestiolibra — Agenda</h1>
-        <div className="user-info">
-          <span>{user?.name} ({user?.role})</span>
-          <button onClick={() => logout()}>Salir</button>
-        </div>
-      </header>
-
       <section className="filters">
         <label>
           Recurso

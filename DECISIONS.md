@@ -643,3 +643,40 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   (credenciales inválidas) se muestra correctamente, sin errores de
   consola. Cierra el ítem "en curso" de `TASKS.md` para el MVP del
   frontend.
+
+## ADR-021 — Frontend: extender con Clientes y Dashboard
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: el usuario pidió extender el MVP del frontend (ADR-019,
+  login + agenda) con las dos superficies que ya estaban listadas como
+  "después del MVP": clientes y dashboard.
+- Decisión — layout compartido: se extrajo `src/components/Layout.tsx`
+  (header con nombre/rol/logout + navegación) de `Agenda.tsx`, para no
+  repetir esa cabecera en cada página nueva. El link "Dashboard" del
+  nav solo se muestra si `user.role === "admin"` — evita que un usuario
+  staff navegue a una página que de entrada le va a devolver 403 (el
+  endpoint ya es admin-only + gateado por plan, ver ADR-012/ADR-013).
+- Decisión — página Clientes: lista siempre visible para staff+admin
+  (mismo criterio de ADR-018: lectura de catálogo abierta a ambos
+  roles). El formulario de alta/edición y los botones de
+  eliminar/editar solo se renderizan si `user.role === "admin"` — la UI
+  refleja exactamente el gating que ya existe en el backend
+  (`POST`/`PUT`/`DELETE /clients` admin-only), no inventa una regla
+  nueva.
+- Decisión — página Dashboard: mismo diseño que el backend expone
+  (`GET /dashboard`) sin agregar cálculos propios del lado del cliente
+  — turnos por estado, clientes activos/nuevos, recordatorios/señas,
+  facturación/caja (moneda formateada con `Intl.NumberFormat("es-AR",
+  {style:"currency", currency:"ARS"})`). Un 403 (rol no-admin, o módulo
+  "dashboard" no habilitado en el plan del cliente — ver ADR-013) se
+  muestra como un mensaje explicativo en la página en vez de un error
+  crudo, ya que es una condición esperada, no un bug.
+- Consecuencias: verificado manualmente en el browser real con ambos
+  roles: staff ve Clientes de solo lectura y no ve el link Dashboard en
+  el nav; admin tiene alta/edición/baja de clientes completa (probado
+  contra la API real: crear, editar teléfono, eliminar) y el dashboard
+  muestra datos reales del rango seleccionado. Sin errores de consola.
+  `npm run build` sin errores de tipos. Sin cambios en el backend — el
+  MVP anterior (ADR-018) ya había resuelto el único gap de permisos que
+  hacía falta.

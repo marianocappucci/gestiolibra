@@ -90,7 +90,16 @@ export type Client = {
 }
 
 export type AppointmentStatus =
-  | 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'rescheduled'
+  | 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
+
+export const STATUS_LABELS: Record<AppointmentStatus, string> = {
+  pending: 'Pendiente',
+  confirmed: 'Confirmado',
+  in_progress: 'En curso',
+  completed: 'Completado',
+  cancelled: 'Cancelado',
+  no_show: 'No se presentó',
+}
 
 export type Appointment = {
   id: string
@@ -100,4 +109,29 @@ export type Appointment = {
   starts_at: string
   ends_at: string
   status: AppointmentStatus
+}
+
+export type DashboardSummary = {
+  date_from: string
+  date_to: string
+  turnos: {
+    total_en_periodo: number
+    por_estado: Record<AppointmentStatus, number>
+    hoy: number
+  }
+  clientes: {
+    total_activos: number
+    nuevos_en_periodo: number
+  }
+  recordatorios_enviados_en_periodo: number
+  senas_pendientes: number
+  facturacion: {
+    facturas_emitidas_en_periodo: number
+    caja: {
+      ingresos_en_periodo: number
+      egresos_en_periodo: number
+      saldo_periodo: number
+      saldo_total: number
+    }
+  }
 }
