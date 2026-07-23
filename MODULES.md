@@ -64,8 +64,13 @@
   recordatorios enviados en el rango (`SentReminderRepository.
   list_sent()` de LibraGenda `v0.9.0`) + señas pendientes sin acotar
   por fecha (`DepositRepository.list_by_status()`, misma versión).
-  Facturación/caja queda fuera de este primer corte (decisión del
-  usuario, mismo alcance que MedLibra) — ver `DECISIONS.md` ADR-012.
+  Facturación/caja quedó fuera del primer corte (decisión del usuario,
+  mismo alcance que MedLibra) — ver `DECISIONS.md` ADR-012 — y se sumó
+  después: `facturacion.facturas_emitidas_en_periodo` +
+  `facturacion.caja` (ingresos/egresos/saldo del período + saldo total),
+  llamando directo a `libracore.db.facturas.get_facturas_filtradas()`/
+  `caja.get_caja_resumen()` (misma conexión global que ya configura
+  `billing.py`, sin dependencia nueva inyectada) — ver ADR-015.
 - `app/services/branch_hours.py`: `BranchHoursRepository` — horario
   comercial semanal por sucursal. **Opt-in**: una sucursal sin horario
   configurado no gatea nada (mismo comportamiento que siempre hubo); solo

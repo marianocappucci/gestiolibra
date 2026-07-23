@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- **Dashboard: sumar facturación/caja** (ver ADR-015): `GET /dashboard`
+  ahora incluye `facturacion.facturas_emitidas_en_periodo` y
+  `facturacion.caja` (ingresos/egresos/saldo del período + saldo total),
+  reutilizando `libracore.db.caja.get_caja_resumen()`/`facturas.
+  get_facturas_filtradas()`, ya genéricos. 1 test nuevo (131 en total).
 - **Deploy real verificado en el VPS** (cierra el onboarding
   multi-negocio de ADR-013, ver ADR-014): build de `gestiolibra:latest`
   y primer cliente de prueba (`prueba`, puerto 8076, plan Premium)

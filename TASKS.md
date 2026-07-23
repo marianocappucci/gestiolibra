@@ -9,9 +9,6 @@ Ninguna en curso — onboarding multi-negocio (ver ADR-013) cerrado, ver
 
 ## Próximas
 
-- [ ] Dashboard: sumar facturación/caja (dejado fuera del primer corte
-      a pedido explícito del usuario) — reutilizando
-      `libracore.db.caja.get_caja_resumen()`, ya genérico.
 - [ ] `libracore.provisioning.panel_admin.cmd_actualizar` tiene
       hardcodeado un solo `--ssh default=<archivo>` — funciona para
       Gestiolibra apuntando `LIBRACORE_SSH_KEY` al socket del ssh-agent
@@ -102,6 +99,16 @@ nueva de solo lectura para LibraGenda (`id_ed25519_libragenda`) +
 ssh-agent persistente en el VPS con ambas claves. 17 tests nuevos (130
 en total), verificado además end-to-end contra un archivo SQLite real
 aplicando planes en vivo.
+
+Resuelto (2026-07-23): dashboard suma facturación/caja (ver ADR-015).
+`GET /dashboard` incluye `facturacion.facturas_emitidas_en_periodo` y
+`facturacion.caja` (ingresos/egresos/saldo del período + saldo total),
+reutilizando `get_caja_resumen()`/`get_facturas_filtradas()` de
+`libracore.db`, ya genéricos — sin gating extra por módulo, porque en
+el diseño de planes actual "facturacion" y "dashboard" solo existen
+juntos. 1 test nuevo (131 en total), verificado además end-to-end
+contra un archivo SQLite real (turno completado con precio configurado
+→ factura → dashboard del día refleja la factura y el ingreso de caja).
 
 Resuelto (2026-07-22): deploy real a producción en el VPS + alta del
 primer cliente de prueba (cierra el onboarding multi-negocio de

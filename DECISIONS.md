@@ -395,3 +395,33 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   evidencia del pipeline completo. Ninguno de los dos bugs requirió
   tocar `libracore.provisioning` ni ningún código compartido con
   Contalibra/Restolibra.
+
+## ADR-015 — Dashboard: sumar facturación/caja
+
+- Estado: aceptada
+- Fecha: 2026-07-23
+- Contexto: facturación/caja quedó explícitamente fuera del primer corte
+  del dashboard (ADR-012) a pedido del usuario. Quedó anotado en
+  `TASKS.md` como pendiente concreto, reutilizando
+  `libracore.db.caja.get_caja_resumen()` (ya genérico, mismo criterio
+  que excluye movimientos `cuenta_corriente` que usa
+  `get_facturas_filtradas` para saber si una factura está cobrada).
+- Decisión: `DashboardService.summary()` agrega una clave `facturacion`
+  con `facturas_emitidas_en_periodo` (vía
+  `libracore.db.facturas.get_facturas_filtradas(desde, hasta,
+  limit=0)["total"]` — `limit=0` evita traer y parsear filas, el conteo
+  ya viene de un `COUNT(*)` separado) y `caja` (ingresos/egresos/saldo
+  del período + saldo total acumulado, vía `get_caja_resumen()`). Ambas
+  funciones son de `libracore.db`, sqlite3 crudo con conexión global ya
+  configurada por `app/services/billing.py` al arrancar la app —
+  `DashboardService` las llama directo, sin inyectar ninguna
+  dependencia nueva (mismo patrón que `billing.py` ya usa). No se
+  agregó gating explícito por módulo "facturacion" dentro del
+  dashboard: en el diseño actual de planes (ADR-013), "facturacion" y
+  "dashboard" solo existen juntos (ambos exclusivos de Premium), así
+  que si el endpoint es alcanzable, facturación también está habilitada
+  — no hay combinación de plan real donde eso no valga hoy.
+- Consecuencias: 1 test nuevo (131 en total), verificado además
+  end-to-end contra un archivo SQLite real (turno completado con precio
+  configurado → factura emitida → dashboard del día refleja la factura
+  y el ingreso de caja correspondiente).

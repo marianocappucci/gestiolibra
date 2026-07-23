@@ -30,6 +30,9 @@ def test_dashboard_with_no_data_returns_zeros(admin_client: TestClient):
     assert body["clientes"]["nuevos_en_periodo"] == 0
     assert body["recordatorios_enviados_en_periodo"] == 0
     assert body["senas_pendientes"] == 0
+    assert body["facturacion"]["facturas_emitidas_en_periodo"] == 0
+    assert body["facturacion"]["caja"]["ingresos_en_periodo"] == 0
+    assert body["facturacion"]["caja"]["saldo_periodo"] == 0
 
 
 def test_dashboard_counts_appointments_by_status_and_today(admin_client: TestClient):
@@ -123,6 +126,33 @@ def test_dashboard_counts_pending_deposits(admin_client: TestClient):
     client.post(f"/deposits/{deposit_id}/mark-paid", json={"medio_pago": "efectivo"})
     response = client.get(f"/dashboard?date_from={date_from}&date_to={date_to}")
     assert response.json()["senas_pendientes"] == 0
+
+
+def test_dashboard_includes_facturacion_and_caja_summary(admin_client: TestClient):
+    client = _seeded_client(admin_client)
+    client.post("/clients", json={"id": "client-1", "name": "Ana"})
+    client.put("/services/service-1/prices", json={"branch_id": "branch-1", "price": "1000.00"})
+    created = client.post("/appointments", json={
+        "resource_id": "resource-1", "service_id": "service-1",
+        "client_id": "client-1", "starts_at": "2099-01-01T10:00:00",
+    })
+    appointment_id = created.json()["id"]
+    client.post(f"/appointments/{appointment_id}/confirm")
+    completed = client.post(
+        f"/appointments/{appointment_id}/complete", json={"medio_pago": "efectivo"},
+    )
+    assert completed.status_code == 200, completed.text
+
+    # La factura se emite con fecha de hoy (no la del turno, que puede ser
+    # a futuro), asi que el rango del dashboard tiene que cubrir hoy.
+    date_from, date_to = _today_range()
+    response = client.get(f"/dashboard?date_from={date_from}&date_to={date_to}")
+    assert response.status_code == 200
+    facturacion = response.json()["facturacion"]
+    assert facturacion["facturas_emitidas_en_periodo"] == 1
+    assert facturacion["caja"]["ingresos_en_periodo"] == 1000.0
+    assert facturacion["caja"]["saldo_periodo"] == 1000.0
+    assert facturacion["caja"]["saldo_total"] == 1000.0
 
 
 def test_dashboard_requires_admin(staff_client: TestClient):
