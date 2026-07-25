@@ -10,7 +10,7 @@ LibraGenda").
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
-from libragenda import Appointment, InMemoryScheduler
+from libragenda import Appointment, InMemoryScheduler, to_utc
 from libragenda.availability_repository import SqlAlchemyAvailabilityRepository
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.repositories import AppointmentRepository
@@ -28,22 +28,6 @@ class OutsideBusinessHours(Exception):
     branch_hours.py's opt-in gating)."""
 
 
-def _as_utc(starts_at: datetime) -> datetime:
-    """Normalize to a timezone-aware UTC instant.
-
-    PostgreSQL's DateTime(timezone=True) columns always return aware
-    datetimes; a naive value from the request would blow up comparing
-    against a block/appointment already round-tripped through the database
-    (works by accident on SQLite, which stays naive throughout). Naive
-    input is treated as already being UTC — branch-local time conversion
-    is not wired yet (see libragenda.timezones for that, once branches
-    carry a selected timezone through this API).
-    """
-    if starts_at.tzinfo is None:
-        return starts_at.replace(tzinfo=timezone.utc)
-    return starts_at.astimezone(timezone.utc)
-
-
 class AppointmentService:
     def __init__(
         self,
@@ -56,6 +40,24 @@ class AppointmentService:
         self.appointments = appointments
         self.availability = availability
         self.branch_hours = branch_hours
+
+    def _resolve_utc(self, resource_id: str, starts_at: datetime) -> datetime:
+        """Normalize to a timezone-aware UTC instant.
+
+        A naive value is interpreted as branch-local wall-clock time (the
+        civil time a `datetime-local` form field naturally produces) and
+        converted using the resource's branch timezone (`Branch.timezone`,
+        default "UTC" if the resource has no branch or the branch was
+        deleted). An already-aware value (e.g. an explicit offset in the
+        request) is trusted as-is and just re-expressed in UTC — same as
+        before this method existed.
+        """
+        if starts_at.tzinfo is not None:
+            return starts_at.astimezone(timezone.utc)
+        resource = self.catalog.get_resource(resource_id)
+        branch = self.catalog.get_branch(resource.branch_id) if resource and resource.branch_id else None
+        branch_timezone = branch.timezone if branch is not None else "UTC"
+        return to_utc(starts_at, branch_timezone)
 
     def _check_branch_hours(self, resource_id: str, starts_at: datetime, ends_at: datetime) -> None:
         resource = self.catalog.get_resource(resource_id)
@@ -71,7 +73,7 @@ class AppointmentService:
         service = services.get(service_id)
         if service is None:
             raise ServiceNotFound(service_id)
-        starts_at = _as_utc(starts_at)
+        starts_at = self._resolve_utc(resource_id, starts_at)
         self._check_branch_hours(resource_id, starts_at, starts_at + service.duration)
         windows = [item for _, item in self.availability.list_availability(resource_id)]
         blocks = [item for _, item in self.availability.list_blocks(resource_id)]
@@ -102,7 +104,7 @@ class AppointmentService:
     ) -> Appointment:
         current = self.appointments.get(appointment_id)
         resource_id = current.resource_id if current is not None else ""
-        starts_at = _as_utc(starts_at)
+        starts_at = self._resolve_utc(resource_id, starts_at)
         if current is not None:
             self._check_branch_hours(resource_id, starts_at, starts_at + current.duration)
         windows = [item for _, item in self.availability.list_availability(resource_id)]

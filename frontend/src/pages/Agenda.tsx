@@ -5,8 +5,8 @@ import { z } from 'zod'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
   api, ApiError, STATUS_LABELS, TIPO_COMPROBANTE_LABELS,
-  type Appointment, type AppointmentStatus, type Client, type CompleteAppointmentResponse,
-  type Factura, type Resource, type Service,
+  type Appointment, type AppointmentStatus, type Branch, type Client,
+  type CompleteAppointmentResponse, type Factura, type Resource, type Service,
 } from '../api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -43,9 +43,13 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function formatTime(iso: string): string {
+// Se formatea en la timezone de la sucursal del recurso, no en la del
+// navegador -- un turno a las 18:00 en una sucursal de Bs. As. tiene que
+// mostrar 18:00 sin importar en qué huso horario esté mirando la agenda
+// quien la usa (ver DECISIONS.md ADR-028).
+function formatTime(iso: string, timeZone: string): string {
   return new Date(iso).toLocaleString('es-AR', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone,
   })
 }
 
@@ -68,6 +72,7 @@ type AppointmentFormValues = z.infer<typeof appointmentSchema>
 
 export function Agenda() {
   const [resources, setResources] = useState<Resource[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [resourceId, setResourceId] = useState<string>('')
@@ -90,10 +95,12 @@ export function Agenda() {
   useEffect(() => {
     Promise.all([
       api.get<Resource[]>('/resources'),
+      api.get<Branch[]>('/branches'),
       api.get<Service[]>('/services'),
       api.get<Client[]>('/clients'),
-    ]).then(([r, s, c]) => {
+    ]).then(([r, b, s, c]) => {
       setResources(r)
+      setBranches(b)
       setServices(s)
       setClients(c)
       if (r.length > 0) setResourceId(r[0].id)
@@ -190,8 +197,19 @@ export function Agenda() {
     return services.find((s) => s.id === id)?.name ?? id
   }
 
+  // El horario ingresado/mostrado siempre es el de la sucursal del recurso
+  // seleccionado, no el del navegador -- ver DECISIONS.md ADR-028.
+  const resourceTimezone = useMemo(() => {
+    const branchId = resources.find((r) => r.id === resourceId)?.branch_id
+    return branches.find((b) => b.id === branchId)?.timezone ?? 'UTC'
+  }, [resourceId, resources, branches])
+
   const columns = useMemo<ColumnDef<Appointment>[]>(() => [
-    { accessorKey: 'starts_at', header: sortableHeader('Horario'), cell: ({ row }) => formatTime(row.original.starts_at) },
+    {
+      accessorKey: 'starts_at',
+      header: sortableHeader('Horario'),
+      cell: ({ row }) => formatTime(row.original.starts_at, resourceTimezone),
+    },
     { id: 'client', header: 'Cliente', cell: ({ row }) => clientName(row.original.client_id) },
     { id: 'service', header: 'Servicio', cell: ({ row }) => serviceName(row.original.service_id) },
     {
@@ -228,7 +246,7 @@ export function Agenda() {
       },
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [clients, services])
+  ], [clients, services, resourceTimezone])
 
   return (
     <div className="grid gap-4">
@@ -314,7 +332,7 @@ export function Agenda() {
                 name="starts_at"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Horario</FormLabel>
+                    <FormLabel>Horario ({resourceTimezone})</FormLabel>
                     <FormControl>
                       <Input type="datetime-local" {...field} className="w-56" />
                     </FormControl>

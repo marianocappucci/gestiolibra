@@ -79,3 +79,53 @@ def test_agenda_rejects_date_to_before_date_from(seeded_client: TestClient):
         "date_from": "2026-07-20", "date_to": "2026-07-19",
     })
     assert response.status_code == 422
+
+
+def test_naive_starts_at_is_interpreted_as_branch_local_time(admin_client: TestClient):
+    # Sucursal en UTC-3 (Buenos Aires, sin horario de verano): un turno
+    # ingresado como "10:00" en el formulario debe guardarse como
+    # 13:00 UTC, no como 10:00 UTC (ver DECISIONS.md ADR-028).
+    client = admin_client
+    client.post("/branches", json={
+        "id": "branch-1", "name": "Sucursal BA", "timezone": "America/Argentina/Buenos_Aires",
+    })
+    client.post("/resources", json={"id": "resource-1", "name": "Box 1", "branch_id": "branch-1"})
+    client.post("/services", json={"id": "service-1", "name": "Corte", "duration_minutes": 30})
+    client.post("/clients", json={"id": "client-1", "name": "Ana"})
+    for weekday in range(7):
+        client.post("/resources/resource-1/availability", json={
+            "weekday": weekday, "starts_at": "00:00:00", "ends_at": "23:59:00",
+        })
+
+    created = client.post("/appointments", json={
+        "resource_id": "resource-1", "service_id": "service-1",
+        "client_id": "client-1", "starts_at": "2026-07-20T10:00:00",
+    })
+    assert created.status_code == 201
+
+    response = client.get("/resources/resource-1/agenda", params={
+        "date_from": "2026-07-20", "date_to": "2026-07-20",
+    })
+    assert response.json()[0]["starts_at"] == "2026-07-20T13:00:00Z"
+
+
+def test_naive_starts_at_defaults_to_utc_when_resource_has_no_branch(admin_client: TestClient):
+    client = admin_client
+    client.post("/resources", json={"id": "resource-1", "name": "Box sin sucursal"})
+    client.post("/services", json={"id": "service-1", "name": "Corte", "duration_minutes": 30})
+    client.post("/clients", json={"id": "client-1", "name": "Ana"})
+    for weekday in range(7):
+        client.post("/resources/resource-1/availability", json={
+            "weekday": weekday, "starts_at": "00:00:00", "ends_at": "23:59:00",
+        })
+
+    created = client.post("/appointments", json={
+        "resource_id": "resource-1", "service_id": "service-1",
+        "client_id": "client-1", "starts_at": "2026-07-20T10:00:00",
+    })
+    assert created.status_code == 201
+
+    response = client.get("/resources/resource-1/agenda", params={
+        "date_from": "2026-07-20", "date_to": "2026-07-20",
+    })
+    assert response.json()[0]["starts_at"] == "2026-07-20T10:00:00Z"
