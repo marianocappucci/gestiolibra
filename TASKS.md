@@ -4,8 +4,9 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Ninguna en curso — facturación en el frontend (ver ADR-027) desplegada
-y verificada en `dev.gestiolibra.com.ar` real, ver "Resuelto" más abajo.
+Ninguna en curso — timezone de sucursal de punta a punta (ver ADR-028)
+desplegado y verificado en `dev.gestiolibra.com.ar` real, ver "Resuelto"
+más abajo. Con esto, el contenido de la Fase 4 queda completo.
 
 ## Próximas
 
@@ -34,15 +35,6 @@ y verificada en `dev.gestiolibra.com.ar` real, ver "Resuelto" más abajo.
       $1500). No se borraron — entorno de desarrollo, no de producción
       real, mismo criterio que otros datos de verificación manual
       dejados en este ambiente. Limpiar si estorba.
-- [ ] El input de horario del formulario de turno (`datetime-local`)
-      manda la hora tal cual la eligió el usuario en su navegador, y el
-      backend la trata como UTC directo (`_as_utc()`, sin conversión de
-      timezone de sucursal — limitación preexistente, no introducida
-      por el frontend). Con un frontend real esto se vuelve visible para
-      un usuario de verdad, no solo para tests: un negocio fuera de UTC
-      va a ver/cargar turnos con la hora corrida. Resolverlo requiere
-      timezone de sucursal de punta a punta (LibraGenda ya expone
-      `Branch.timezone`, no está conectado al frontend todavía).
 - [ ] `libracore.provisioning.panel_admin.cmd_actualizar` tiene
       hardcodeado un solo `--ssh default=<archivo>` — funciona para
       Gestiolibra apuntando `LIBRACORE_SSH_KEY` al socket del ssh-agent
@@ -171,6 +163,18 @@ real: guardado de config ARCA (roundtrip confirmado), turno completado
 sin seña → diálogo de medio de pago → factura tipo B real con CAE mock
 mostrada correctamente. Sin errores de consola. Sin cambios de backend.
 136 tests de backend sin cambios (ninguno tocado en esta ronda).
+
+Resuelto (2026-07-25): timezone de sucursal de punta a punta (ver
+ADR-028). `AppointmentService._resolve_utc()` interpreta un horario
+naive como hora local de la sucursal del recurso (`libragenda.timezones.
+to_utc()`, ya existía sin conectar) en vez de tratarlo como UTC directo.
+`Agenda.tsx` muestra `Horario (<timezone>)` en el formulario y formatea
+los horarios guardados con la timezone de la sucursal, no la del
+navegador. 2 tests nuevos (138 en total). Verificado en
+`dev.gestiolibra.com.ar` real: sucursal cambiada a
+`America/Argentina/Buenos_Aires`, turno cargado como "10:00" → guardado
+como `13:00:00Z` → mostrado de vuelta como "10:00 a. m.". Con esto
+queda completo el contenido de la Fase 4.
 
 Resuelto (2026-07-23): stack de frontend normalizado con TanStack
 Table + React Hook Form + Zod (ver ADR-026). Agenda/Clientes migrados:

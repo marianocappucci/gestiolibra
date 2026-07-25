@@ -175,9 +175,15 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   fallaba con un 422 crudo) y muestra la factura emitida (tipo, número,
   CAE, total) en un segundo diálogo. Verificado en
   `dev.gestiolibra.com.ar` real de punta a punta (turno completado →
-  factura tipo B real con CAE mock). Sin cambios de backend. Con esto,
-  el contenido de la Fase 4 queda completo — solo falta el ítem técnico
-  de timezone de sucursal (siguiente).
-- Timezone de sucursal de punta a punta (hoy el horario que carga un
-  turno se trata como UTC directo, sin convertir por la timezone de la
-  sucursal — visible ahora con un frontend real, ver `TASKS.md`).
+  factura tipo B real con CAE mock). Sin cambios de backend.
+- Timezone de sucursal de punta a punta (completo — ver ADR-028).
+  `AppointmentService._resolve_utc()` interpreta un horario naive del
+  formulario como hora local de la sucursal del recurso (en vez de UTC
+  directo), usando `libragenda.timezones.to_utc()` — ya existía sin
+  conectar. El frontend muestra `Horario (<timezone>)` en el formulario
+  y formatea los horarios guardados con la timezone de la sucursal, no
+  la del navegador de quien mira la agenda. Verificado en
+  `dev.gestiolibra.com.ar` real: turno cargado como "10:00" en una
+  sucursal `America/Argentina/Buenos_Aires` → guardado como `13:00:00Z`
+  → mostrado de vuelta como "10:00 a. m.". Con esto, el contenido
+  completo de la Fase 4 queda cerrado.

@@ -923,3 +923,52 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   ambos endpoints (`/config/arca`, `/appointments/{id}/complete`) ya
   existían desde ADR-011. 136 tests de backend sin cambios (ninguno
   tocado en esta ronda).
+
+## ADR-028 — Timezone de sucursal de punta a punta
+
+- Estado: aceptada
+- Fecha: 2026-07-25
+- Contexto: último pendiente de contenido del frontend, anotado en
+  `TASKS.md` desde que el frontend real hizo visible un problema
+  preexistente: el input `datetime-local` del formulario de turno manda
+  siempre un datetime *naive* (sin offset), y `AppointmentService._as_utc()`
+  trataba cualquier datetime naive como si ya fuera UTC directo —
+  documentado en su propio docstring como una limitación conocida desde
+  antes de que hubiera frontend ("branch-local time conversion no está
+  wired todavía"). LibraGenda ya exponía todo lo necesario para
+  resolverlo (`Branch.timezone`, `libragenda.timezones.to_utc()`) sin
+  usarlo nunca desde Gestiolibra.
+- Decisión — backend: `AppointmentService._resolve_utc(resource_id,
+  starts_at)` reemplaza la función libre `_as_utc()`. Un datetime naive
+  se interpreta como hora local de la sucursal del recurso (resuelta vía
+  `catalog.get_resource()`→`get_branch()`, default `"UTC"` si el recurso
+  no tiene sucursal) y se convierte con `to_utc()` de LibraGenda — cero
+  código de conversión propio, solo conectar lo que ya existía. Un
+  datetime aware (con offset explícito) se sigue confiando tal cual,
+  mismo comportamiento que antes.
+- Decisión — frontend: `Agenda.tsx` ahora carga `/branches` además de
+  `/resources`, calcula `resourceTimezone` a partir del recurso
+  seleccionado, muestra el label `Horario (<timezone>)` en el formulario
+  de alta (para que quien carga el turno sepa en qué huso está
+  escribiendo) y formatea los horarios ya guardados con
+  `Intl.DateTimeFormat`/`toLocaleString(..., {timeZone})` usando la
+  timezone de la sucursal — no la del navegador de quien mira la
+  agenda. Antes, dos personas mirando la misma agenda desde husos
+  distintos hubieran visto horas distintas para el mismo turno.
+- Consecuencias: 2 tests de backend nuevos (sucursal no-UTC
+  `America/Argentina/Buenos_Aires` — un naive "10:00" se guarda como
+  "13:00Z"; recurso sin sucursal — sigue tratándose como UTC, sin
+  cambio de comportamiento) — 138 tests en total, la suite completa
+  sigue verde salvo el flake ya documentado del reloj de WSL2 (test no
+  tocado, confirmado en aislamiento). `npm run build` sin errores.
+  Verificado de punta a punta en `dev.gestiolibra.com.ar` real: sucursal
+  de prueba cambiada a `America/Argentina/Buenos_Aires`, turno cargado
+  con "10:00" en el formulario → guardado como `13:00:00Z` (confirmado
+  contra la API) → mostrado de vuelta como "10:00 a. m." en la tabla —
+  el ciclo completo ida y vuelta preserva la hora local correctamente.
+  Un turno viejo creado cuando la sucursal todavía tenía timezone UTC
+  (18:00 UTC) pasó a mostrarse como "15:00" tras el cambio de timezone
+  de la sucursal a Buenos Aires — comportamiento esperado, no un bug: el
+  instante UTC guardado no cambia, solo cambia en qué huso se
+  interpreta para mostrarlo. Sin errores de consola. Con esto, el
+  contenido completo de la Fase 4 queda cerrado.

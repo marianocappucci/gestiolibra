@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- **Timezone de sucursal de punta a punta** (ver ADR-028):
+  `AppointmentService._resolve_utc()` interpreta un horario naive del
+  formulario de turno como hora local de la sucursal del recurso (en
+  vez de tratarlo como UTC directo), usando
+  `libragenda.timezones.to_utc()` (ya existía, nunca conectado).
+  `Agenda.tsx` muestra `Horario (<timezone>)` en el formulario y
+  formatea los horarios guardados con la timezone de la sucursal, no
+  la del navegador. 2 tests nuevos (138 en total). Verificado en
+  `dev.gestiolibra.com.ar` real de punta a punta. Con esto, el
+  contenido completo de la Fase 4 queda cerrado.
 - **Facturación en el frontend: config ARCA + factura al completar un
   turno** (ver ADR-027): página `/facturacion` (admin-only) para
   `GET`/`PUT /config/arca`. Completar un turno con saldo pendiente
