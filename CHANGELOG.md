@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- **Facturación en el frontend: config ARCA + factura al completar un
+  turno** (ver ADR-027): página `/facturacion` (admin-only) para
+  `GET`/`PUT /config/arca`. Completar un turno con saldo pendiente
+  ahora pide el medio de pago en un diálogo en vez de fallar con un
+  422 crudo; si la respuesta incluye una factura, se muestra en un
+  segundo diálogo (tipo, número, CAE, total). Componente
+  `ui/dialog.tsx` nuevo (mismo patrón que `sheet.tsx` sobre
+  `radix-ui`). Verificado en `dev.gestiolibra.com.ar` real de punta a
+  punta. Sin cambios de backend. 136 tests de backend sin cambios.
 - **Stack de frontend normalizado: TanStack Table + React Hook Form +
   Zod** (ver ADR-026): `src/components/data-table.tsx` nuevo (wrapper
   genérico y reutilizable sobre TanStack Table + primitivos shadcn),

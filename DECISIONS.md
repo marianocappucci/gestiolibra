@@ -877,3 +877,49 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   Vite, no un error; no se hizo code-splitting todavía, queda anotado
   en `TASKS.md` si hace falta más adelante). 136 tests de backend sin
   cambios (ninguno tocado en esta ronda).
+
+## ADR-027 — Facturación en el frontend: config ARCA + factura al completar un turno
+
+- Estado: aceptada
+- Fecha: 2026-07-25
+- Contexto: último ítem pendiente de contenido de Fase 4 (clientes y
+  dashboard ya estaban, ver ADR-021) — el frontend no tenía forma de
+  configurar ARCA ni de ver la factura que ya emitía
+  `POST /appointments/{id}/complete` desde el backend (ADR-011).
+- Decisión — página `/facturacion` (admin-only, ítem nuevo en el nav):
+  formulario sobre `GET`/`PUT /config/arca` con React Hook Form + Zod,
+  mismo patrón que Clientes/Agenda desde ADR-026. `punto_venta` se
+  maneja como string en el schema del formulario y se convierte a
+  number recién al armar el payload — evita la fricción de tipos entre
+  `z.coerce.number()` y el resolver de React Hook Form (error de
+  compilación real encontrado al primer `npm run build`, no había
+  precedente de un campo numérico en un formulario de este frontend
+  todavía).
+- Decisión — factura al completar un turno: `Agenda.tsx` reemplaza el
+  `POST .../complete` directo por un flujo de dos pasos. (1) Si el
+  backend devuelve 422 ("medio_pago requerido para saldo de X" — la
+  validación ya existía, ver ADR-011, pero el frontend nunca la
+  manejaba y el error se mostraba crudo), se abre un diálogo pidiendo
+  el medio de pago (efectivo/transferencia/tarjeta/mercadopago) en vez
+  de mostrar el 422 como texto de error. (2) Si la respuesta incluye
+  `factura`, se muestra en un segundo diálogo (tipo A/B, número
+  `punto_venta-numero` formateado, CAE, total) — la única forma de ver
+  una factura desde el frontend hoy, no hay una lista de facturas
+  todavía (fuera de alcance de este ítem).
+- Decisión — componente `ui/dialog.tsx` nuevo: no existía un modal
+  centrado en este frontend (`Sheet` ya usado es un panel lateral, no
+  sirve para esto). Mismo patrón que `sheet.tsx`: wrapper sobre
+  `Dialog` del paquete `radix-ui` ya instalado (v1.6.5) — sin
+  dependencia nueva.
+- Consecuencias: verificado manualmente en `dev.gestiolibra.com.ar`
+  real (no solo build local): login, guardado de config ARCA
+  (roundtrip confirmado — `punto_venta` vuelve como number, no string),
+  alta de sucursal/recurso/servicio con precio y turno de prueba,
+  confirmar → completar sin seña previa → diálogo de medio de pago →
+  factura emitida real (tipo B para cliente Monotributista, CAE mock,
+  total $1500) mostrada correctamente en el segundo diálogo. Sin
+  errores de consola. `npm run build` sin errores de tipos (bundle
+  ~561 KB gzip ~170 KB, crecimiento marginal). Sin cambios de backend —
+  ambos endpoints (`/config/arca`, `/appointments/{id}/complete`) ya
+  existían desde ADR-011. 136 tests de backend sin cambios (ninguno
+  tocado en esta ronda).

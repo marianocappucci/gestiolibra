@@ -4,16 +4,15 @@ Trabajo concreto vigente. La dirección estratégica permanece en `ROADMAP.md`; 
 
 ## En curso
 
-Ninguna en curso — stack de frontend normalizado (ver ADR-026)
-desplegado y verificado en `dev.gestiolibra.com.ar` real, ver
-"Resuelto" más abajo.
+Ninguna en curso — facturación en el frontend (ver ADR-027) desplegada
+y verificada en `dev.gestiolibra.com.ar` real, ver "Resuelto" más abajo.
 
 ## Próximas
 
-- [ ] El bundle del frontend creció a ~552 KB (gzip ~169 KB) al sumar
-      TanStack Table + React Hook Form + Zod — advertencia de tamaño de
-      Vite, no un error. Evaluar code-splitting (`dynamic import()`)
-      si sigue creciendo con las páginas que faltan (facturación).
+- [ ] El bundle del frontend creció a ~561 KB (gzip ~170 KB) tras sumar
+      la página de facturación — advertencia de tamaño de Vite, no un
+      error. Evaluar code-splitting (`dynamic import()`) si sigue
+      creciendo.
 - [ ] `gestiolibra.com.ar` (dominio pelado, sin subdominio) no tiene
       proxy host en NPM ni certificado — HTTPS falla el handshake
       directamente, HTTP cae en el fallback default de NPM. Solo
@@ -24,9 +23,17 @@ desplegado y verificado en `dev.gestiolibra.com.ar` real, ver
       `restolibra.com.ar` → contenedor `-web`) — no es un bug, no
       apurar un proxy provisorio. Para entrar hoy, usar
       `https://dev.gestiolibra.com.ar`.
-- [ ] Extender el frontend con facturación (config ARCA, ver factura
-      por turno completado) — clientes y dashboard ya se sumaron
-      (ver ADR-021).
+- [ ] No hay una lista/historial de facturas en el frontend todavía —
+      la única forma de ver una factura hoy es el diálogo que aparece
+      al completar el turno que la generó (ver ADR-027). Si hace falta
+      consultar facturas viejas, agregar una vista propia (o sumarla al
+      dashboard).
+- [ ] Datos de prueba quedaron en `dev.gestiolibra.com.ar` real tras
+      verificar facturación (2026-07-25): sucursal/recurso/servicio
+      `*-test`, un turno completado y una factura real (CAE mock,
+      $1500). No se borraron — entorno de desarrollo, no de producción
+      real, mismo criterio que otros datos de verificación manual
+      dejados en este ambiente. Limpiar si estorba.
 - [ ] El input de horario del formulario de turno (`datetime-local`)
       manda la hora tal cual la eligió el usuario en su navegador, y el
       backend la trata como UTC directo (`_as_utc()`, sin conversión de
@@ -154,6 +161,16 @@ WAL-safe de la DB vía `sqlite3.Connection.backup()`) → datos mutados a
 propósito → restore desde el backup → confirmado que la fila marcadora
 vuelve y la mutación posterior desaparece, contenedor sano tras el
 reinicio. Sin cambios de código.
+
+Resuelto (2026-07-25): facturación en el frontend — página `/facturacion`
+(admin-only) para config ARCA (`GET`/`PUT /config/arca`), y diálogo de
+medio de pago + diálogo de factura al completar un turno con saldo
+pendiente (ver ADR-027). Componente `ui/dialog.tsx` nuevo (mismo patrón
+que `sheet.tsx` sobre `radix-ui`). Verificado en `dev.gestiolibra.com.ar`
+real: guardado de config ARCA (roundtrip confirmado), turno completado
+sin seña → diálogo de medio de pago → factura tipo B real con CAE mock
+mostrada correctamente. Sin errores de consola. Sin cambios de backend.
+136 tests de backend sin cambios (ninguno tocado en esta ronda).
 
 Resuelto (2026-07-23): stack de frontend normalizado con TanStack
 Table + React Hook Form + Zod (ver ADR-026). Agenda/Clientes migrados:

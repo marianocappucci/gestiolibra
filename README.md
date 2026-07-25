@@ -212,10 +212,12 @@ aplicación real.
 ## Frontend
 
 Primer frontend de Gestiolibra (ver `DECISIONS.md` ADR-019): SPA en
-React + TypeScript + Vite, en `frontend/`. MVP: login + agenda/turnos
-(clientes, dashboard y facturación quedan para más adelante). Consume
-la API JSON de este mismo repo sin cambios — misma cookie de sesión
-(`gl_session`).
+React + TypeScript + Vite, en `frontend/`. Páginas: `/agenda` (login +
+turnos, MVP original), `/clientes`, `/reportes` (dashboard, admin-only)
+y `/facturacion` (admin-only — config ARCA; completar un turno con
+saldo pendiente pide el medio de pago y muestra la factura emitida, ver
+`DECISIONS.md` ADR-027). Consume la API JSON de este mismo repo sin
+cambios — misma cookie de sesión (`gl_session`).
 
 ```bash
 cd frontend

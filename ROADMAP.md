@@ -169,6 +169,15 @@ entorno dev real" de la Fase 3 del roadmap de LibraGenda.
   vez de error crudo). `Layout.tsx` nuevo con header+nav compartido.
   Verificado manualmente con ambos roles contra la API real. Falta
   facturación y el deploy de este cambio al VPS.
+- Extender el frontend con facturación (completo — ver ADR-027).
+  Página `/facturacion` (admin-only) para config ARCA. Completar un
+  turno con saldo pendiente pide el medio de pago en un diálogo (antes
+  fallaba con un 422 crudo) y muestra la factura emitida (tipo, número,
+  CAE, total) en un segundo diálogo. Verificado en
+  `dev.gestiolibra.com.ar` real de punta a punta (turno completado →
+  factura tipo B real con CAE mock). Sin cambios de backend. Con esto,
+  el contenido de la Fase 4 queda completo — solo falta el ítem técnico
+  de timezone de sucursal (siguiente).
 - Timezone de sucursal de punta a punta (hoy el horario que carga un
   turno se trata como UTC directo, sin convertir por la timezone de la
   sucursal — visible ahora con un frontend real, ver `TASKS.md`).
