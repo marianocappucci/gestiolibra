@@ -21,11 +21,21 @@ def https_client(app) -> TestClient:
     cookie jar won't send a Secure cookie back over plain http, and
     TestClient defaults to http://testserver. A dotted hostname is required
     too: httpx's cookie jar domain-matching is unreliable for single-label
-    hosts like the default "testserver" -- reproduced standalone as an
-    intermittent ~5% rate of an already-logged-in session getting 401'd on
-    the very next request, with the valid signed cookie still sitting in
-    the jar (i.e. not a signature/expiry problem, a domain-matching one).
-    0 failures in 300 iterations once the host has a dot."""
+    hosts like the default "testserver". This part is real and stays.
+
+    CORRECTION (2026-07-25, investigated in VentaLibra/DECISIONS.md
+    ADR-006): the intermittent 401 documented here before as fixed by this
+    dotted hostname ("0 failures in 300 iterations") was misdiagnosed. Re-run
+    30 clean iterations of this suite after that investigation: 30/30 had at
+    least one failure, spread across unrelated test files -- the dotted
+    hostname does NOT fix it. The real cause is this machine's WSL2 clock
+    jumping ~15s forward/backward recurrently during a test run (confirmed
+    with a standalone `time.time()` monitor), which intermittently makes
+    itsdangerous's signature/expiry check on SessionAuth's cookie fail even
+    though the cookie is valid and was issued moments earlier -- not a
+    cookie-jar or domain-matching problem. No code fix exists for this: it's
+    an environment issue (see the ADR for what was tried and ruled out:
+    thread-limiter, locks, converting everything to `async def`)."""
     return TestClient(app, base_url="https://gestiolibra.test")
 
 
@@ -35,9 +45,13 @@ def admin_client():
 
     Entered as a context manager and kept open for the whole test: outside
     a `with` block, TestClient spins up a brand new anyio portal thread per
-    request instead of reusing one (see starlette.testclient.TestClient),
-    which raced with SQLite's single StaticPool connection often enough to
-    intermittently 401 an already-authenticated session mid-test.
+    request instead of reusing one (see starlette.testclient.TestClient).
+
+    CORRECTION (2026-07-25): this used to blame an "anyio portal thread /
+    SQLite StaticPool race" for the intermittent 401 seen mid-test -- see
+    the corrected note on `https_client()` above. That theory was never
+    confirmed and the real cause (WSL2 clock jumps) has nothing to do with
+    threading or connection pooling.
     """
     with https_client(create_app("sqlite:///:memory:")) as client:
         response = client.post("/auth/login", json={"username": "admin", "password": "admin"})
