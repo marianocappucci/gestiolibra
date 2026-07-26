@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- **Endpoint `POST /auth/verify`** (ver ADR-029): chequeo de credenciales
+  sin sesión, protegido por `X-Internal-Auth`/`DOCS_AUTH_SECRET`, para que
+  el login de `/docs/` de `gestiolibra_web` valide contra la instancia
+  real del cliente. 5 tests nuevos.
 - **Timezone de sucursal de punta a punta** (ver ADR-028):
   `AppointmentService._resolve_utc()` interpreta un horario naive del
   formulario de turno como hora local de la sucursal del recurso (en

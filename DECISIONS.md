@@ -972,3 +972,37 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   instante UTC guardado no cambia, solo cambia en qué huso se
   interpreta para mostrarlo. Sin errores de consola. Con esto, el
   contenido completo de la Fase 4 queda cerrado.
+
+## ADR-029 — Endpoint `POST /auth/verify` para el login de `/docs/` de gestiolibra_web
+
+- Estado: aceptada
+- Fecha: 2026-07-26
+- Contexto: se construyó `gestiolibra_web`, la landing de marketing del
+  producto, con documentación técnica en `/docs/` gateada por login —
+  mismo patrón que ya usan Contalibra/Restolibra: la landing no guarda
+  usuarios propios, valida en tiempo real contra la instancia real del
+  cliente vía un endpoint interno protegido por un secreto compartido
+  (`DOCS_AUTH_SECRET`). Ese endpoint no existía todavía en Gestiolibra.
+- Decisión: `POST /auth/verify` en `app/routers/auth.py`, junto al
+  resto de endpoints de auth existentes (`/login`, `/logout`, `/me`).
+  Recibe `username`/`password`, exige el header `X-Internal-Auth`
+  comparado con `hmac.compare_digest()` contra `DOCS_AUTH_SECRET` (leído
+  del entorno en cada request, no al importar el módulo, para no quedar
+  desactualizado si el proceso lo recibe más tarde) y responde
+  `{"valid": bool}` reusando `UserRepository.check_credentials()` — la
+  misma validación que usa `/login`, sin crear ninguna cookie de sesión.
+  Si el secreto no está configurado, falla cerrado (401) — mismo
+  criterio que la resolución de `SECRET_KEY` de `SessionAuth` en el
+  resto de la app.
+- Alternativas consideradas: reusar `/login` tal cual desde la landing
+  — descartada porque crearía una sesión real innecesaria del lado de
+  la app solo para chequear una contraseña, y expondría la cookie de
+  sesión a un flujo que no la necesita.
+- Consecuencias: 5 tests nuevos (`tests/test_auth_verify.py`): sin
+  secreto configurado, con secreto incorrecto, credenciales válidas,
+  contraseña inválida, y que el endpoint no crea sesión (`/auth/me`
+  sigue en 401 después de llamarlo). Suite completa verificada en verde
+  salvo el flake ya documentado del reloj de WSL2 (un test distinto en
+  cada corrida, no relacionado con este cambio). Sin cambios de
+  frontend ni de ningún otro endpoint. Detalle del lado de la landing en
+  `gestiolibra_web` (`auth/app.py`).
