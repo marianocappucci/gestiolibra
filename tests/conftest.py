@@ -64,7 +64,7 @@ def staff_client(admin_client: TestClient):
     """A second client logged in as a staff user that admin_client just
     created -- same app/database, separate session/cookie."""
     created = admin_client.post("/users", json={
-        "id": "staff-1", "username": "staff-1", "name": "Empleada",
+        "username": "staff-1", "name": "Empleada",
         "password": "staff-pass", "role": "staff",
     })
     assert created.status_code == 201, created.text
