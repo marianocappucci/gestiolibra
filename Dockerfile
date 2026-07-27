@@ -35,26 +35,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl git ope
 # pyproject.toml referencia LibraGenda/LibraCore via git+https (asi
 # funciona tambien el dev local en WSL, que no tiene identidad SSH contra
 # GitHub -- ver wiki/entities/libracore.md). El build en el VPS reescribe
-# esas URLs a git+ssh (--mount=type=ssh, agente con las dos deploy keys de
-# solo lectura cargadas -- libracore ya tenia la suya, libragenda es
-# nueva, GitHub no permite reusar una deploy key entre repos) y las
-# descarta con la imagen: ninguna clave queda en ninguna capa.
+# esas URLs a git+ssh, cada una con su propio mount SSH con id propio
+# (--mount=type=ssh,id=libracore / id=libragenda -- mismo patron que
+# Contalibra/Restolibra: docker_build_ssh_args(), libracore >= v0.25.0, le
+# pasa a cada id su propia key dedicada, sin ambiguedad de que identidad
+# ofrece GitHub) y las descarta con la imagen: ninguna clave queda en
+# ninguna capa.
 #
-# GitHub autentica la conexion SSH completa con la PRIMERA key del agente
-# que acepte -- no reintenta con la otra si esa key no tiene acceso al
-# repo pedido. Con un agente multi-key eso rompe: la key de libracore
-# puede autenticar la conexion y despues el repo de libragenda devuelve
-# "Repository not found" (identidad correcta a nivel transporte, sin
-# permiso a nivel repo). Por eso cada dependencia usa su propio alias de
-# Host con `IdentitiesOnly yes` + su public key especifica -- eso filtra
-# que identidad del agente se ofrece por alias, aunque el agente tenga
-# cargadas ambas. Las public keys no son secreto, se hornean en la imagen.
+# `pip install .` necesita resolver AMBAS dependencias en un solo comando,
+# asi que no alcanza con un SSH_AUTH_SOCK global (esa variable solo puede
+# apuntar a un socket a la vez). Cada dependencia usa su propio alias de
+# Host, seleccionando la identidad via `IdentityAgent` (el socket del
+# mount con ese id, que ya trae una sola key) en vez de `IdentityFile` --
+# mas simple que hornear public keys en la imagen para filtrar que
+# identidad ofrece un agente multi-key compartido (asi fallaba antes:
+# --mount=type=ssh sin id forwardeaba un agente de una sola key, que no
+# tenia la identidad que el alias de libragenda pedia).
 RUN mkdir -p -m 0700 /root/.ssh \
     && ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null \
-    && printf 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG7oB3H2Rd+xsO/qCUk5aCA14/5GaQFMSh1U0ErJjG55 vps-donweb-libracore-deploy-key\n' > /root/.ssh/id_libracore.pub \
-    && printf 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG4hVY2CmSWj0Na3K8DeryjTDM6URpN8Wj4htLaiLK+L deploy-key-libragenda-readonly\n' > /root/.ssh/id_libragenda.pub \
-    && printf 'Host github-libracore\n  HostName github.com\n  User git\n  HostKeyAlias github.com\n  IdentityFile /root/.ssh/id_libracore.pub\n  IdentitiesOnly yes\n\nHost github-libragenda\n  HostName github.com\n  User git\n  HostKeyAlias github.com\n  IdentityFile /root/.ssh/id_libragenda.pub\n  IdentitiesOnly yes\n' > /root/.ssh/config \
-    && chmod 600 /root/.ssh/config /root/.ssh/id_libracore.pub /root/.ssh/id_libragenda.pub
+    && printf 'Host github-libracore\n  HostName github.com\n  User git\n  HostKeyAlias github.com\n  IdentityAgent /tmp/ssh-libracore.sock\n  IdentitiesOnly yes\n\nHost github-libragenda\n  HostName github.com\n  User git\n  HostKeyAlias github.com\n  IdentityAgent /tmp/ssh-libragenda.sock\n  IdentitiesOnly yes\n' > /root/.ssh/config \
+    && chmod 600 /root/.ssh/config
 
 COPY . .
 # Horneado FUERA de /app a proposito (ver ADR-022): el docker-compose.yml
@@ -67,7 +67,8 @@ COPY . .
 # la version del primer build para siempre. Copiarlo fuera del arbol
 # bind-mounteado evita el problema de raiz, sin volumenes.
 COPY --from=frontend-build /frontend/dist /opt/frontend-dist
-RUN --mount=type=ssh \
+RUN --mount=type=ssh,id=libracore,target=/tmp/ssh-libracore.sock \
+    --mount=type=ssh,id=libragenda,target=/tmp/ssh-libragenda.sock \
     git config --global url."ssh://git@github-libracore/marianocappucci/libracore.git".insteadOf "https://github.com/marianocappucci/libracore.git" \
     && git config --global url."ssh://git@github-libragenda/marianocappucci/libragenda.git".insteadOf "https://github.com/marianocappucci/libragenda.git" \
     && pip install --no-cache-dir . \
