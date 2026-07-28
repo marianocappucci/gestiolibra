@@ -16,6 +16,7 @@ import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form'
 import { DataTable, sortableHeader } from '@/components/data-table'
+import { Pencil, Trash2 } from 'lucide-react'
 
 const CONDICIONES_IVA = [
   'Responsable Inscripto',
@@ -130,16 +131,22 @@ export function Clientes() {
     }
   }
 
+  // Anchos fijos al contenido real de cada columna + la de nombre elastica,
+  // mismo patron que Contalibra/Restolibra: la tabla llena el ancho
+  // disponible sin desbordarlo. La columna de acciones no declara ancho --
+  // la mide `libra-ui` sola (ver wiki/entities/libra-ui.md v0.4.0).
   const columns = useMemo<ColumnDef<Client>[]>(() => {
     const base: ColumnDef<Client>[] = [
-      { accessorKey: 'name', header: sortableHeader('Nombre'), cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
-      { accessorKey: 'phone', header: 'Teléfono', cell: ({ row }) => row.original.phone ?? '—' },
-      { accessorKey: 'email', header: 'Email', cell: ({ row }) => row.original.email ?? '—' },
-      { accessorKey: 'cuit', header: 'CUIT', cell: ({ row }) => row.original.cuit ?? '—' },
-      { accessorKey: 'condicion_iva', header: 'Condición IVA', cell: ({ row }) => row.original.condicion_iva ?? '—' },
+      { accessorKey: 'name', header: sortableHeader('Nombre'), size: 200, minSize: 120, meta: { stretch: true }, cell: ({ row }) => <span className="block truncate font-medium" title={row.original.name}>{row.original.name}</span> },
+      { accessorKey: 'phone', header: 'Teléfono', size: 130, minSize: 100, cell: ({ row }) => row.original.phone ?? '—' },
+      { accessorKey: 'email', header: 'Email', size: 200, minSize: 140, cell: ({ row }) => <span className="block truncate" title={row.original.email ?? undefined}>{row.original.email ?? '—'}</span> },
+      { accessorKey: 'cuit', header: 'CUIT', size: 130, minSize: 110, cell: ({ row }) => row.original.cuit ?? '—' },
+      { accessorKey: 'condicion_iva', header: 'Condición IVA', size: 150, minSize: 120, cell: ({ row }) => <span className="block truncate" title={row.original.condicion_iva ?? undefined}>{row.original.condicion_iva ?? '—'}</span> },
       {
         accessorKey: 'active',
         header: 'Estado',
+        size: 100,
+        minSize: 85,
         cell: ({ row }) => (
           <Badge variant={row.original.active ? 'default' : 'outline'}>
             {row.original.active ? 'Activo' : 'Inactivo'}
@@ -152,9 +159,9 @@ export function Clientes() {
         id: 'actions',
         header: () => <div className="text-right">Acciones</div>,
         cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="outline" onClick={() => startEdit(row.original)}>Editar</Button>
-            <Button size="sm" variant="outline" onClick={() => handleDelete(row.original)}>Eliminar</Button>
+          <div className="flex justify-end gap-1">
+            <Button size="icon" variant="outline" title="Editar cliente" aria-label="Editar cliente" onClick={() => startEdit(row.original)}><Pencil /></Button>
+            <Button size="icon" variant="outline" className="text-destructive hover:text-destructive" title="Eliminar cliente" aria-label="Eliminar cliente" onClick={() => handleDelete(row.original)}><Trash2 /></Button>
           </div>
         ),
       })
