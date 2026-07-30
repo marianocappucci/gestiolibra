@@ -7,4 +7,8 @@ export const Login = createLogin({
   productName: 'Gestiolibra',
   productInitial: 'G',
   redirectTo: '/agenda',
+  // Muestra el enlace "¿Olvidaste tu contraseña?". Va de la mano con
+  // `incluir_password_reset=True` en app/routers/auth.py: sin el backend
+  // prendido, este enlace llevaría a una pantalla que no puede funcionar.
+  forgotPasswordPath: '/forgot-password',
 })

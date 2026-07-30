@@ -5,6 +5,7 @@ import os
 from fastapi import Depends, FastAPI
 
 from libraauth.models import Base as AuthBase
+from libraauth.password_reset import PasswordResetService
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -93,6 +94,20 @@ def create_app(database_url: str) -> FastAPI:
     )
     app.state.users = user_repository
     app.state.session_auth = build_session_auth(user_repository)
+    # Recuperación de contraseña por correo (libraauth v0.5.0). Usa
+    # `auth_sessions` —el mismo session_factory que el UserRepository— porque
+    # la tabla de tokens tiene FK a `usuarios`, que vive en la base de
+    # LibraCore y no en la del dominio.
+    #
+    # Sin SMTP configurado la app **levanta igual**: el que avisa es el
+    # endpoint, con un 503, recién cuando alguien pide un reset.
+    app.state.password_reset = PasswordResetService(
+        auth_sessions,
+        product_name="Gestiolibra",
+        reset_url_base=os.environ.get(
+            "GESTIOLIBRA_RESET_URL_BASE", "https://dev.gestiolibra.com.ar/reset-password"
+        ),
+    )
     app.state.reminder_dispatcher = ReminderDispatcher(
         appointment_repository, reminder_repository,
         LoggingNotificationPort(), DEFAULT_REMINDER_POLICIES,

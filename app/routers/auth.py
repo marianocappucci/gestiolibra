@@ -12,7 +12,12 @@ stateless de credenciales que usa el login de `/docs/` de la landing
 endpoint es opt-in porque no todo consumidor tiene landing (LibraDesk no la
 tenía cuando se creó el paquete); **sin este flag el `/docs/` de la landing
 deja de poder validar credenciales**.
+
+`incluir_password_reset=True` agrega `/auth/forgot-password` y
+`/auth/reset-password` (libraauth v0.5.0). Requiere que `main.py` haya
+configurado `app.state.password_reset`; sin eso los endpoints existirían pero
+fallarían al primer pedido.
 """
 from libraauth.session_auth import build_json_api_auth_router
 
-router = build_json_api_auth_router(incluir_verify=True)
+router = build_json_api_auth_router(incluir_verify=True, incluir_password_reset=True)
