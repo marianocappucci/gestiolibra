@@ -5,9 +5,11 @@ import { z } from 'zod'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
   api, ApiError, STATUS_LABELS, TIPO_COMPROBANTE_LABELS,
+  opcionesCliente, opcionesServicio,
   type Appointment, type AppointmentStatus, type Branch, type Client,
   type CompleteAppointmentResponse, type Factura, type Resource, type Service,
 } from '../api'
+import { SelectBuscable } from 'libra-ui/SelectBuscable'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -297,18 +299,16 @@ export function Agenda() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Servicio</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="w-56">
-                          <SelectValue placeholder="Servicio…" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {services.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SelectBuscable
+                        value={field.value}
+                        onChange={field.onChange}
+                        opciones={opcionesServicio(services)}
+                        placeholder="Servicio…"
+                        ariaLabel="Servicio"
+                        className="w-56"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -319,18 +319,16 @@ export function Agenda() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cliente</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="w-56">
-                          <SelectValue placeholder="Cliente…" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {clients.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SelectBuscable
+                        value={field.value}
+                        onChange={field.onChange}
+                        opciones={opcionesCliente(clients)}
+                        placeholder="Cliente…"
+                        ariaLabel="Cliente"
+                        className="w-56"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
