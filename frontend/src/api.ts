@@ -13,6 +13,8 @@
 
 export { api, ApiError, type User } from 'libra-ui/api-client'
 
+import type { OpcionSelect } from 'libra-ui/SelectBuscable'
+
 export type Branch = {
   id: string
   name: string
@@ -44,6 +46,34 @@ export type Client = {
   active: boolean
   cuit: string | null
   condicion_iva: string | null
+}
+
+// --- opciones para los selects con busqueda (libra-ui/SelectBuscable) ------
+//
+// Viven aca, junto a los tipos, para que toda pantalla que elija un cliente o
+// un servicio lo muestre y lo busque igual. El `hint` no es decorativo:
+// ademas de desambiguar dos nombres parecidos, **entra en la busqueda**.
+//
+// En un negocio de servicios el telefono es el mejor discriminador: es lo que
+// suele tenerse a mano cuando el cliente llama para sacar turno, y dos
+// personas pueden llamarse casi igual.
+
+export function opcionesCliente(clientes: Client[]): OpcionSelect[] {
+  return clientes.map((c) => ({
+    value: c.id,
+    label: c.name,
+    hint: [c.phone, c.active ? null : 'inactivo'].filter(Boolean).join(' · ') || undefined,
+  }))
+}
+
+export function opcionesServicio(servicios: Service[]): OpcionSelect[] {
+  return servicios.map((s) => ({
+    value: s.id,
+    label: s.name,
+    // La duracion es lo que distingue dos servicios de nombre parecido
+    // ("Corte" de 30 y "Corte + barba" de 45) al armar la agenda.
+    hint: `${s.duration_minutes} min`,
+  }))
 }
 
 export type AppointmentStatus =
