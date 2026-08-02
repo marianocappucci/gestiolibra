@@ -17,7 +17,7 @@ from libragenda.database import configure, get_engine, get_session_factory
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.sqlalchemy_repository import Base, SqlAlchemyAppointmentRepository
 
-from .auth import build_session_auth, require_admin, require_staff
+from .auth import build_session_auth, require_admin, require_admin_o_servicio, require_staff
 from .modules_gate import require_module
 from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
@@ -153,7 +153,17 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(clients.router, dependencies=staff_or_admin_catalog)
     app.include_router(availability.router, dependencies=admin_only)
     app.include_router(business_settings.router, dependencies=admin_only)
-    app.include_router(users_router.router, dependencies=admin_only)
+    # Usuarios acepta ADEMÁS el token de servicio (libraauth v0.7.0): es lo
+    # único que el backoffice de la suite necesita y que no puede salir del
+    # motor, porque el router de usuarios es propio de cada producto.
+    #
+    # Deliberadamente sólo este: el resto de los routers admin-only siguen
+    # exigiendo sesión de un usuario del producto. El backoffice no tiene por
+    # qué poder tocar sucursales, precios ni disponibilidad, y darle el token
+    # acceso a todo `admin_only` sería ampliar el permiso sin necesidad.
+    app.include_router(
+        users_router.router, dependencies=[Depends(require_admin_o_servicio)]
+    )
     # Recordatorios, señas, facturación y dashboard son módulos gateables
     # por plan (ver plans.py) -- catálogo/turnos nunca se gatean.
     app.include_router(
