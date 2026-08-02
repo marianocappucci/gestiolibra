@@ -6,6 +6,8 @@ from fastapi import Depends, FastAPI
 
 from libraauth.models import Base as AuthBase
 from libraauth.password_reset import PasswordResetService
+from libraauth.session_auth import build_smtp_settings_router
+from libraauth.smtp_settings import SmtpSettingsRepository, resolver_smtp_config
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -101,12 +103,21 @@ def create_app(database_url: str) -> FastAPI:
     #
     # Sin SMTP configurado la app **levanta igual**: el que avisa es el
     # endpoint, con un 503, recién cuando alguien pide un reset.
+    # Config SMTP editable por backoffice (libraauth v0.6.0), con la contraseña
+    # cifrada en reposo. Mismo `auth_sessions` que el resto del motor.
+    app.state.smtp_settings = SmtpSettingsRepository(auth_sessions)
     app.state.password_reset = PasswordResetService(
         auth_sessions,
         product_name="Gestiolibra",
         reset_url_base=os.environ.get(
             "GESTIOLIBRA_RESET_URL_BASE", "https://dev.gestiolibra.com.ar/reset-password"
         ),
+        # CALLABLE, no un valor: se resuelve en cada envío. Con un valor fijo,
+        # guardar el SMTP por pantalla no tendría efecto hasta recrear el
+        # contenedor. Si no hay nada guardado cae a las variables de entorno,
+        # así que esta instancia se comporta igual que antes hasta que alguien
+        # cargue algo.
+        smtp_config=lambda: resolver_smtp_config(auth_sessions),
     )
     app.state.reminder_dispatcher = ReminderDispatcher(
         appointment_repository, reminder_repository,
@@ -121,6 +132,10 @@ def create_app(database_url: str) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(auth_router.router)
+    # `GET`/`PUT`/`DELETE /admin/smtp`. El router ya exige rol admin por dentro
+    # (quien pueda escribir ahí puede redirigir a dónde salen los enlaces de
+    # recuperación de contraseña de todos los usuarios).
+    app.include_router(build_smtp_settings_router())
     # Catalog/admin surface: only admins manage branches, resources, services,
     # clients, availability, hours, prices, business settings and other users
     # -- staff only touches turnos.
