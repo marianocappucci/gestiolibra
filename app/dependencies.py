@@ -2,6 +2,8 @@
 
 from fastapi import Request
 
+from libraauth.auditoria import AuditoriaRepository
+from libraauth.auth_events import AuthEventRepository
 from libragenda import DepositManager, ReminderDispatcher
 from libragenda.availability_repository import SqlAlchemyAvailabilityRepository
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
@@ -15,6 +17,14 @@ from .services.clients import ClientRepository
 from .services.dashboard import DashboardService
 from .services.service_prices import ServicePriceRepository
 from .services.users import UserRepository
+
+
+def get_auditoria_repository(request: Request) -> AuditoriaRepository:
+    return request.app.state.auditoria
+
+
+def get_auth_events_repository(request: Request) -> AuthEventRepository:
+    return request.app.state.auth_events
 
 
 def get_catalog_repository(request: Request) -> SqlAlchemyCatalogRepository:

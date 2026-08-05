@@ -23,7 +23,11 @@ dependencies = [
     # arreglada en vez de heredar un bug conocido -- hasta v1.6.0 un guion
     # largo en el nombre de empresa devolvia 500 al descargar el comprobante.
     "libracore @ git+https://github.com/marianocappucci/libracore.git@v1.8.2",
-    "libraauth @ git+https://github.com/marianocappucci/libraauth.git@v0.7.0",
+    # v0.8.0 trae el log de accesos, v0.9.0 el de actividad y v0.10.0 el router
+    # que los lee. Los tres nacieron en LibraDesk y se extrajeron para que este
+    # producto no los copie: aca el trabajo es la lista blanca de que se audita
+    # (`app/auditoria.py`) y tres lineas de cableado en `main.py`.
+    "libraauth @ git+https://github.com/marianocappucci/libraauth.git@v0.10.0",
     "fastapi>=0.111,<1",
     "uvicorn[standard]>=0.30,<1",
     "alembic>=1.13,<2",
