@@ -10,6 +10,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Facturacion } from './pages/Facturacion'
 import { Usuarios } from './pages/Usuarios'
 import { Logs } from './pages/Logs'
+import { Configuracion } from './pages/Configuracion'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -79,6 +80,16 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Logs />
+          </ProtectedRoute>
+        }
+      />
+      {/* Una sola ruta para las cuatro secciones: la activa va en
+          `?seccion=`, así se puede linkear una en particular. */}
+      <Route
+        path="/configuracion"
+        element={
+          <ProtectedRoute>
+            <Configuracion />
           </ProtectedRoute>
         }
       />
