@@ -27,7 +27,11 @@ dependencies = [
     # que los lee. Los tres nacieron en LibraDesk y se extrajeron para que este
     # producto no los copie: aca el trabajo es la lista blanca de que se audita
     # (`app/auditoria.py`) y tres lineas de cableado en `main.py`.
-    "libraauth @ git+https://github.com/marianocappucci/libraauth.git@v0.10.0",
+    #
+    # v0.12.0: una edicion que solo toca columnas ocultas deja fila igual, con
+    # el valor tapado. Antes se descartaba entera — o sea que cambiar SOLO la
+    # contrasena de un usuario no dejaba rastro en el log de este producto.
+    "libraauth @ git+https://github.com/marianocappucci/libraauth.git@v0.12.0",
     "fastapi>=0.111,<1",
     "uvicorn[standard]>=0.30,<1",
     "alembic>=1.13,<2",
