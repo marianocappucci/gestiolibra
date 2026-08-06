@@ -31,7 +31,7 @@ dependencies = [
     # v0.12.0: una edicion que solo toca columnas ocultas deja fila igual, con
     # el valor tapado. Antes se descartaba entera — o sea que cambiar SOLO la
     # contrasena de un usuario no dejaba rastro en el log de este producto.
-    "libraauth @ git+https://github.com/marianocappucci/libraauth.git@v0.12.0",
+    "libraauth @ git+https://github.com/marianocappucci/libraauth.git@v0.16.0",
     "fastapi>=0.111,<1",
     "uvicorn[standard]>=0.30,<1",
     "alembic>=1.13,<2",
