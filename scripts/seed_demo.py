@@ -253,8 +253,32 @@ def _sembrar_turnos(api: Api, clientes: dict, contar) -> None:
     pasado que sigue "pendiente" se lee como un error del sistema, no como un
     dato de ejemplo.
     """
+    #: Los días que el negocio atiende, tomados de HORARIOS: si mañana se suma
+    #: el domingo, esto lo sigue solo.
+    DIAS_HABILES = {dia for dia, _, _ in HORARIOS}
+
+    def _habil(fecha: date) -> bool:
+        return fecha.weekday() in DIAS_HABILES
+
     def cuando(dias: int, hora: int, minuto: int = 0) -> datetime:
-        return datetime.combine(HOY + timedelta(days=dias), time(hora, minuto))
+        """El día hábil número `dias` contando desde hoy (negativo = hacia atrás).
+
+        🔴 **No es `HOY + días`, y esa era la falla.** Con desplazamientos de
+        calendario, un turno a "+1" corrido un sábado cae domingo y LibraGenda
+        lo rechaza —correctamente— por estar fuera del horario. El seed lo
+        avisaba y seguía, así que la demo amanecía con menos turnos sin que
+        nada fallara a la vista, y el reset corre todas las noches.
+        """
+        fecha = HOY
+        paso = 1 if dias >= 0 else -1
+        restantes = abs(dias)
+        while not _habil(fecha):
+            fecha += timedelta(days=1)
+        while restantes:
+            fecha += timedelta(days=paso)
+            if _habil(fecha):
+                restantes -= 1
+        return datetime.combine(fecha, time(hora, minuto))
 
     # ⚠️ **No hay `GET /appointments`**: la agenda se lista por recurso y rango
     # (`/resources/{id}/agenda`). Preguntarle a la ruta que uno se imagina
