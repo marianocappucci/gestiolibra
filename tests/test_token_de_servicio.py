@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from libraauth.session_auth import SERVICE_TOKEN_ENV, SERVICE_TOKEN_HEADER
 
 from app.main import create_app
+from motor_de_test import fresh_database_url
 from conftest import https_client
 
 TOKEN = "un-token-de-servicio-de-prueba"
@@ -25,7 +26,7 @@ TOKEN = "un-token-de-servicio-de-prueba"
 @pytest.fixture
 def sin_sesion():
     """Cliente sin loguear: es como llega el backoffice, que no es usuario."""
-    with https_client(create_app("sqlite:///:memory:")) as client:
+    with https_client(create_app(fresh_database_url())) as client:
         yield client
 
 

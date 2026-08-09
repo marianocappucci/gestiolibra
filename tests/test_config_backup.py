@@ -17,6 +17,8 @@ import io
 import zipfile
 
 import pytest
+
+from motor_de_test import corre_contra_postgres
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -41,6 +43,13 @@ def admin_client(tmp_path):
     2. `engine.dispose()` sobre una base en memoria **la borra**: la base vive
        en la conexión. En producción siempre es un archivo.
     """
+    if corre_contra_postgres():
+        pytest.skip(
+            "Estos tests respaldan los ARCHIVOS de base. Contra "
+            "PostgreSQL no hay archivo que respaldar: el backup de una "
+            "instancia PostgreSQL es otro mecanismo (libracore.respaldo "
+            "desde v1.17.0), y simularlo aca probaria otra cosa."
+        )
     app = create_app(f"sqlite:///{tmp_path / 'gestiolibra.db'}")
     with https_client(app) as client:
         r = client.post("/auth/login", json={"username": "admin", "password": "admin"})

@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from motor_de_test import fresh_database_url
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +54,7 @@ def admin_client():
     confirmed and the real cause (WSL2 clock jumps) has nothing to do with
     threading or connection pooling.
     """
-    with https_client(create_app("sqlite:///:memory:")) as client:
+    with https_client(create_app(fresh_database_url())) as client:
         response = client.post("/auth/login", json={"username": "admin", "password": "admin"})
         assert response.status_code == 200, response.text
         yield client

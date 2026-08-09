@@ -8,6 +8,8 @@ flujo entero funcione contra la app real.
 from datetime import datetime, timedelta, timezone
 
 import pytest
+
+from motor_de_test import corre_contra_postgres, fresh_database_url
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -19,7 +21,7 @@ from conftest import https_client
 
 
 def test_los_endpoints_estan_montados():
-    client = https_client(create_app("sqlite:///:memory:"))
+    client = https_client(create_app(fresh_database_url()))
     # Sin SMTP configurado responde 503, que es justamente la prueba de que
     # el endpoint existe y llega al servicio (un 404 sería "no montado").
     r = client.post("/auth/forgot-password", json={"identificador": "admin"})
@@ -29,7 +31,7 @@ def test_los_endpoints_estan_montados():
 def test_forgot_password_responde_igual_exista_o_no(monkeypatch):
     monkeypatch.setenv("LIBRAAUTH_SMTP_HOST", "smtp.test")
     monkeypatch.setenv("LIBRAAUTH_SMTP_FROM_EMAIL", "no-reply@test")
-    app = create_app("sqlite:///:memory:")
+    app = create_app(fresh_database_url())
     enviados = []
     app.state.password_reset._send_email = lambda **kw: enviados.append(kw)
     client = https_client(app)
@@ -50,7 +52,7 @@ def test_flujo_completo_con_un_usuario_con_email(monkeypatch):
     del reset, y login con la contraseña nueva."""
     monkeypatch.setenv("LIBRAAUTH_SMTP_HOST", "smtp.test")
     monkeypatch.setenv("LIBRAAUTH_SMTP_FROM_EMAIL", "no-reply@test")
-    app = create_app("sqlite:///:memory:")
+    app = create_app(fresh_database_url())
     enviados = []
     app.state.password_reset._send_email = lambda **kw: enviados.append(kw)
     app.state.users.create(username="ana", name="Ana", password="vieja123",
@@ -75,12 +77,18 @@ def test_flujo_completo_con_un_usuario_con_email(monkeypatch):
 
 
 def test_token_invalido_da_400():
-    client = https_client(create_app("sqlite:///:memory:"))
+    client = https_client(create_app(fresh_database_url()))
     r = client.post("/auth/reset-password",
                     json={"token": "inventado", "new_password": "nueva-clave-1"})
     assert r.status_code == 400
 
 
+@pytest.mark.skipif(
+    corre_contra_postgres(),
+    reason="Abre la base de libracore con un engine propio apuntando a una RUTA "
+    "de archivo, y ademas usa PRAGMA foreign_key_check. Las dos cosas son de "
+    "SQLite; contra PostgreSQL habria que reescribir el test, no adaptarlo.",
+)
 def test_la_tabla_de_tokens_queda_en_la_base_de_libracore(tmp_path, monkeypatch):
     """El chequeo que el motor no puede hacer: que la tabla nueva haya
     quedado en el MISMO archivo que `usuarios`.
@@ -109,6 +117,10 @@ def test_la_tabla_de_tokens_queda_en_la_base_de_libracore(tmp_path, monkeypatch)
         ).fetchall() == []
 
 
+@pytest.mark.skipif(
+    corre_contra_postgres(),
+    reason="Abre la base de libracore con un engine propio apuntando a una RUTA de archivo, y ademas usa PRAGMA foreign_key_check. Las dos cosas son de SQLite; contra PostgreSQL habria que reescribir el test, no adaptarlo.",
+)
 def test_token_vencido_no_sirve(tmp_path, monkeypatch):
     """Se fuerza el vencimiento escribiendo `expires_at` en el pasado en vez
     de esperar una hora — el reloj real no participa."""
