@@ -1,3 +1,4 @@
+from motor_de_test import fresh_database_url
 import pytest
 from fastapi.testclient import TestClient
 
@@ -203,6 +204,6 @@ def test_staff_can_manage_own_appointments_but_not_catalog(seeded_client: TestCl
 
 def test_unauthenticated_request_returns_401():
     from app.main import create_app
-    client = https_client(create_app("sqlite:///:memory:"))
+    client = https_client(create_app(fresh_database_url()))
     assert client.get("/branches").status_code == 401
     assert client.post("/appointments", json={}).status_code == 401

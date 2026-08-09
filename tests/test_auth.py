@@ -1,11 +1,12 @@
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from motor_de_test import fresh_database_url
 from conftest import https_client
 
 
 def test_login_with_bootstrap_admin_succeeds():
-    client = https_client(create_app("sqlite:///:memory:"))
+    client = https_client(create_app(fresh_database_url()))
     response = client.post("/auth/login", json={"username": "admin", "password": "admin"})
     assert response.status_code == 200
     body = response.json()
@@ -14,19 +15,19 @@ def test_login_with_bootstrap_admin_succeeds():
 
 
 def test_login_with_wrong_password_returns_401():
-    client = https_client(create_app("sqlite:///:memory:"))
+    client = https_client(create_app(fresh_database_url()))
     response = client.post("/auth/login", json={"username": "admin", "password": "wrong"})
     assert response.status_code == 401
 
 
 def test_login_with_unknown_username_returns_401():
-    client = https_client(create_app("sqlite:///:memory:"))
+    client = https_client(create_app(fresh_database_url()))
     response = client.post("/auth/login", json={"username": "missing", "password": "whatever"})
     assert response.status_code == 401
 
 
 def test_me_without_login_returns_401():
-    client = https_client(create_app("sqlite:///:memory:"))
+    client = https_client(create_app(fresh_database_url()))
     assert client.get("/auth/me").status_code == 401
 
 
@@ -43,5 +44,5 @@ def test_logout_clears_the_session(admin_client: TestClient):
 
 
 def test_health_does_not_require_authentication():
-    client = https_client(create_app("sqlite:///:memory:"))
+    client = https_client(create_app(fresh_database_url()))
     assert client.get("/health").status_code == 200
