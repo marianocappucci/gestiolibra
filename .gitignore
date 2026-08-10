@@ -60,3 +60,8 @@ id_ed25519*
 data/
 logs/
 *.log
+
+# Excepcion a `*.sql`: el init del sidecar PostgreSQL es codigo de
+# infraestructura, no un dump. Sin versionarlo, el sidecar del VPS arranca sin
+# la base de LibraCore y el producto no levanta.
+!docker/postgres-init/*.sql
