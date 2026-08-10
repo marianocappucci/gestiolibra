@@ -130,8 +130,8 @@ def test_hay_turnos_pasados_y_futuros(api):
     from datetime import date, timedelta
 
     sembrar(api)
-    ayer = date.today() - timedelta(days=1)
-    manana = date.today() + timedelta(days=1)
+    hoy = date.today()
+    manana = hoy + timedelta(days=1)
 
     def cuantos(desde, hasta):
         return sum(
@@ -140,7 +140,17 @@ def test_hay_turnos_pasados_y_futuros(api):
             for r in api.get("/resources")
         )
 
-    assert cuantos(ayer, ayer) >= 1
+    # 🔴 El turno pasado NO cae en el día calendario anterior: el seed cuenta
+    # días HÁBILES, justamente porque un turno corrido a un domingo lo rechaza
+    # LibraGenda. Preguntar por "ayer" a secas pasa seis días de cada siete y
+    # falla los lunes -- que es como se descubrió, un lunes, con el CI en rojo
+    # por un cambio que no tenía nada que ver.
+    #
+    # Se pregunta por la semana pasada en vez de replicar acá la tabla de
+    # horarios del seed: acoplar el test a esa tabla es acoplarlo a lo que
+    # justamente está probando. Y sigue fallando si el seed pone todo hoy, que
+    # es lo que este test cuida.
+    assert cuantos(hoy - timedelta(days=7), hoy - timedelta(days=1)) >= 1
     assert cuantos(manana, manana + timedelta(days=3)) >= 1
 
 
