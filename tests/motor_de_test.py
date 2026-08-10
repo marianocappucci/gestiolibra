@@ -71,6 +71,73 @@ def fresh_database_url() -> str:
     return TEST_DATABASE_URL
 
 
+def _url_cruda(url: str) -> str:
+    return url.replace("postgresql+psycopg://", "postgresql://", 1)
+
+
+def url_libracore() -> str:
+    """La URL de la base de LibraCore: **otra base**, en el mismo servidor.
+
+    🔴 **No puede ser el mismo schema que el dominio, y esto no es preferencia.**
+    LibraCore y LibraGenda declaran los dos una tabla `clients`, con formas
+    incompatibles:
+
+        LibraCore   clients.id  INTEGER PRIMARY KEY AUTOINCREMENT
+        LibraGenda  clients.id  VARCHAR(100) PRIMARY KEY
+
+    En SQLite vivian en dos ARCHIVOS distintos y nunca se cruzaban. En un solo
+    schema hay una sola tabla: el segundo `CREATE TABLE IF NOT EXISTS` no hace
+    nada y no avisa, y despues PostgreSQL rechaza el DDL de LibraCore con
+    *"foreign key constraint cannot be implemented: Key columns are of
+    incompatible types: integer and character varying"*. Son las nueve FK del
+    core que apuntan a `clients(id)`.
+
+    Dos bases en el mismo servidor es la traduccion fiel de los dos archivos, y
+    es la topologia que va a necesitar tambien la instancia de produccion.
+    """
+    cruda = _url_cruda(TEST_DATABASE_URL)
+    base, _, _ = cruda.rpartition("/")
+    nombre = cruda.rsplit("/", 1)[1].split("?")[0]
+    return f"{base}/{nombre}_core"
+
+
+def _preparar_libracore() -> None:
+    """Crea la base de LibraCore si no esta, y la deja vacia."""
+    import psycopg
+
+    cruda = _url_cruda(TEST_DATABASE_URL)
+    servidor = cruda.rsplit("/", 1)[0] + "/postgres"
+    nombre = cruda.rsplit("/", 1)[1].split("?")[0] + "_core"
+
+    with psycopg.connect(servidor, autocommit=True) as conexion:
+        existe = conexion.execute(
+            "SELECT 1 FROM pg_database WHERE datname = %s", (nombre,)
+        ).fetchone()
+        if not existe:
+            conexion.execute(f'CREATE DATABASE "{nombre}"')
+
+    with psycopg.connect(url_libracore(), autocommit=True) as conexion:
+        # `IF EXISTS` por lo mismo que arriba: una corrida cortada a mitad no
+        # puede envenenar las siguientes.
+        conexion.execute("DROP SCHEMA IF EXISTS public CASCADE")
+        conexion.execute("CREATE SCHEMA public")
+
+
+def destino_libracore(ruta_sqlite) -> str:
+    """El destino de la base de LIBRACORE (facturacion, caja, ARCA).
+
+    🔴 **Esta era la mitad que la suite no ejercitaba.** El conftest le daba un
+    archivo SQLite temporal aunque el resto de la corrida fuera a PostgreSQL, asi
+    que el verde de este repo no decia nada sobre las ~340 consultas crudas de
+    LibraCore. Se vio al cablear [[ventalibra]], que tiene la misma estructura de
+    dos bases y las apunto a las dos.
+    """
+    if not corre_contra_postgres():
+        return str(ruta_sqlite)
+    _preparar_libracore()
+    return url_libracore()
+
+
 def url_para_archivo(ruta) -> str:
     """La URL de una base **en archivo**, para los tests que necesitan que la
     base sobreviva a la app (backup, restore, migraciones).
