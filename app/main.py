@@ -52,6 +52,59 @@ from libraauth.bootstrap import ensure_demo_user
 from .services.users import UserRepository, ensure_default_admin
 
 
+def _carpeta_de_backups(libracore_db_path: str) -> str:
+    """Donde se guardan los ZIP de backup.
+
+    🔴 **Salia de `os.path.dirname(libracore_db_path)`, y con la base en
+    PostgreSQL eso no es una carpeta.** `dirname()` de
+    `postgresql://usuario:clave@host:5432/base` devuelve
+    `postgresql://usuario:clave@host:5432`, y ahi se creaba `backups/`: una
+    carpeta **con la contrasena en el nombre**, colgando del directorio de
+    trabajo. Es el mismo defecto que `billing.configure()` tenia, en otro lugar
+    del mismo arranque.
+
+    Con la base en PostgreSQL no hay "al lado de la base": se usa `DATA_DIR`,
+    que es donde viven los logos de esta instancia.
+    """
+    if str(libracore_db_path).startswith(("postgresql://", "postgresql+psycopg://")):
+        return os.path.join(os.environ.get("DATA_DIR", "./data"), "backups")
+    return os.path.join(os.path.dirname(libracore_db_path), "backups")
+
+
+def _instancia_a_respaldar(database_url: str, libracore_db_path: str,
+                           directorios: list) -> Instancia:
+    """Que se lleva el backup, segun el motor de cada mitad.
+
+    🔴 **Las dos mitades o ninguna.** El dominio y LibraCore son dos bases
+    separadas -- dos archivos en SQLite, dos bases PostgreSQL despues del corte,
+    porque no pueden compartir schema: las dos declaran una tabla `clients` con
+    `id` de tipos incompatibles. Un backup con una sola no se puede restaurar:
+    o volves el dominio y te quedan usuarios de otro momento, o al reves. Y no
+    falla -- da un ZIP que se descarga y pesa poco.
+
+    `bases=` sirve para rutas de archivo: con la base en PostgreSQL la URL
+    entraba como si fuera una ruta, el archivo no existia y `_copiar_base` se lo
+    salteaba **en silencio**. Lo encontro la suite de [[medlibra]], donde ese
+    test no se saltea contra PostgreSQL; aca los skips lo tapaban.
+    """
+    dominio = make_url(database_url)
+    if dominio.drivername.startswith("postgresql"):
+        extra = []
+        if str(libracore_db_path).startswith(("postgresql://", "postgresql+psycopg://")):
+            extra.append(str(libracore_db_path))
+        return Instancia(
+            nombre="gestiolibra",
+            postgres_url=database_url,
+            postgres_extra=extra,
+            directorios=directorios,
+        )
+    return Instancia(
+        nombre="gestiolibra",
+        bases=[dominio.database, libracore_db_path],
+        directorios=directorios,
+    )
+
+
 def create_app(database_url: str) -> FastAPI:
     """Build the vertical app after configuring LibraGenda's PostgreSQL port."""
     configure(database_url)
@@ -260,12 +313,11 @@ def create_app(database_url: str) -> FastAPI:
     engine = get_engine()
     app.include_router(
         build_backup_router(
-            Instancia(
-                nombre="gestiolibra",
-                bases=[make_url(database_url).database, libracore_db_path],
+            _instancia_a_respaldar(
+                database_url, libracore_db_path,
                 directorios=[config_manager.LOGO_DIR],
             ),
-            os.path.join(os.path.dirname(libracore_db_path), "backups"),
+            _carpeta_de_backups(libracore_db_path),
             # Sin estos dos el restore devuelve `ok` y no tiene efecto hasta
             # que alguien reinicie el contenedor: el pool sigue con el archivo
             # viejo abierto. `dispose()` sirve para los dos momentos.
