@@ -9,6 +9,8 @@ import { Clientes } from './pages/Clientes'
 import { Dashboard } from './pages/Dashboard'
 import { Facturacion } from './pages/Facturacion'
 import { Usuarios } from './pages/Usuarios'
+import { Logs } from './pages/Logs'
+import { Configuracion } from './pages/Configuracion'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -67,6 +69,27 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Usuarios />
+          </ProtectedRoute>
+        }
+      />
+      {/* El gateo real es del backend (`admin_only` sobre `/logs`): acá
+          `adminOnly` sólo esconde el ítem del menú. Un staff que escriba la
+          URL a mano ve el error del 403, no los datos. */}
+      <Route
+        path="/logs"
+        element={
+          <ProtectedRoute>
+            <Logs />
+          </ProtectedRoute>
+        }
+      />
+      {/* Una sola ruta para las cuatro secciones: la activa va en
+          `?seccion=`, así se puede linkear una en particular. */}
+      <Route
+        path="/configuracion"
+        element={
+          <ProtectedRoute>
+            <Configuracion />
           </ProtectedRoute>
         }
       />
