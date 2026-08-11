@@ -31,6 +31,8 @@ instead of trying to preserve it with a volume (tried first, but an
 anonymous volume only seeds from the image once and then freezes the
 frontend at that first build forever, see ADR-022)."""
 import os
+
+from libracore.db.url_de_instancia import url_de_instancia
 from pathlib import Path
 
 from fastapi.responses import FileResponse
@@ -41,16 +43,24 @@ from .main import create_app
 DATA_DIR = os.environ.get("DATA_DIR")
 if DATA_DIR:
     os.makedirs(DATA_DIR, exist_ok=True)
-    database_url = os.environ.get("DATABASE_URL", f"sqlite:///{DATA_DIR}/gestiolibra.db")
+    database_url = url_de_instancia(
+        "gestiolibra", default=f"sqlite:///{DATA_DIR}/gestiolibra.db"
+    )
+    # Puente al nombre NORMALIZADO. Se resuelve primero -- asi un compose
+    # que todavia trae `GESTIOLIBRA_LIBRACORE_DB_PATH` gana sobre el default,
+    # que es de SQLite: al reves, la instancia migrada se conectaria a un
+    # archivo que no existe.
     os.environ.setdefault(
-        "GESTIOLIBRA_LIBRACORE_DB_PATH", f"{DATA_DIR}/gestiolibra_libracore.db"
+        "GESTIOLIBRA_LIBRACORE_DATABASE_URL",
+        url_de_instancia("gestiolibra", core=True,
+                         default=f"{DATA_DIR}/gestiolibra_libracore.db"),
     )
     if os.environ.get("ADMIN_USER"):
         os.environ.setdefault("GESTIOLIBRA_ADMIN_USERNAME", os.environ["ADMIN_USER"])
     if os.environ.get("ADMIN_PASSWORD"):
         os.environ.setdefault("GESTIOLIBRA_ADMIN_PASSWORD", os.environ["ADMIN_PASSWORD"])
 else:
-    database_url = os.environ["DATABASE_URL"]
+    database_url = url_de_instancia("gestiolibra", requerida=True)
 
 app = create_app(database_url)
 
