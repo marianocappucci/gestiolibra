@@ -19,6 +19,8 @@ from libracore.provisioning.nuevo_cliente import (
 REPO_ROOT = Path(__file__).parent.parent.resolve()
 
 configure(
+    postgres=True,
+    base_core_separada=True,
     product_name="GESTIOLIBRA",
     image_name="gestiolibra:latest",
     container_prefix="gestiolibra",
