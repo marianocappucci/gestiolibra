@@ -50,10 +50,20 @@ function todayIso(): string {
 // navegador -- un turno a las 18:00 en una sucursal de Bs. As. tiene que
 // mostrar 18:00 sin importar en qué huso horario esté mirando la agenda
 // quien la usa (ver DECISIONS.md ADR-028).
+//
+// El separador de la fecha es el GUION (regla del 2026-08-12: el formato
+// visible del ecosistema es dd-mm-aaaa). Por eso se arma por partes en vez de
+// devolver el string que da `toLocaleString`, que usa barra y ademas mete una
+// coma entre la fecha y la hora. `formatToParts` respeta el `timeZone`, que es
+// lo que no se puede perder acá.
 function formatTime(iso: string, timeZone: string): string {
-  return new Date(iso).toLocaleString('es-AR', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone,
-  })
+  const partes = new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    hourCycle: 'h23', timeZone,
+  }).formatToParts(new Date(iso))
+  const p: Record<string, string> = {}
+  for (const parte of partes) p[parte.type] = parte.value
+  return `${p.day}-${p.month} ${p.hour}:${p.minute}`
 }
 
 const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
