@@ -342,7 +342,7 @@ def _sembrar_turnos(api: Api, clientes: dict, contar) -> None:
             # Un turno que se pisa con otro, o fuera de horario, no corta el
             # seed: se avisa y se sigue. Es el mismo criterio que el catálogo
             # que no responde en el formulario de comprobante de LibraDesk.
-            print(f"  -- {inicio:%d/%m %H:%M} {recurso}: {e}")
+            print(f"  -- {inicio:%d-%m %H:%M} {recurso}: {e}")
             continue
         contar("turnos", True)
         for paso in pasos:
@@ -351,7 +351,7 @@ def _sembrar_turnos(api: Api, clientes: dict, contar) -> None:
             except RuntimeError as e:
                 # Una transición inválida no corta el seed: el turno queda
                 # creado y en su estado anterior, que también es un estado real.
-                print(f"  -- {inicio:%d/%m %H:%M} {paso}: {e}")
+                print(f"  -- {inicio:%d-%m %H:%M} {paso}: {e}")
                 break
 
 
