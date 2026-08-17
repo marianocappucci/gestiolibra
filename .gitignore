@@ -10,6 +10,24 @@ __pycache__/
 /clientes/
 dev-data/
 
+# Estado de la instancia, no codigo (agregado 2026-08-16). `config.json` y
+# `logos/` son lo que `libracore.config_manager` escribe en DATA_DIR: en el
+# contenedor eso es `/app/data` (produccion) o `/app/dev-data` (dev), los dos
+# fuera del repo. Aparecen aca solo cuando algo corre SIN `DATA_DIR` y cae al
+# cwd -- que es el caso del `uvicorn` local del README y, hasta hoy, el de
+# `pytest` (ver el parche de `CONFIG_PATH`/`LOGO_DIR` en tests/conftest.py).
+#
+# Estuvieron versionados hasta el 2026-08-16 con residuo de la suite adentro:
+# el nombre y el CUIT del test, y un `logo_path` absoluto de la maquina que
+# corrio los tests -- una ruta que no era correcta para ninguna otra. Los otros
+# cuatro productos de la familia nunca los versionaron.
+#
+# 🔴 Y `config.json` guarda `mp_access_token` y `email_smtp_password`: una copia
+# local con credenciales reales no puede entrar al repo. Por eso tambien esta
+# en `.dockerignore`, para que `COPY . .` no la hornee en la imagen.
+config.json
+logos/
+
 # Config de NPM (credenciales de Nginx Proxy Manager para scripts/npm_*.py).
 scripts/.npm_config.json
 
