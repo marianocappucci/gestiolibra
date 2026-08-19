@@ -30,7 +30,6 @@ AUDITABLES: dict[str, str] = {
     "AvailabilityExceptionRow": "excepcion",
     "TimeBlockRow": "bloqueo",
     "HolidayRow": "feriado",
-    "AgendaPolicyRow": "politica",
     "DepositRow": "seña",
     # Dominio propio de Gestiolibra
     "BranchHoursRow": "horario",
@@ -39,6 +38,25 @@ AUDITABLES: dict[str, str] = {
     "ServicePriceRow": "precio",
     "ClientBillingRow": "facturacion",
 }
+
+# 🔴 Aca vivia `"AgendaPolicyRow": "politica"`, y estuvo MUERTA desde el dia
+# que se escribio. Las dos fechas cuentan la historia sola:
+#
+#   2026-08-05  nace `AgendaPolicyRow` en libragenda (commit `1935d8e`)
+#   2026-08-05  se escribe esta lista, nombrandola (commit `64a2dd6`)
+#   ...pero este producto pinea `libragenda@v0.9.0` desde su scaffold, y esa
+#   clase **no salio en ningun tag**: no existe en la version instalada.
+#
+# O sea que quien escribio la lista estaba leyendo el `develop` del motor
+# mientras el producto consume un tag anterior. No rompio nada --la lista se
+# indexa por nombre de clase, asi que un nombre inexistente no matchea nunca--,
+# pero el filtro "politica" se ofrecia en la pantalla de Logs y no podia
+# devolver nada, indistinguible de "todavia no se uso".
+#
+# **Vuelve el dia que libragenda saque un tag con `AgendaPolicyRow` y este
+# producto suba el pin**, no antes. Lo cuida `tests/test_auditables.py`, que
+# cruza cada clave contra los modelos realmente mapeados: si se la agrega sin
+# bumpear, el test se pone rojo.
 
 # Afuera a proposito:
 #
