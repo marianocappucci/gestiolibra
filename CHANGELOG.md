@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+- **La validación del turno corre en hora de pared** (ver ADR-030):
+  arregla el defecto reportado *"El horario elegido está fuera del horario
+  de atención"*, que con UTC-3 rechazaba **todo turno que empezara después
+  de las 16** en una sucursal abierta de 9 a 19. La disponibilidad, el
+  horario comercial y las excepciones se cargan en hora de pared y se
+  comparaban contra la hora UTC del turno. Ahora la validación entera
+  corre en hora local (`app/services/husos.py` y `_TurnosEnHoraLocal`) y
+  la conversión a instante pasa al repositorio. Arrastra otros dos
+  síntomas del mismo defecto: los turnos de 21:00 en adelante, que cruzan
+  la medianoche UTC y eran irrechazables, y los que se guardaban bien pero
+  no aparecían en su día al listar la agenda. Los bloqueos de recurso se
+  convierten en el borde de su router. El huso por defecto de una sucursal
+  nueva pasa de `UTC` a `America/Argentina/Buenos_Aires`. 5 tests nuevos
+  (246 en total).
 - **`DOCS_AUTH_SECRET` expuesto en `docker-compose.yml`**: conecta el
   endpoint `POST /auth/verify` (ver abajo) con el valor real cargado en
   `.env`, necesario para que `/docs/` de `gestiolibra_web` autentique

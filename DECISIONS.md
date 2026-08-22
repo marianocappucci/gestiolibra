@@ -1006,3 +1006,104 @@ Registro ADR. Las decisiones no se borran; si dejan de aplicar, se marcan como r
   cada corrida, no relacionado con este cambio). Sin cambios de
   frontend ni de ningún otro endpoint. Detalle del lado de la landing en
   `gestiolibra_web` (`auth/app.py`).
+
+## ADR-030 — La validación del turno corre en hora de pared, no en UTC
+
+**Fecha**: 2026-08-22
+**Estado**: Aceptada
+
+### Contexto
+
+El humano reportó que la agenda no servía: *"se quiere otorgar un turno y dice:
+El horario elegido está fuera del horario de atención. Revisá los horarios de la
+sucursal y del recurso."*
+
+El producto maneja dos unidades de tiempo distintas y las estaba mezclando:
+
+- **Hora de pared**, que es lo que alguien escribe en un formulario y lo que
+  dice el reloj de la sucursal. Es la unidad de la disponibilidad del recurso
+  (`Availability`, `(día de la semana, 09:00, 19:00)`), del horario de atención
+  (`branch_hours`) y de las excepciones por fecha.
+- **Instante**, que es lo que se guarda (`DateTime(timezone=True)`, normalizado
+  a UTC por LibraGenda).
+
+ADR-028 conectó `libragenda.timezones.to_utc()` para que un horario naive del
+formulario se interpretara como hora local de la sucursal. Lo que quedó a medias
+es que esa conversión se hacía **antes** de validar, así que las dos
+comparaciones —`Availability.contains()` del motor y
+`BranchHoursRepository.is_within_hours()` de acá— terminaban midiendo la hora
+**UTC** contra ventanas cargadas en hora **local**.
+
+Con `America/Argentina/Buenos_Aires` (UTC-3) eso corre la comparación tres
+horas. Los tres síntomas:
+
+1. Una sucursal abierta de 9 a 19 **rechazaba todo turno que empezara después de
+   las 16**. Es el caso reportado.
+2. `contains()` exige `starts_at.date() == ends_at.date()`. En UTC-3 **todo
+   turno de las 21:00 en adelante cruza la medianoche UTC**, así que era
+   irrechazable aunque la sucursal estuviera abierta las 24 horas.
+3. `agenda()` filtraba por la fecha del instante UTC: un turno de las 21:30 del
+   lunes se guardaba bien y después **no aparecía al pedir el lunes**.
+
+Estaba anotado como defecto conocido desde el 2026-08-06 en
+`scripts/seed_demo.py`, que por eso agenda sus turnos de ejemplo entre las 10 y
+las 14 — *"la franja donde las dos lecturas coinciden"*.
+
+### Decisión
+
+**La validación entera corre en hora de pared de la sucursal, y la conversión a
+instante ocurre en el repositorio.**
+
+No se toca el motor, y no por comodidad: `libragenda/timezones.py` declara el
+contrato al revés — *"verticals are expected to collect wall-clock times ... and
+convert at the boundary using this module, rather than teaching the scheduling
+engine about civil time zones"*. El borde es este producto.
+
+- `app/services/husos.py` (nuevo) concentra las cuatro conversiones y explica
+  cuál es cuál.
+- `_TurnosEnHoraLocal` es un adaptador del repositorio de turnos: hacia el motor
+  devuelve todo en hora de pared —la misma unidad de las ventanas, las
+  excepciones y el horario comercial— y hacia la base guarda en UTC. Con eso el
+  motor compara ventanas, excepciones, bloqueos y **choques entre turnos** en un
+  solo terreno.
+- Los bloqueos (`TimeBlock`) se cargan por el mismo formulario que un turno pero
+  se guardan como instante: el router de disponibilidad ahora los convierte en
+  el alta y en la edición. Sin eso, un bloqueo cargado de 10 a 11 tapaba en
+  realidad de 7 a 8.
+- `agenda()` filtra por el día **del calendario de la sucursal**.
+- El huso por defecto de una sucursal nueva pasa de `UTC` a
+  `America/Argentina/Buenos_Aires`.
+
+### Alternativas descartadas
+
+- **Traducir las ventanas a UTC al validar.** Es exacto para las ventanas
+  semanales (partiéndolas cuando cruzan la medianoche) pero **no arregla el
+  síntoma 2**: la regla de "empieza y termina el mismo día" seguiría midiéndose
+  en UTC.
+- **Pasarle al motor el turno como `datetime` *aware* en hora local.**
+  `weekday()`, `time()` y `date()` darían lo correcto, pero el motor persiste el
+  objeto que recibe y `DateTime(timezone=True)` **vuelve naive en SQLite**: se
+  guardaría la hora de pared como si fuera UTC. Depender del motor de base para
+  la corrección de un cálculo de husos es exactamente lo que no se quiere.
+- **Enseñarle husos a LibraGenda.** Es el lugar "correcto" en abstracto y
+  arreglaría también a MedLibra, pero contradice el contrato que el propio motor
+  declara, obliga a cortar una versión nueva del paquete y a migrar dos
+  productos. Queda anotado como pendiente si aparece un tercer consumidor con el
+  mismo problema.
+
+### Consecuencias
+
+- El huso por defecto vale igual para el alta y para la edición de sucursal: las
+  dos declaran la sucursal entera, y un default distinto en cada una sería una
+  forma silenciosa de reescribir el huso de una sucursal ya configurada.
+- **La suite pasa a correr con offset distinto de cero**, que es lo que hace que
+  estos defectos sean visibles: con UTC, validar en el terreno equivocado da el
+  mismo resultado que validar en el correcto. Cinco tests existentes cambiaron
+  su valor esperado por eso. `tests/test_reminders.py` pide explícitamente una
+  sucursal en UTC porque mide plazos contra `now()` y el huso no es lo que
+  prueba.
+- 5 tests nuevos de regresión, con **dos** sucursales: una de 9 a 19 (donde se
+  reproduce el caso reportado) y otra de 9 a 23 (donde se reproduce el cruce de
+  medianoche). La primera versión de estos tests usaba una sola sucursal de 9 a
+  23 y **pasaba en verde contra el código viejo**, porque con esa ventana las
+  20:00 UTC caen adentro.
