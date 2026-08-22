@@ -3,4 +3,11 @@
 // backend le manda hasta la lista de entidades y los colores.
 //
 // Sin `basePath`: el default `/logs` es el de este producto.
-export { Logs } from 'libra-ui/Logs'
+
+import { ScrollText } from 'lucide-react'
+import { Logs as Compartida } from 'libra-ui/Logs'
+
+/** Ver el comentario de `Usuarios`: el icono es de este producto. */
+export function Logs() {
+  return <Compartida icono={ScrollText} />
+}
