@@ -1,7 +1,7 @@
 // Shim sobre libra-ui/Layout (extraído 2026-07-26, era idéntico en
 // Gestiolibra/MedLibra/VentaLibra salvo NAV_ITEMS/branding -- ver
 // wiki/analyses/auditoria-duplicacion-familia-libra.md).
-import { CalendarDays, LayoutDashboard, Receipt, ScrollText, Settings, UserCog, Users } from 'lucide-react'
+import { CalendarDays, LayoutDashboard, ScrollText, Settings, UserCog, Users } from 'lucide-react'
 import { createLayout } from 'libra-ui/Layout'
 import { LOGO, WORDMARK } from '@/branding'
 
@@ -24,11 +24,21 @@ export const Layout = createLayout({
   // este `text-[15px]` y el nombre se quedaria con 22,5 px de caja.
   // 21 = 36 (el alto del logo) menos los 15 de la linea de la empresa.
   wordmarkClassName: `${WORDMARK} text-[15px]/[21px]`,
+  // 🔴 **Dashboard va primero**, pedido del humano (2026-08-22). Es la pantalla
+  // de resumen: lo que se abre para saber cómo viene el día antes de entrar a
+  // operar. Ojo con leerlo como "es la pantalla de arranque": el ítem es
+  // `adminOnly`, así que un usuario `staff` no lo ve, y por eso el catch-all de
+  // `App.tsx` sigue mandando a `/agenda` y no acá.
   navItems: [
+    { to: '/reportes', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
     { to: '/clientes', label: 'Clientes', icon: Users },
-    { to: '/reportes', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
-    { to: '/facturacion', label: 'Facturación', icon: Receipt, adminOnly: true },
+    // ⚠️ **No hay ítem "Facturación"** y no es un olvido. Lo único que tenía esa
+    // pantalla era la configuración de ARCA, que ya vive —con el mismo
+    // formulario, el de `libra-ui/Configuracion`— dentro de Configuración. Eran
+    // dos pantallas para el mismo `GET/PUT /config/arca`; el humano pidió
+    // (2026-08-22) que la configuración de facturación esté adentro de
+    // Configuración y no por fuera.
     { to: '/usuarios', label: 'Usuarios', icon: UserCog, adminOnly: true },
     // Junto a Usuarios: se mira para responder "quién hizo esto", que es una
     // pregunta sobre la gente.
