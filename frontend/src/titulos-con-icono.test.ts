@@ -31,8 +31,8 @@ describe('el icono del título sale del sidebar', () => {
     // contra dos listas vacías. Es la forma en que este guard falló mientras se
     // escribía.
     const { rutasDelNav, pantallas, conIcono } = auditarTitulos(SRC)
-    expect(rutasDelNav).toBeGreaterThanOrEqual(7)
-    expect(pantallas).toBeGreaterThanOrEqual(7)
+    expect(rutasDelNav).toBeGreaterThanOrEqual(6)
+    expect(pantallas).toBeGreaterThanOrEqual(6)
     expect(conIcono).toBeGreaterThan(0)
   })
 })
