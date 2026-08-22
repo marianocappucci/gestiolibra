@@ -7,7 +7,6 @@ import { ForgotPassword, ResetPassword } from './pages/PasswordReset'
 import { Agenda } from './pages/Agenda'
 import { Clientes } from './pages/Clientes'
 import { Dashboard } from './pages/Dashboard'
-import { Facturacion } from './pages/Facturacion'
 import { Usuarios } from './pages/Usuarios'
 import { Logs } from './pages/Logs'
 import { Configuracion } from './pages/Configuracion'
@@ -56,13 +55,15 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      {/* La pantalla suelta de Facturación se borró el 2026-08-22: lo único
+          que tenía era el formulario de ARCA, que ya vive dentro de
+          Configuración (`SECCION_ARCA` de libra-ui) — eran dos pantallas
+          para el mismo `GET/PUT /config/arca`. La ruta sobrevive como
+          redirección y no se borra: sin ella un favorito viejo cae en el
+          catch-all y aterriza en la agenda sin explicación. */}
       <Route
         path="/facturacion"
-        element={
-          <ProtectedRoute>
-            <Facturacion />
-          </ProtectedRoute>
-        }
+        element={<Navigate to="/configuracion?seccion=arca" replace />}
       />
       <Route
         path="/usuarios"
