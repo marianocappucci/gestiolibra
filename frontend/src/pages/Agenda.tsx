@@ -1,69 +1,76 @@
-import { useEffect, useMemo, useState } from 'react'
+/** La agenda, como calendario.
+ *
+ *  Pedido del humano (2026-08-22): *"en gestiolibra hay que importar la agenda
+ *  que usa libradesk con su ui y su mecanismo"*.
+ *
+ *  **Lo que reemplaza.** Hasta hoy esta pantalla era un formulario de alta
+ *  arriba y una tabla abajo, con dos `<input type="date">` de rango. Podía
+ *  decir *qué* turnos hay, pero no **cuánto ocupa cada uno ni dónde está el
+ *  hueco**, que es la pregunta de quien atiende el teléfono. Y para saber qué
+ *  hay el jueves había que mover el rango y perder de vista el resto.
+ *
+ *  El calendario en sí vive en `libra-ui/agenda`, extraído de LibraDesk. Lo que
+ *  queda acá es lo que **es** de Gestiolibra: de dónde salen los turnos, qué es
+ *  un evento, el alta, y las acciones sobre un turno (confirmar, cancelar,
+ *  completar con su medio de pago y su factura).
+ *
+ *  **Todo el estado de la pantalla vive en la URL** — `?vista=`, `?dia=`,
+ *  `?recurso=` y `?turno=` —, no en `useState`. Así se puede mandar "mirá el
+ *  jueves" o "fijate este turno" por mensaje, el botón "atrás" del navegador
+ *  vuelve del turno al día y del día a la semana, y recargar deja al usuario
+ *  donde estaba.
+ *
+ *  ⚠️ **Las horas se muestran en el huso de la sucursal del recurso**, no en el
+ *  del navegador: un turno de las 18:00 en una sucursal de Buenos Aires tiene
+ *  que decir 18:00 sin importar desde dónde se mire la agenda (ADR-028), y el
+ *  día al que pertenece también es el de la sucursal (ADR-030). La conversión
+ *  la hace `components/agenda/datos.ts` una sola vez, al cargar.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { type ColumnDef } from '@tanstack/react-table'
+import { CalendarDays, Plus } from 'lucide-react'
+import { TituloPantalla } from 'libra-ui/titulo-pantalla'
+import { EncabezadoDePantalla } from 'libra-ui/acciones'
+import { SelectBuscable } from 'libra-ui/SelectBuscable'
+import { BadgeEstado, type TonoEstado } from 'libra-ui/badge-estado'
+import {
+  LABEL_VISTA, NavegadorCalendario, ReferenciaDeColores, VISTAS, VistaMes,
+  VistaSemana, clasePunto, diaDeLaUrl, hoyLocal, rangoDeVista, vistaDeLaUrl,
+} from 'libra-ui/agenda'
 import {
   api, ApiError, STATUS_LABELS, TIPO_COMPROBANTE_LABELS,
   opcionesCliente, opcionesServicio,
-  type Appointment, type AppointmentStatus, type Branch, type Client,
+  type AppointmentStatus, type Branch, type Client,
   type CompleteAppointmentResponse, type Factura, type Resource, type Service,
 } from '../api'
-import { SelectBuscable } from 'libra-ui/SelectBuscable'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BadgeEstado, type TonoEstado } from 'libra-ui/badge-estado'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { DataTable, sortableHeader } from '@/components/data-table'
-import { Ban, Check, CheckCheck } from 'lucide-react'
+import { useAgendaRango, type TurnoConRecurso } from '@/components/agenda/datos'
+import { armadores, porDiaComoEventos } from '@/components/agenda/eventos'
+import { VistaDia } from '@/components/agenda/vista-dia'
+
+const TODOS = '__todos__'
 
 const MEDIO_PAGO_LABELS: Record<string, string> = {
   efectivo: 'Efectivo',
   transferencia: 'Transferencia',
   tarjeta: 'Tarjeta',
   mercadopago: 'MercadoPago',
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value)
-}
-
-function formatNumeroComprobante(f: Factura): string {
-  return `${String(f.punto_venta).padStart(4, '0')}-${String(f.numero).padStart(8, '0')}`
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-// Se formatea en la timezone de la sucursal del recurso, no en la del
-// navegador -- un turno a las 18:00 en una sucursal de Bs. As. tiene que
-// mostrar 18:00 sin importar en qué huso horario esté mirando la agenda
-// quien la usa (ver DECISIONS.md ADR-028).
-//
-// El separador de la fecha es el GUION (regla del 2026-08-12: el formato
-// visible del ecosistema es dd-mm-aaaa). Por eso se arma por partes en vez de
-// devolver el string que da `toLocaleString`, que usa barra y ademas mete una
-// coma entre la fecha y la hora. `formatToParts` respeta el `timeZone`, que es
-// lo que no se puede perder acá.
-function formatTime(iso: string, timeZone: string): string {
-  const partes = new Intl.DateTimeFormat('es-AR', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-    hourCycle: 'h23', timeZone,
-  }).formatToParts(new Date(iso))
-  const p: Record<string, string> = {}
-  for (const parte of partes) p[parte.type] = parte.value
-  return `${p.day}-${p.month} ${p.hour}:${p.minute}`
 }
 
 const STATUS_TONO: Record<AppointmentStatus, TonoEstado> = {
@@ -75,35 +82,60 @@ const STATUS_TONO: Record<AppointmentStatus, TonoEstado> = {
   no_show: 'negativo',
 }
 
-const appointmentSchema = z.object({
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value)
+}
+
+function formatNumeroComprobante(f: Factura): string {
+  return `${String(f.punto_venta).padStart(4, '0')}-${String(f.numero).padStart(8, '0')}`
+}
+
+/** `22-08 17:00` a partir de la hora de pared que ya calculó `datos.ts`.
+ *
+ *  El separador de la fecha es el GUION: el formato visible del ecosistema es
+ *  `dd-mm-aaaa` (regla del 2026-08-12). Se corta el string en vez de construir
+ *  un `Date` porque ese string YA está en la zona correcta — pasarlo por `Date`
+ *  lo re-interpretaría como hora del navegador. */
+function horaDePared(local: string): string {
+  return `${local.slice(8, 10)}-${local.slice(5, 7)} ${local.slice(11, 16)}`
+}
+
+const turnoSchema = z.object({
+  resource_id: z.string().min(1, 'Elegí un recurso'),
   service_id: z.string().min(1, 'Elegí un servicio'),
   client_id: z.string().min(1, 'Elegí un cliente'),
   starts_at: z.string().min(1, 'Elegí un horario'),
 })
 
-type AppointmentFormValues = z.infer<typeof appointmentSchema>
+type TurnoFormValues = z.infer<typeof turnoSchema>
 
 export function Agenda() {
+  const [params, setParams] = useSearchParams()
   const [resources, setResources] = useState<Resource[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [clients, setClients] = useState<Client[]>([])
-  const [resourceId, setResourceId] = useState<string>('')
-  const [dateFrom, setDateFrom] = useState(todayIso())
-  const [dateTo, setDateTo] = useState(todayIso())
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [completeTarget, setCompleteTarget] = useState<Appointment | null>(null)
+  const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null)
+  // 🔴 Si el catálogo YA se pidió. No alcanza con `resources.length === 0`
+  // para distinguir "todavía cargando" de "no hay ninguno": son el mismo
+  // valor, y una instancia recién creada -- la que más necesita el cartel
+  // que manda a Configuración -- se quedaba en "Cargando…" para siempre.
+  const [catalogoCargado, setCatalogoCargado] = useState(false)
+  const [errorAccion, setErrorAccion] = useState<string | null>(null)
+  const [creando, setCreando] = useState(false)
+  const [altaAbierta, setAltaAbierta] = useState(false)
   const [medioPago, setMedioPago] = useState('')
-  const [completing, setCompleting] = useState(false)
+  const [pidiendoMedioPago, setPidiendoMedioPago] = useState<TurnoConRecurso | null>(null)
+  const [completando, setCompletando] = useState(false)
   const [factura, setFactura] = useState<Factura | null>(null)
 
-  const form = useForm<AppointmentFormValues>({
-    resolver: zodResolver(appointmentSchema),
-    defaultValues: { service_id: '', client_id: '', starts_at: '' },
-  })
+  const vista = vistaDeLaUrl(params.get('vista'))
+  // `hoyLocal()` en cada render y no en un `useState`: si alguien deja la
+  // pantalla abierta pasada la medianoche, "hoy" tiene que ser el día nuevo.
+  const hoy = hoyLocal()
+  const dia = diaDeLaUrl(params.get('dia'), hoy)
+  const filtro = params.get('recurso') ?? TODOS
+  const turnoAbierto = params.get('turno')
 
   useEffect(() => {
     Promise.all([
@@ -112,197 +144,280 @@ export function Agenda() {
       api.get<Service[]>('/services'),
       api.get<Client[]>('/clients'),
     ]).then(([r, b, s, c]) => {
-      setResources(r)
-      setBranches(b)
-      setServices(s)
-      setClients(c)
-      if (r.length > 0) setResourceId(r[0].id)
-    }).catch((err) => setError(describeError(err)))
+      // `Array.isArray` y no confiar en el tipo: un cuerpo truncado o un `{}`
+      // es truthy, y el `.filter()` de más abajo tumbaría la pantalla entera
+      // con un TypeError en vez de mostrar de menos.
+      setResources(Array.isArray(r) ? r : [])
+      setBranches(Array.isArray(b) ? b : [])
+      setServices(Array.isArray(s) ? s : [])
+      setClients(Array.isArray(c) ? c : [])
+    }).catch((err) => setErrorCatalogo(describirError(err)))
+      .finally(() => setCatalogoCargado(true))
   }, [])
 
-  useEffect(() => {
-    if (!resourceId) return
-    loadAgenda()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resourceId, dateFrom, dateTo])
+  // Sólo los activos: un recurso dado de baja no se agenda, y sus turnos viejos
+  // en la grilla serían ruido permanente.
+  const activos = useMemo(() => resources.filter((r) => r.active), [resources])
 
-  function describeError(err: unknown): string {
+  const { desde, dias } = rangoDeVista(vista, dia)
+  const { porDia, error, recargar } = useAgendaRango(activos, branches, desde, dias)
+
+  const form = useForm<TurnoFormValues>({
+    resolver: zodResolver(turnoSchema),
+    defaultValues: { resource_id: '', service_id: '', client_id: '', starts_at: '' },
+  })
+
+  function describirError(err: unknown): string {
     if (err instanceof ApiError) return err.detail
     return 'Error de conexión.'
   }
 
-  async function loadAgenda() {
-    setLoading(true)
-    setError(null)
+  /** Los parámetros de la pantalla con algunos cambiados. Los demás se
+   *  conservan: cambiar de vista no tiene por qué olvidar el recurso elegido. */
+  const con = useCallback((cambios: Record<string, string>) => {
+    const p = new URLSearchParams(params)
+    for (const [k, v] of Object.entries(cambios)) {
+      if (v === '') p.delete(k)
+      else p.set(k, v)
+    }
+    return p
+  }, [params])
+
+  const href = useCallback(
+    (cambios: Record<string, string>) => `/agenda?${con(cambios)}`,
+    [con],
+  )
+
+  const nombreCliente = useCallback(
+    (id: string) => clients.find((c) => c.id === id)?.name ?? id, [clients])
+  const nombreServicio = useCallback(
+    (id: string) => services.find((s) => s.id === id)?.name ?? id, [services])
+  const nombreSucursal = useCallback(
+    (id: string | null) => (id ? branches.find((b) => b.id === id)?.name ?? null : null),
+    [branches])
+
+  const como = useMemo(
+    () => armadores((id) => href({ turno: id }), nombreCliente, nombreServicio),
+    [href, nombreCliente, nombreServicio],
+  )
+
+  // El filtro recorta lo que se dibuja, no lo que se pide (ver `datos.ts`).
+  const visibles = filtro === TODOS
+    ? porDia
+    : Object.fromEntries(Object.entries(porDia).map(([d, ts]) => [
+      d, ts.filter((t) => t.resource_id === filtro),
+    ]))
+  const recursosVisibles = filtro === TODOS
+    ? activos
+    : activos.filter((r) => r.id === filtro)
+
+  const turno = useMemo(() => {
+    if (!turnoAbierto) return null
+    return Object.values(porDia).flat().find((t) => t.id === turnoAbierto) ?? null
+  }, [turnoAbierto, porDia])
+
+  function cerrarTurno() {
+    setErrorAccion(null)
+    setParams(con({ turno: '' }))
+  }
+
+  async function accion(hacer: () => Promise<unknown>) {
+    setErrorAccion(null)
     try {
-      const items = await api.get<Appointment[]>(
-        `/resources/${resourceId}/agenda?date_from=${dateFrom}&date_to=${dateTo}`,
+      await hacer()
+      await recargar()
+      cerrarTurno()
+    } catch (err) {
+      setErrorAccion(describirError(err))
+    }
+  }
+
+  async function completar(t: TurnoConRecurso, medio?: string) {
+    setErrorAccion(null)
+    setCompletando(true)
+    try {
+      const respuesta = await api.post<CompleteAppointmentResponse>(
+        `/appointments/${t.id}/complete`,
+        medio ? { medio_pago: medio } : undefined,
       )
-      setAppointments(items.sort((a, b) => a.starts_at.localeCompare(b.starts_at)))
-    } catch (err) {
-      setError(describeError(err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleCreate(values: AppointmentFormValues) {
-    setCreating(true)
-    setError(null)
-    try {
-      await api.post('/appointments', {
-        resource_id: resourceId,
-        service_id: values.service_id,
-        client_id: values.client_id,
-        starts_at: values.starts_at,
-      })
-      form.reset({ service_id: '', client_id: '', starts_at: '' })
-      await loadAgenda()
-    } catch (err) {
-      setError(describeError(err))
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  async function handleAction(action: () => Promise<unknown>) {
-    setError(null)
-    try {
-      await action()
-      await loadAgenda()
-    } catch (err) {
-      setError(describeError(err))
-    }
-  }
-
-  async function completeAppointment(a: Appointment, medioPagoValue?: string) {
-    setError(null)
-    setCompleting(true)
-    try {
-      const response = await api.post<CompleteAppointmentResponse>(
-        `/appointments/${a.id}/complete`,
-        medioPagoValue ? { medio_pago: medioPagoValue } : undefined,
-      )
-      setCompleteTarget(null)
+      setPidiendoMedioPago(null)
       setMedioPago('')
-      if (response.factura) setFactura(response.factura)
-      await loadAgenda()
+      if (respuesta.factura) setFactura(respuesta.factura)
+      await recargar()
+      cerrarTurno()
     } catch (err) {
-      // Sin medio_pago todavía intentado: el turno tiene saldo pendiente y
-      // el backend pide medio_pago (422) -- se pide en un diálogo en vez de
-      // mostrarlo como error crudo.
-      if (err instanceof ApiError && err.status === 422 && !medioPagoValue) {
-        setCompleteTarget(a)
+      // Sin medio de pago todavía intentado: el turno tiene saldo pendiente y
+      // el backend lo pide (422). Se pregunta en un diálogo en vez de mostrar
+      // el error crudo.
+      if (err instanceof ApiError && err.status === 422 && !medio) {
+        setPidiendoMedioPago(t)
       } else {
-        setError(describeError(err))
-        setCompleteTarget(null)
+        setErrorAccion(describirError(err))
+        setPidiendoMedioPago(null)
       }
     } finally {
-      setCompleting(false)
+      setCompletando(false)
     }
   }
 
-  function clientName(id: string): string {
-    return clients.find((c) => c.id === id)?.name ?? id
+  async function crear(values: TurnoFormValues) {
+    setCreando(true)
+    setErrorAccion(null)
+    try {
+      await api.post('/appointments', values)
+      form.reset({ resource_id: values.resource_id, service_id: '', client_id: '', starts_at: '' })
+      setAltaAbierta(false)
+      await recargar()
+    } catch (err) {
+      setErrorAccion(describirError(err))
+    } finally {
+      setCreando(false)
+    }
   }
 
-  function serviceName(id: string): string {
-    return services.find((s) => s.id === id)?.name ?? id
-  }
-
-  // El horario ingresado/mostrado siempre es el de la sucursal del recurso
-  // seleccionado, no el del navegador -- ver DECISIONS.md ADR-028.
-  const resourceTimezone = useMemo(() => {
-    const branchId = resources.find((r) => r.id === resourceId)?.branch_id
-    return branches.find((b) => b.id === branchId)?.timezone ?? 'UTC'
-  }, [resourceId, resources, branches])
-
-  // Anchos fijos al contenido real + Cliente elastica, mismo patron que
-  // Contalibra/Restolibra. La columna de acciones no declara ancho: la mide
-  // `libra-ui` sola (ver wiki/entities/libra-ui.md v0.4.0).
-  const columns = useMemo<ColumnDef<Appointment>[]>(() => [
-    {
-      accessorKey: 'starts_at',
-      header: sortableHeader('Horario'),
-      size: 150,
-      minSize: 120,
-      cell: ({ row }) => formatTime(row.original.starts_at, resourceTimezone),
-    },
-    { id: 'client', header: 'Cliente', size: 200, minSize: 120, meta: { stretch: true }, cell: ({ row }) => <span className="block truncate" title={clientName(row.original.client_id)}>{clientName(row.original.client_id)}</span> },
-    { id: 'service', header: 'Servicio', size: 180, minSize: 120, cell: ({ row }) => <span className="block truncate" title={serviceName(row.original.service_id)}>{serviceName(row.original.service_id)}</span> },
-    {
-      accessorKey: 'status',
-      header: 'Estado',
-      size: 120,
-      minSize: 100,
-      cell: ({ row }) => (
-        <BadgeEstado tono={STATUS_TONO[row.original.status]}>{STATUS_LABELS[row.original.status]}</BadgeEstado>
-      ),
-    },
-    {
-      id: 'actions',
-      header: () => <div className="text-right">Acciones</div>,
-      cell: ({ row }) => {
-        const a = row.original
-        return (
-          <div className="flex justify-end gap-1">
-            {a.status === 'pending' && (
-              <Button size="icon" variant="outline" title="Confirmar turno" aria-label="Confirmar turno" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/confirm`))}>
-                <Check />
-              </Button>
-            )}
-            {(a.status === 'pending' || a.status === 'confirmed') && (
-              <Button size="icon" variant="outline" className="text-destructive hover:text-destructive" title="Cancelar turno" aria-label="Cancelar turno" onClick={() => handleAction(() => api.post(`/appointments/${a.id}/cancel`))}>
-                <Ban />
-              </Button>
-            )}
-            {a.status === 'confirmed' && (
-              <Button size="icon" variant="outline" title="Completar turno" aria-label="Completar turno" onClick={() => completeAppointment(a)}>
-                <CheckCheck />
-              </Button>
-            )}
-          </div>
-        )
-      },
-    },
+  /** El huso del recurso elegido en el alta, para rotular el campo de horario.
+   *  Sin el rótulo, quien carga un turno no tiene forma de saber si "18:00" es
+   *  la hora de la sucursal o la de su propia máquina. */
+  const zonaDelAlta = useMemo(() => {
+    const elegido = form.watch('resource_id')
+    const recurso = activos.find((r) => r.id === elegido)
+    const sucursal = recurso?.branch_id
+      ? branches.find((b) => b.id === recurso.branch_id) : undefined
+    return sucursal?.timezone ?? 'UTC'
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [clients, services, resourceTimezone])
+  }, [form.watch('resource_id'), activos, branches])
+
+  function abrirAlta() {
+    form.reset({
+      resource_id: filtro !== TODOS ? filtro : (activos[0]?.id ?? ''),
+      service_id: '', client_id: '',
+      // Prellenado con el día que se está mirando: quien abre el alta parado en
+      // el jueves quiere un turno el jueves, no hoy.
+      starts_at: `${dia}T09:00`,
+    })
+    setErrorAccion(null)
+    setAltaAbierta(true)
+  }
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="grid gap-1.5">
-          <Label>Recurso</Label>
-          <Select value={resourceId} onValueChange={setResourceId}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Recurso…" />
-            </SelectTrigger>
-            <SelectContent>
-              {resources.map((r) => (
-                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <EncabezadoDePantalla
+        className="items-end"
+        titulo={
+          <div>
+            <TituloPantalla icono={CalendarDays}>Agenda</TituloPantalla>
+            <p className="text-sm text-muted-foreground">
+              Qué tiene cada recurso y dónde queda lugar. Entrá a un turno para
+              confirmarlo, cancelarlo o completarlo.
+            </p>
+          </div>
+        }
+      >
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="grid gap-2">
+            <Label htmlFor="filtro-recurso">Recurso</Label>
+            <Select
+              value={filtro}
+              onValueChange={(v) => setParams(con({ recurso: v }))}
+            >
+              <SelectTrigger id="filtro-recurso" className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos los recursos</SelectItem>
+                {activos.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={abrirAlta} disabled={activos.length === 0}>
+            <Plus />Nuevo turno
+          </Button>
         </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="date-from">Desde</Label>
-          <Input id="date-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="date-to">Hasta</Label>
-          <Input id="date-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
-        </div>
-      </div>
+      </EncabezadoDePantalla>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      <NavegadorCalendario vista={vista} dia={dia} hoy={hoy} href={href}>
+        {/* Las pestañas de shadcn, como en Configuración: la vista la manda la
+            URL, así que el conmutador es controlado (`value`, no
+            `defaultValue`) — con el default, entrar con `?vista=mes` pintaría
+            la primera pestaña y mostraría otra cosa. */}
+        <Tabs value={vista} onValueChange={(v) => setParams(con({ vista: v }))}>
+          <TabsList>
+            {VISTAS.map((v) => (
+              <TabsTrigger key={v} value={v}>{LABEL_VISTA[v]}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </NavegadorCalendario>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Nuevo turno</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* La referencia no se muestra en el día, que ya viene con una columna
+          por recurso y el nombre en cada encabezado. */}
+      {vista !== 'dia' && (
+        <ReferenciaDeColores carriles={activos.map((r, i) => ({
+          clave: r.id, nombre: r.name, clasePunto: clasePunto(i),
+        }))} />
+      )}
+
+      {(errorCatalogo || error) && (
+        <p className="text-sm text-destructive">{errorCatalogo ?? error}</p>
+      )}
+
+      {activos.length === 0 ? (
+        <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
+          {catalogoCargado
+            ? 'No hay recursos activos. Cargá uno en Configuración › Recursos.'
+            : 'Cargando…'}
+        </CardContent></Card>
+      ) : vista === 'dia' ? (
+        <VistaDia
+          recursos={recursosVisibles}
+          turnos={visibles[dia] ?? []}
+          esHoy={dia === hoy}
+          comoEvento={como.dia}
+          nombreSucursal={nombreSucursal}
+        />
+      ) : vista === 'semana' ? (
+        <VistaSemana
+          desde={desde} porDia={porDiaComoEventos(visibles, como.semana)} hoy={hoy}
+          hrefDia={(d) => href({ vista: 'dia', dia: d })}
+        />
+      ) : (
+        <VistaMes
+          desde={desde} celdas={dias} mes={dia}
+          porDia={porDiaComoEventos(visibles, como.chip)} hoy={hoy}
+          hrefDia={(d) => href({ vista: 'dia', dia: d })}
+        />
+      )}
+
+      {/* ── El alta ───────────────────────────────────────────────────── */}
+      <Dialog open={altaAbierta} onOpenChange={setAltaAbierta}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo turno</DialogTitle>
+          </DialogHeader>
           <Form {...form}>
-            <form className="flex flex-wrap items-start gap-3" onSubmit={form.handleSubmit(handleCreate)}>
+            <form className="grid gap-3" onSubmit={form.handleSubmit(crear)}>
+              <FormField
+                control={form.control}
+                name="resource_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Recurso</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Recurso…" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {activos.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="service_id"
@@ -313,10 +428,9 @@ export function Agenda() {
                       <SelectBuscable
                         value={field.value}
                         onChange={field.onChange}
-                        opciones={opcionesServicio(services)}
+                        opciones={opcionesServicio(services.filter((s) => s.active))}
                         placeholder="Servicio…"
                         ariaLabel="Servicio"
-                        className="w-56"
                       />
                     </FormControl>
                     <FormMessage />
@@ -333,10 +447,9 @@ export function Agenda() {
                       <SelectBuscable
                         value={field.value}
                         onChange={field.onChange}
-                        opciones={opcionesCliente(clients)}
+                        opciones={opcionesCliente(clients.filter((c) => c.active))}
                         placeholder="Cliente…"
                         ariaLabel="Cliente"
-                        className="w-56"
                       />
                     </FormControl>
                     <FormMessage />
@@ -348,45 +461,95 @@ export function Agenda() {
                 name="starts_at"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Horario ({resourceTimezone})</FormLabel>
+                    <FormLabel>Horario ({zonaDelAlta})</FormLabel>
                     <FormControl>
-                      <Input type="datetime-local" {...field} className="w-56" />
+                      <Input type="datetime-local" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={creating || !resourceId} className="mt-6">
-                {creating ? 'Creando…' : 'Crear turno'}
-              </Button>
+              {errorAccion && <p className="text-sm text-destructive">{errorAccion}</p>}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAltaAbierta(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={creando}>
+                  {creando ? 'Creando…' : 'Crear turno'}
+                </Button>
+              </DialogFooter>
             </form>
           </Form>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
 
-      <Card>
-        <CardContent>
-          {loading ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>
-          ) : (
-            <DataTable columns={columns} data={appointments} emptyMessage="Sin turnos en el rango seleccionado." />
+      {/* ── El turno abierto ──────────────────────────────────────────── */}
+      <Dialog open={turno !== null} onOpenChange={(abierto) => { if (!abierto) cerrarTurno() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{turno && nombreCliente(turno.client_id)}</DialogTitle>
+          </DialogHeader>
+          {turno && (
+            <div className="grid gap-2 text-sm">
+              {[
+                ['Servicio', nombreServicio(turno.service_id)],
+                ['Recurso', turno.recurso_nombre],
+                ['Horario', `${horaDePared(turno.desde)} – ${turno.hasta.slice(11, 16)}`],
+              ].map(([rotulo, valor]) => (
+                <div key={rotulo} className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{rotulo}</span>
+                  <span className="font-medium">{valor}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">Estado</span>
+                <BadgeEstado tono={STATUS_TONO[turno.status]}>
+                  {STATUS_LABELS[turno.status]}
+                </BadgeEstado>
+              </div>
+              {errorAccion && <p className="text-sm text-destructive">{errorAccion}</p>}
+            </div>
           )}
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            {turno?.status === 'pending' && (
+              <Button
+                variant="outline"
+                onClick={() => accion(() => api.post(`/appointments/${turno.id}/confirm`))}
+              >
+                Confirmar
+              </Button>
+            )}
+            {turno && (turno.status === 'pending' || turno.status === 'confirmed') && (
+              <Button
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                onClick={() => accion(() => api.post(`/appointments/${turno.id}/cancel`))}
+              >
+                Cancelar turno
+              </Button>
+            )}
+            {turno?.status === 'confirmed' && (
+              <Button onClick={() => completar(turno)}>Completar</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <Dialog open={completeTarget !== null} onOpenChange={(open) => { if (!open) setCompleteTarget(null) }}>
+      {/* ── El medio de pago, cuando el turno tiene saldo ─────────────── */}
+      <Dialog
+        open={pidiendoMedioPago !== null}
+        onOpenChange={(abierto) => { if (!abierto) setPidiendoMedioPago(null) }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Medio de pago requerido</DialogTitle>
             <DialogDescription>
-              Este turno tiene un saldo pendiente de cobro. Elegí cómo se cobró para completarlo
-              y facturarlo.
+              Este turno tiene un saldo pendiente de cobro. Elegí cómo se cobró para
+              completarlo y facturarlo.
             </DialogDescription>
           </DialogHeader>
           <Select value={medioPago} onValueChange={setMedioPago}>
-            <SelectTrigger>
-              <SelectValue placeholder="Medio de pago…" />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Medio de pago…" /></SelectTrigger>
             <SelectContent>
               {Object.entries(MEDIO_PAGO_LABELS).map(([value, label]) => (
                 <SelectItem key={value} value={value}>{label}</SelectItem>
@@ -394,40 +557,36 @@ export function Agenda() {
             </SelectContent>
           </Select>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCompleteTarget(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setPidiendoMedioPago(null)}>Cancelar</Button>
             <Button
-              disabled={!medioPago || completing}
-              onClick={() => completeTarget && completeAppointment(completeTarget, medioPago)}
+              disabled={!medioPago || completando}
+              onClick={() => pidiendoMedioPago && completar(pidiendoMedioPago, medioPago)}
             >
-              {completing ? 'Completando…' : 'Completar'}
+              {completando ? 'Completando…' : 'Completar'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={factura !== null} onOpenChange={(open) => { if (!open) setFactura(null) }}>
+      {/* ── La factura emitida ────────────────────────────────────────── */}
+      <Dialog open={factura !== null} onOpenChange={(abierto) => { if (!abierto) setFactura(null) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Factura emitida</DialogTitle>
           </DialogHeader>
           {factura && (
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tipo</span>
-                <span className="font-medium">{TIPO_COMPROBANTE_LABELS[factura.tipo] ?? factura.tipo}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Número</span>
-                <span className="font-medium">{formatNumeroComprobante(factura)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">CAE</span>
-                <span className="font-medium">{factura.cae || '—'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total</span>
-                <span className="font-medium">{formatCurrency(factura.total)}</span>
-              </div>
+              {[
+                ['Tipo', TIPO_COMPROBANTE_LABELS[factura.tipo] ?? String(factura.tipo)],
+                ['Número', formatNumeroComprobante(factura)],
+                ['CAE', factura.cae || '—'],
+                ['Total', formatCurrency(factura.total)],
+              ].map(([rotulo, valor]) => (
+                <div key={rotulo} className="flex justify-between">
+                  <span className="text-muted-foreground">{rotulo}</span>
+                  <span className="font-medium">{valor}</span>
+                </div>
+              ))}
             </div>
           )}
           <DialogFooter>

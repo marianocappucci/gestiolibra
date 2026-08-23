@@ -98,6 +98,67 @@ export type Appointment = {
   status: AppointmentStatus
 }
 
+// --- parametrizacion de la agenda -----------------------------------------
+//
+// Los endpoints existian desde el MVP; lo que no habia era pantalla. Hasta el
+// 2026-08-22 sucursales, horarios, servicios, precios, recursos y
+// disponibilidad solo se podian cargar por API o por `scripts/seed_demo.py`,
+// asi que un cliente nuevo no podia configurar su propia agenda -- que es lo
+// que el humano reporto como "no se puede parametrizar servicios, horarios de
+// esos servicios, honorarios de esos servicios, etc.".
+
+/** Lunes primero, igual que el calendario y que `weekday` de Python. */
+export const DIAS_SEMANA = [
+  'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo',
+] as const
+
+/** Una ventana semanal: el mismo par (día, desde, hasta) sirve para el horario
+ *  de atención de una sucursal y para la disponibilidad de un recurso.
+ *
+ *  🔴 **Son dos cosas distintas y las dos hacen falta.** La sucursal abre de 9
+ *  a 19; cada persona o box tiene su propia agenda **dentro** de eso. Un
+ *  recurso sin ninguna ventana no recibe turnos nunca — el motor no tiene con
+ *  qué decir que sí —, mientras que una sucursal sin horarios no restringe
+ *  nada (el horario comercial es opt-in). Es la asimetría que hace que cargar
+ *  sólo el horario de la sucursal deje la agenda muerta. */
+export type VentanaSemanal = {
+  id: number
+  weekday: number
+  /** `HH:MM:SS`, hora de pared de la sucursal (ver ADR-030). */
+  starts_at: string
+  ends_at: string
+}
+
+export type Bloqueo = {
+  id: number
+  resource_id: string
+  /** Instante ISO. Se manda naive (hora de pared) y vuelve en UTC. */
+  starts_at: string
+  ends_at: string
+  reason: string
+}
+
+export type ExcepcionDeAgenda = {
+  id: number
+  resource_id: string
+  day: string
+  starts_at: string
+  ends_at: string
+  /** `false` cierra ese rango; `true` lo abre aunque la ventana semanal no lo
+   *  cubra. Una excepción **siempre** gana sobre la ventana semanal. */
+  available: boolean
+}
+
+export type PrecioDeServicio = {
+  id: string
+  service_id: string
+  branch_id: string
+  /** ⚠️ Llega como **string**: el backend lo tipa `Decimal` y Pydantic lo
+   *  serializa en JSON como cadena para no perder precisión. Convertirlo con
+   *  `Number()` al mostrar o comparar. */
+  price: string
+}
+
 export type ArcaConfig = {
   empresa: string
   cuit: string
