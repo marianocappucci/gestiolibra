@@ -81,7 +81,15 @@ class BranchHoursRepository:
     def is_within_hours(self, branch_id: str, starts_at, ends_at) -> bool:
         """True if [starts_at, ends_at) falls inside a configured window for
         that weekday, or if the branch has no hours configured at all
-        (opt-in gating, see module docstring)."""
+        (opt-in gating, see module docstring).
+
+        🔴 **starts_at/ends_at are branch-local wall clock**, the same
+        unit the windows are stored in -- an admin typing "9 to 19" means nine
+        by the clock on the wall of that branch. Feeding this UTC instants was
+        the defect fixed on 2026-08-22: with UTC-3 it shifted every comparison
+        three hours, so a branch open 9-19 rejected anything starting after 16.
+        The conversion is the caller's job -- see
+        AppointmentService._check_branch_hours."""
         windows = self.list_for_branch(branch_id)
         if not windows:
             return True
