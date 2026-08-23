@@ -1107,3 +1107,76 @@ engine about civil time zones"*. El borde es este producto.
   medianoche). La primera versión de estos tests usaba una sola sucursal de 9 a
   23 y **pasaba en verde contra el código viejo**, porque con esa ventana las
   20:00 UTC caen adentro.
+
+## ADR-031 — La agenda como calendario, y la parametrización adentro de Configuración
+
+**Fecha**: 2026-08-22
+**Estado**: Aceptada
+
+### Contexto
+
+Dos pedidos del humano, el mismo día:
+
+> *"En gestiolibra hay que importar la agenda que usa libradesk con su ui y su
+> mecanismo."*
+
+> *"No se puede parametrizar servicios, horarios de esos servicios, honorarios
+> de esos servicios, etc."*
+
+**La agenda era un formulario de alta arriba y una tabla abajo**, con dos
+`<input type="date">` de rango. Decía *qué* turnos hay, pero no **cuánto ocupa
+cada uno ni dónde está el hueco**, que es la pregunta de quien atiende el
+teléfono; y para saber qué hay el jueves había que mover el rango y perder de
+vista el resto.
+
+**Y no había ninguna pantalla de parametrización.** Los endpoints de sucursales,
+horarios de atención, servicios, precios, recursos, disponibilidad, bloqueos y
+excepciones existen desde el MVP, pero sólo se llegaba a ellos por API o por
+`scripts/seed_demo.py`. Un cliente nuevo no podía configurar su propio negocio.
+
+### Decisión
+
+**1. El calendario se extrajo a `libra-ui/agenda` (v0.38.0) y se consume desde
+acá**, en vez de copiarse desde LibraDesk. Dos calendarios con la misma forma
+divergen, y el de LibraDesk ya llevaba tres rondas de correcciones reportadas a
+mano —el encabezado que se desfasaba por la barra de scroll, las flechas que se
+corrían con el largo del título, el racimo de bloques superpuestos— que la copia
+habría tenido que volver a pagar.
+
+Del paquete vienen la rejilla horaria, las vistas de semana y mes, el chip, la
+aritmética de días, la paleta por posición y la barra de navegación. De acá son
+los datos (`components/agenda/datos.ts`), qué es un evento
+(`components/agenda/eventos.ts`), la vista de día —una columna por recurso— y
+las acciones sobre un turno.
+
+**Todo el estado de la pantalla vive en la URL**: `?vista=`, `?dia=`,
+`?recurso=` y `?turno=`. Se puede mandar "mirá el jueves" o "fijate este turno"
+por mensaje, y el botón "atrás" vuelve del turno al día y del día a la semana.
+
+**2. Sucursales, Servicios y Recursos son secciones de Configuración**, no ítems
+propios del sidebar. El criterio lo fija el otro pedido del mismo día —*"la
+configuración de la facturación por ARCA debe ir por dentro de configuración y
+no por fuera"*—: lo que se configura vive en un solo lugar. Estas tres se cargan
+al arrancar y se tocan poco, a diferencia de la agenda y los clientes.
+
+### Consecuencias
+
+- **La agenda no tiene un `datetime-local` suelto arriba**: el alta pasó a un
+  diálogo, con el horario prellenado en el día que se está mirando.
+- **Los turnos anulados no llevan el color de su recurso.** Siguen en la grilla
+  —sacarlos escondería que ese hueco existió— pero apagados y tachados: con el
+  color del recurso la columna diría que el box está ocupado a esa hora cuando
+  está libre.
+- **El día de un turno lo decide la sucursal, también en el frontend.** La API
+  devuelve instantes en UTC; agrupar por el string crudo pondría un turno de las
+  21:30 en la columna del día siguiente. `datos.ts` convierte una sola vez, al
+  cargar, con la misma cuenta que hace el backend (ADR-030).
+- **El editor de ventanas semanales es uno solo** para el horario de la sucursal
+  y para la disponibilidad del recurso: tienen la misma forma. Lo que dice en
+  pantalla es la asimetría entre las dos — el horario de la sucursal es opt-in,
+  la disponibilidad del recurso **no**, y un recurso sin ventanas no recibe
+  ningún turno. Cargar sólo el primero, que es lo intuitivo, deja la agenda
+  muerta sin ninguna pista.
+- Se descartó vendorizar el `Switch` de shadcn por una casilla de "activo": un
+  `<input type="checkbox">` nativo evita traer un primitivo entero y su
+  dependencia de Radix a los tres formularios más simples de la aplicación.

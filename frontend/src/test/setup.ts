@@ -51,3 +51,14 @@ if (typeof Range !== 'undefined' && !Range.prototype.getBoundingClientRect) {
   Range.prototype.getBoundingClientRect = cero
   Range.prototype.getClientRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList
 }
+
+// El `Select` de Radix usa las APIs de captura de puntero, que jsdom no
+// implementa: sin esto, abrirlo desde un test no despliega ninguna opción y el
+// `getByRole('option')` falla con "unable to find" -- que se lee como un
+// defecto de la pantalla y no lo es. Es el mismo criterio que `scrollIntoView`
+// de acá arriba: en un navegador de verdad existen.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false
+  Element.prototype.setPointerCapture = () => {}
+  Element.prototype.releasePointerCapture = () => {}
+}

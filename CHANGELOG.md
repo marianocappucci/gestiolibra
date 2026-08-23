@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+- **La agenda como calendario, y la parametrización adentro de
+  Configuración** (ver ADR-031): la agenda pasa de formulario + tabla a
+  calendario con vistas de día, semana y mes, consumido de
+  `libra-ui/agenda` v0.38.0 (extraído de LibraDesk, no copiado). El estado
+  de la pantalla vive en la URL (`?vista=`, `?dia=`, `?recurso=`,
+  `?turno=`). Y tres secciones nuevas de Configuración —Sucursales (con su
+  horario de atención), Servicios (duración y honorarios por sucursal) y
+  Recursos (disponibilidad, bloqueos y excepciones)— que cierran el pedido
+  *"no se puede parametrizar servicios, horarios de esos servicios,
+  honorarios de esos servicios"*: los endpoints existían desde el MVP, la
+  pantalla no. 23 tests nuevos (36 en total).
 - **La validación del turno corre en hora de pared** (ver ADR-030):
   arregla el defecto reportado *"El horario elegido está fuera del horario
   de atención"*, que con UTC-3 rechazaba **todo turno que empezara después
