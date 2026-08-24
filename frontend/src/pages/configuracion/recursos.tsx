@@ -33,6 +33,7 @@ import { VentanasSemanales } from './ventanas'
 import {
   CampoActivo, ListaDelCatalogo, PieDeFormulario, comoIdentificador, describirError,
 } from './catalogo'
+import { fecha, fechaHora } from '@/lib/fechas'
 
 const SIN_SUCURSAL = '__ninguna__'
 const VACIO = { id: '', name: '', branch_id: SIN_SUCURSAL, active: true }
@@ -283,13 +284,13 @@ function Bloqueos({ resourceId }: { resourceId: string }) {
             {items.map((b) => (
               <li key={b.id} className="flex items-center gap-3">
                 <span className="tabular-nums">
-                  {b.starts_at.slice(0, 16).replace('T', ' ')} → {b.ends_at.slice(0, 16).replace('T', ' ')}
+                  {fechaHora(b.starts_at)} → {fechaHora(b.ends_at)}
                 </span>
                 <span className="text-muted-foreground">{b.reason}</span>
                 <Button
                   size="icon" variant="ghost"
                   className="size-7 text-destructive hover:text-destructive"
-                  aria-label={`Borrar bloqueo ${b.starts_at}`}
+                  aria-label={`Borrar bloqueo ${fechaHora(b.starts_at)}`}
                   onClick={() => borrar(b.id)}
                 >
                   <Trash2 />
@@ -385,9 +386,6 @@ function Excepciones({ resourceId }: { resourceId: string }) {
       setError(describirError(err))
     }
   }
-
-  /** `2026-08-22` → `22-08-2026`, el formato visible del ecosistema. */
-  const fecha = (iso: string) => `${iso.slice(8, 10)}-${iso.slice(5, 7)}-${iso.slice(0, 4)}`
 
   return (
     <Card>
