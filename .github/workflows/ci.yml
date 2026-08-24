@@ -43,6 +43,7 @@ jobs:
           POSTGRES_DB: gestiolibra
           POSTGRES_USER: gestiolibra
           POSTGRES_PASSWORD: gestiolibra-ci
+          TZ: America/Argentina/Buenos_Aires
         ports:
           - 5432:5432
         options: >-
@@ -52,6 +53,7 @@ jobs:
           --health-retries=5
 
     env:
+      TZ: America/Argentina/Buenos_Aires
       DATABASE_URL: sqlite:///${{ github.workspace }}/ci.db
 
     steps:
@@ -178,6 +180,8 @@ jobs:
   # frontend del producto.
   frontend:
     runs-on: ubuntu-latest
+    env:
+      TZ: America/Argentina/Buenos_Aires
     defaults:
       run:
         working-directory: frontend
@@ -227,6 +231,15 @@ jobs:
       # durante el deploy y no en el CI.
       - name: Build de produccion
         run: npm run build
+
+      # 🔴 No es redundante con el paso de arriba. `npm run build` devuelve 0
+      # aunque `tsc -b` haya fallado con errores y no haya escrito `dist/`: sin
+      # este chequeo el job queda verde habiendo producido nada, que es
+      # exactamente lo que el paso de build tiene que impedir. Y `dist/` es lo
+      # que el Dockerfile copia (`COPY --from=frontend-build /frontend/dist`),
+      # asi que un build vacio se manifiesta recien en el deploy.
+      - name: El build dejo algo de verdad
+        run: test -f dist/index.html
 
       # `--reporter=default` mantiene la salida legible en el log; el `junit`
       # agregado deja además el XML que lee el gate del paso siguiente. Los dos
