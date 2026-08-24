@@ -41,7 +41,8 @@ from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
 from .routers import (
     agenda, appointments, availability, billing as billing_router, branch_hours, branches,
-    business_settings, clients, dashboard as dashboard_router, deposits, health, reminders,
+    business_settings, clients, dashboard as dashboard_router, deposits, health, holidays,
+    reminders,
     resources, service_prices, services, users as users_router,
 )
 from .routers import auth as auth_router
@@ -282,6 +283,7 @@ def create_app(database_url: str) -> FastAPI:
     # puestas en cada endpoint mutante de esos routers.
     app.include_router(branches.router, dependencies=staff_or_admin_catalog)
     app.include_router(branch_hours.router, dependencies=admin_only)
+    app.include_router(holidays.router, dependencies=admin_only)
     app.include_router(resources.router, dependencies=staff_or_admin_catalog)
     app.include_router(services.router, dependencies=staff_or_admin_catalog)
     app.include_router(service_prices.router, dependencies=admin_only)
