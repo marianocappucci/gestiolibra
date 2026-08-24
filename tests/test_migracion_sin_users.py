@@ -48,9 +48,30 @@ def _cruda(url: str) -> str:
 
 
 @pytest.fixture
-def base_limpia():
-    """Un `schema public` vacío, y la config de alembic apuntada a él."""
+def base_limpia(monkeypatch):
+    """Un `schema public` vacío, y alembic apuntado a él **por el entorno**.
+
+    🔑 **`sqlalchemy.url` no alcanza.** El `env.py` resuelve la URL con
+    `url_de_instancia("gestiolibra")` y sólo cae a la config del `.ini` si el
+    entorno **no dice nada**. En el CI sí dice: `DATABASE_URL` es una variable
+    del job entero y apunta al SQLite del primer paso, así que las migraciones
+    de este test corrían contra **otra base** y acá no pasaba nada. Local pasaba
+    porque ahí esa variable no está puesta — o sea que el test era verde en la
+    máquina y rojo en el único lugar donde se mira.
+
+    Se pone el **nombre normalizado**, que `url_de_instancia` prueba antes que
+    el histórico `DATABASE_URL`, así que le gana sin tener que borrar nada del
+    entorno del job.
+    """
     import psycopg
+
+    from libracore.db.url_de_instancia import url_de_instancia
+
+    monkeypatch.setenv("GESTIOLIBRA_DATABASE_URL", TEST_DATABASE_URL)
+    assert url_de_instancia("gestiolibra") == TEST_DATABASE_URL, (
+        "el control: si el entorno le gana al test, las migraciones se van a "
+        "otra base y los asserts de abajo miden una base que nadie migró"
+    )
 
     with psycopg.connect(_cruda(TEST_DATABASE_URL), autocommit=True) as c:
         c.execute("DROP SCHEMA public CASCADE")
