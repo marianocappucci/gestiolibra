@@ -46,6 +46,7 @@ from .routers import (
     resources, service_prices, services, users as users_router,
 )
 from .routers import auth as auth_router
+from . import mercadopago
 from .services import billing
 from .services.appointments import AppointmentService
 from .services.branch_hours import BranchHoursRepository
@@ -311,6 +312,12 @@ def create_app(database_url: str) -> FastAPI:
     )
     app.include_router(
         billing_router.router, dependencies=admin_only + [Depends(require_module("facturacion"))],
+    )
+    # MercadoPago: las tres pantallas y el webhook, todas del motor. Lo unico
+    # de este producto es de donde salen los clientes -- ver app/mercadopago.py.
+    mercadopago.montar(
+        app, client_repository,
+        gates=admin_only + [Depends(require_module("facturacion"))],
     )
     app.include_router(
         dashboard_router.router, dependencies=admin_only + [Depends(require_module("dashboard"))],
