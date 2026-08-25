@@ -23,9 +23,24 @@ import os
 #: mitad al otro, que es peor que cualquiera de los dos.
 TEST_DATABASE_URL = os.environ.get("GESTIOLIBRA_TEST_DATABASE_URL", "").strip()
 
-
-def corre_contra_postgres() -> bool:
-    return TEST_DATABASE_URL.startswith("postgresql")
+# 🔴 **PostgreSQL y nada mas.** Hasta el 2026-08-25 la suite caia a SQLite
+# cuando la variable no estaba, y el CI corria las dos pasadas. El modo SQLite
+# se retiro el 2026-08-12 para toda la familia: no chequea las FK, tipa
+# dinamicamente y acepta cadenas donde la base pide enteros, asi que una corrida
+# verde sobre el no dice nada del motor real.
+#
+# El guard va ACA porque este es el unico lugar donde se elegia el motor. Con el
+# puesto, el predicado que preguntaba por el motor seria siempre True, asi que
+# se saco junto con las tres ramas SQLite que colgaban de el.
+if not TEST_DATABASE_URL.startswith("postgresql"):
+    raise RuntimeError(
+        "La suite de Gestiolibra necesita PostgreSQL: defini "
+        "GESTIOLIBRA_TEST_DATABASE_URL (ej. "
+        "postgresql+psycopg://gestiolibra:gestiolibra-ci@localhost:5432/gestiolibra). "
+        "Sin esa variable la suite correria sobre SQLite, que es lo que se "
+        "retiro el 2026-08-12: una suite verde sobre SQLite no dice nada "
+        "sobre el motor real."
+    )
 
 
 def fresh_database_url() -> str:
@@ -50,9 +65,6 @@ def fresh_database_url() -> str:
     lejos del test que los causo) no se parece en nada a la causa. Lo pago
     medlibra antes que nosotros.
     """
-    if not corre_contra_postgres():
-        return "sqlite:///:memory:"
-
     import psycopg
 
     try:
@@ -132,8 +144,6 @@ def destino_libracore(ruta_sqlite) -> str:
     LibraCore. Se vio al cablear [[ventalibra]], que tiene la misma estructura de
     dos bases y las apunto a las dos.
     """
-    if not corre_contra_postgres():
-        return str(ruta_sqlite)
     _preparar_libracore()
     return url_libracore()
 
@@ -146,6 +156,4 @@ def url_para_archivo(ruta) -> str:
     vaciado. El test que de verdad necesite un archivo aparte tiene que
     saltearse solo, no simularlo.
     """
-    if not corre_contra_postgres():
-        return f"sqlite:///{ruta}"
     return fresh_database_url()

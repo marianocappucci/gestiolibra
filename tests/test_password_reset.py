@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from motor_de_test import corre_contra_postgres, fresh_database_url
+from motor_de_test import fresh_database_url
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -83,67 +83,72 @@ def test_token_invalido_da_400():
     assert r.status_code == 400
 
 
-@pytest.mark.skipif(
-    corre_contra_postgres(),
-    reason="Abre la base de libracore con un engine propio apuntando a una RUTA "
-    "de archivo, y ademas usa PRAGMA foreign_key_check. Las dos cosas son de "
-    "SQLite; contra PostgreSQL habria que reescribir el test, no adaptarlo.",
-)
-def test_la_tabla_de_tokens_queda_en_la_base_de_libracore(tmp_path, monkeypatch):
-    """El chequeo que el motor no puede hacer: que la tabla nueva haya
-    quedado en el MISMO archivo que `usuarios`.
+def test_la_tabla_de_tokens_declara_su_FK_contra_usuarios(admin_client):
+    """El invariante que el motor **si** puede chequear.
 
     `usuarios` vive en la base de LibraCore (no en la del dominio) porque 11
     tablas del motor le declaran FK; si `password_reset_tokens` cayera en la
-    otra base, su FK apuntaría a una tabla que ahí no existe.
+    otra base, su FK apuntaria a una tabla que ahi no existe.
+
+    🔴 Hasta el 2026-08-25 esto se comprobaba abriendo el ARCHIVO de libracore
+    con un engine propio y corriendo `PRAGMA foreign_key_check` --- las dos
+    cosas de SQLite, asi que el test se salteaba entero contra PostgreSQL. Con
+    SQLite retirado se habria quedado sin correr nunca.
+
+    Reescrito con el mismo proposito y sin depender del motor: se le pregunta al
+    catalogo si la FK existe y a que tabla apunta. Sobre PostgreSQL la respuesta
+    ademas es fuerte, porque una FK que no resuelve **no se puede crear**: si la
+    tabla hubiera caido en otra base, el DDL habria fallado al arrancar la app.
+    """
+    from sqlalchemy import inspect
+
+    sesiones = admin_client.app.state.smtp_settings.session_factory
+    with sesiones() as s:
+        fks = inspect(s.get_bind()).get_foreign_keys("password_reset_tokens")
+
+    apuntadas = {fk["referred_table"] for fk in fks}
+    assert "usuarios" in apuntadas, (
+        f"`password_reset_tokens` no declara FK contra `usuarios`: apunta a "
+        f"{apuntadas or 'nada'}. Si la tabla quedo en la base del dominio, su "
+        "FK no tiene contra que resolver."
+    )
+
+
+def test_token_vencido_no_sirve(monkeypatch):
+    """Un token de recuperacion vencido no deja cambiar la clave.
+
+    Se fuerza el vencimiento escribiendo `expires_at` en el pasado en vez de
+    esperar una hora --- el reloj real no participa.
+
+    🔴 Hasta el 2026-08-25 este test se salteaba contra PostgreSQL, y el motivo
+    era **incidental**: se armaba su propio engine contra un ARCHIVO para llegar
+    a la fila del token. Lo que se dejaba de probar no es incidental --- que un
+    token vencido no sirva es de seguridad. Con SQLite retirado se habria
+    quedado sin correr nunca.
+
+    Ahora llega a la fila por la sesion de la app, que va al motor que sea, y
+    arma la app con el mismo molde que el resto del archivo.
     """
     monkeypatch.setenv("LIBRAAUTH_SMTP_HOST", "smtp.test")
     monkeypatch.setenv("LIBRAAUTH_SMTP_FROM_EMAIL", "no-reply@test")
-    libracore_db = tmp_path / "gestiolibra_libracore.db"
-    monkeypatch.setenv("GESTIOLIBRA_LIBRACORE_DB_PATH", str(libracore_db))
-    app = create_app(f"sqlite:///{tmp_path}/dominio.db")
-    app.state.password_reset._send_email = lambda **kw: None
-    app.state.users.create(username="ana", name="Ana", password="vieja123",
-                           role="staff", email="ana@empresa.com")
-    https_client(app).post("/auth/forgot-password", json={"identificador": "ana"})
-
-    sessions = sessionmaker(bind=create_engine(f"sqlite:///{libracore_db}"))
-    with sessions() as s:
-        filas = s.query(PasswordResetToken).all()
-        assert len(filas) == 1
-        # Y la FK resuelve de verdad contra `usuarios` del mismo archivo.
-        assert s.execute(
-            __import__("sqlalchemy").text("PRAGMA foreign_key_check")
-        ).fetchall() == []
-
-
-@pytest.mark.skipif(
-    corre_contra_postgres(),
-    reason="Abre la base de libracore con un engine propio apuntando a una RUTA de archivo, y ademas usa PRAGMA foreign_key_check. Las dos cosas son de SQLite; contra PostgreSQL habria que reescribir el test, no adaptarlo.",
-)
-def test_token_vencido_no_sirve(tmp_path, monkeypatch):
-    """Se fuerza el vencimiento escribiendo `expires_at` en el pasado en vez
-    de esperar una hora — el reloj real no participa."""
-    monkeypatch.setenv("LIBRAAUTH_SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("LIBRAAUTH_SMTP_FROM_EMAIL", "no-reply@test")
-    libracore_db = tmp_path / "gestiolibra_libracore.db"
-    monkeypatch.setenv("GESTIOLIBRA_LIBRACORE_DB_PATH", str(libracore_db))
-    app = create_app(f"sqlite:///{tmp_path}/dominio.db")
+    app = create_app(fresh_database_url())
     enviados = []
     app.state.password_reset._send_email = lambda **kw: enviados.append(kw)
     app.state.users.create(username="ana", name="Ana", password="vieja123",
                            role="staff", email="ana@empresa.com")
-    client = https_client(app)
-    client.post("/auth/forgot-password", json={"identificador": "ana"})
-    token = enviados[0]["cuerpo"].split("?token=")[1].split("\n")[0].strip()
+    cliente = https_client(app)
+    cliente.post("/auth/forgot-password", json={"identificador": "ana"})
+    assert enviados, "no salio ningun mail: sin token no hay nada que vencer"
+    token = enviados[0]["cuerpo"].split("?token=")[1].splitlines()[0].strip()
 
-    sessions = sessionmaker(bind=create_engine(f"sqlite:///{libracore_db}"))
-    with sessions() as s:
+    sesiones = app.state.smtp_settings.session_factory
+    with sesiones() as s:
         fila = s.query(PasswordResetToken).filter_by(token_hash=_hash_token(token)).one()
         fila.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1)
         s.commit()
 
-    assert client.post("/auth/reset-password",
-                       json={"token": token, "new_password": "nueva-clave-1"}).status_code == 400
-    assert client.post("/auth/login",
-                       json={"username": "ana", "password": "vieja123"}).status_code == 200
+    assert cliente.post("/auth/reset-password",
+                        json={"token": token, "new_password": "nueva-clave-1"}).status_code == 400
+    # 🔑 El control de que ese 400 significa algo: la clave vieja sigue valiendo.
+    assert cliente.post("/auth/login",
+                        json={"username": "ana", "password": "vieja123"}).status_code == 200
