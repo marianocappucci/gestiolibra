@@ -200,7 +200,12 @@ PY
     log "migraciones: $cmd"
     # shellcheck disable=SC2086 -- $cmd va sin comillas a proposito: es la
     # linea de comando completa y tiene que splitearse en argumentos.
-    docker compose -p "$CONTENEDOR" -f "$COMPOSE" run --rm "$CONTENEDOR" $cmd >/dev/null 2>&1 \
+    # 🔴 `-T` y `</dev/null` no son adorno: sin ellos `docker compose run`
+    # abre una TTY y **se come el resto del heredoc** que alimenta este
+    # `while read`. Medido corriendo el script de verdad: de las tres cadenas
+    # corria SOLO la primera y el reset terminaba "bien" con dos migraciones
+    # sin aplicar. Es el mismo filo que `docker exec` sin `-i`.
+    docker compose -p "$CONTENEDOR" -f "$COMPOSE" run --rm -T "$CONTENEDOR" $cmd >/dev/null 2>&1 </dev/null \
       || { log "ABORTA: fallo \`$cmd\`."; docker start "$CONTENEDOR" >/dev/null; exit 11; }
   done <<CADENAS_EOF
 $CADENAS
