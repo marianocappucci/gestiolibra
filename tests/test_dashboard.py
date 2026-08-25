@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi.testclient import TestClient
 from libragenda import ReminderPolicy
@@ -69,7 +69,19 @@ def _seeded_client(client: TestClient):
 
 
 def _today_range():
-    today = datetime.now(timezone.utc).date()
+    """El "hoy" del rango, con el MISMO reloj con el que la app estampa.
+
+    🔴 Acá decía `datetime.now(timezone.utc).date()`, y la app emite la factura
+    con `date.today()` —el reloj local, que en el contenedor es hora de
+    Argentina—. Entre las **21:00 y las 24:00 ART** eso son dos días distintos:
+    la factura queda estampada el 24 y el rango pregunta por el 25, así que el
+    dashboard devuelve cero y el test falla.
+
+    No es flakiness: es determinista y sólo depende de a qué hora corra el CI.
+    Se manifestó el 2026-08-25 a las 01:21 UTC (22:21 ART); la corrida verde
+    anterior había sido a las 18:18 ART, fuera de la ventana.
+    """
+    today = date.today()
     return today.isoformat(), today.isoformat()
 
 
