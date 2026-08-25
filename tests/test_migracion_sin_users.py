@@ -32,15 +32,15 @@ import pytest
 from alembic import command
 from alembic.config import Config
 
-from motor_de_test import TEST_DATABASE_URL, corre_contra_postgres
+from motor_de_test import TEST_DATABASE_URL
 
 PREVIA = "0007_entidad_id_texto"
 NUEVA = "0008_sin_users"
 
-pytestmark = pytest.mark.skipif(
-    not corre_contra_postgres(),
-    reason="necesita PostgreSQL: la migración se ejercita contra una base real",
-)
+# El `pytestmark = skipif(not corre_contra_postgres(), ...)` que estaba aca se
+# saco el 2026-08-25: la suite ya no puede correr contra otra cosa, asi que el
+# skip nunca se disparaba y solo quedaba como ruido. Estos tres tests **ganan**
+# con el cambio: antes solo corrian en una de las dos pasadas del CI.
 
 
 def _cruda(url: str) -> str:
