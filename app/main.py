@@ -42,6 +42,7 @@ from .payments import ManualPaymentPort
 from .routers import (
     agenda, appointments, availability, billing as billing_router, branch_hours, branches,
     business_settings, clients, dashboard as dashboard_router, deposits, health, holidays,
+    medios_pago as medios_pago_router,
     reminders,
     resources, service_prices, services, users as users_router,
 )
@@ -291,6 +292,10 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(clients.router, dependencies=staff_or_admin_catalog)
     app.include_router(availability.router, dependencies=admin_only)
     app.include_router(business_settings.router, dependencies=admin_only)
+    # 🔴 Con que medios se puede cobrar. **NO va con **: lo consume
+    # el selector del mostrador al completar un turno, y ahi no hay un admin.
+    # Es una lista de constantes del motor, sin datos de la instancia.
+    app.include_router(medios_pago_router.router)
     # Usuarios acepta ADEMÁS el token de servicio (libraauth v0.7.0): es lo
     # único que el backoffice de la suite necesita y que no puede salir del
     # motor, porque el router de usuarios es propio de cada producto.

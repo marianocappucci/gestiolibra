@@ -24,6 +24,22 @@ export type Branch = {
   address: string | null
 }
 
+/** Un medio de pago, tal como lo sirve `GET /medios-pago`.
+ *
+ *  🔴 **No hay lista de medios en este archivo, y es a propósito.** Hasta el
+ *  2026-08-24 `Agenda.tsx` declaraba cuatro a mano, y uno —`tarjeta`— no
+ *  existía en el vocabulario de la familia: ni siquiera en la caja que este
+ *  producto crea por defecto, así que el selector ofrecía un medio que la
+ *  instancia no tiene habilitado. Era la misma copia byte a byte que tenía
+ *  MedLibra.
+ *
+ *  La lista es de `libracore.medios_pago` y llega por API. Ver
+ *  `wiki/concepts/medios-de-pago-familia-libra.md`. */
+export type MedioPago = {
+  id: string
+  label: string
+}
+
 export type Resource = {
   id: string
   name: string

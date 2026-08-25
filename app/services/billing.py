@@ -60,23 +60,30 @@ def configure(db_path: str) -> None:
     """Llamar una vez al arrancar la app: configura libracore.db contra su
     propio archivo SQLite (independiente del engine de LibraGenda) y
     asegura que el schema compartido y una caja por defecto existan."""
-    # 🔴 `db_path` puede ser una URL de PostgreSQL, y entonces NO hay carpeta
-    # que crear. Sin esta guarda, `os.path.dirname()` de
-    # `postgresql://usuario:clave@host:5432/base` devuelve
-    # `postgresql://usuario:clave@host:5432` y `makedirs` lo crea como
-    # directorio: **la contraseña queda escrita en el nombre de una carpeta**.
-    # Y donde el repo está bind-mounteado en `/app`, esa carpeta cae dentro del
-    # checkout del VPS y el siguiente `docker build` la mete en la imagen.
-    # Encontrado en VentaLibra el 2026-08-10, al cortar su demo a PostgreSQL.
+    # 🔴 **Este producto corre sobre PostgreSQL y nada mas.** La guarda va aca,
+    # en el arranque del producto, y no dentro de `libracore.db.core`: el motor
+    # tiene que poder abrir un SQLite igual, porque de eso vive la herramienta
+    # de diagnostico `python -m libracore.db.schema_dump`, que vuelca el schema
+    # de un archivo viejo o de la base de LibraEdge. La regla "este producto no
+    # habla con otro motor" es del producto, no del motor.
     #
-    # El chequeo va escrito acá y no con `libracore.db.core.es_url_postgres()`
-    # porque ese helper existe desde LibraCore v1.18.0 y este producto todavía
-    # pinea v1.14.0. Cuando suba el pin para su propio corte, cambiar por el
-    # helper y borrar este comentario.
-    if not str(db_path).startswith(("postgres://", "postgresql://")):
-        directory = os.path.dirname(db_path)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
+    # Aca habia un `if not ... startswith(...)` que salteaba el `makedirs`
+    # cuando el destino era una URL. Existia para evitar un defecto medido: con
+    # una URL, `os.path.dirname()` devuelve `postgresql://usuario:clave@host` y
+    # `makedirs` lo creaba como carpeta --- **la contrasena escrita en el nombre
+    # de un directorio**, que ademas caia dentro del checkout bind-mounteado y
+    # se colaba en la imagen del siguiente build. Encontrado en VentaLibra el
+    # 2026-08-10.
+    #
+    # Con la guarda ese camino no existe mas: si no hay ruta de archivo posible,
+    # no hay carpeta que crear ni defecto que evitar. El bloque entero se va.
+    if not libracore_core.es_url_postgres(db_path):
+        raise RuntimeError(
+            "Gestiolibra corre solo sobre PostgreSQL y recibio {!r}, que es una "
+            "ruta de archivo. El modo SQLite se retiro el 2026-08-12: no chequea "
+            "las FK, tipa dinamicamente y acepta cadenas donde la base pide "
+            "enteros.".format(db_path)
+        )
     libracore_core.configure(db_path)
     conn = libracore_core.get_connection()
     try:
