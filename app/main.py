@@ -337,7 +337,17 @@ def create_app(database_url: str) -> FastAPI:
     # El prefijo y las dependencias son los mismos, asi que el gate del modulo
     # "facturacion" sigue igual.
     app.include_router(
-        build_arca_router(prefix="/config/arca"),
+        # 🔴 `empresa_por_defecto` es el slug con el que `services/billing.py`
+        # lee la configuracion de facturacion (`EMPRESA = "negocio"`). En una
+        # instancia que todavia no facturo no hay fila, y el primer guardado la
+        # crea: sin esto la crearia como `default`, donde ese servicio no mira
+        # nunca. El PUT contesta 200, la pantalla dice "Guardado", y el primer
+        # comprobante falla con "ARCA no esta configurado".
+        #
+        # La pantalla compartida ya manda el slug desde libra-ui v0.48.0, pero
+        # un script, el backoffice o un curl no tienen por que saberlo. Ver
+        # LibraCore v1.63.0.
+        build_arca_router(prefix="/config/arca", empresa_por_defecto=billing.EMPRESA),
         dependencies=admin_only + [Depends(require_module("facturacion"))],
     )
     # MercadoPago: las tres pantallas y el webhook, todas del motor. Lo unico
