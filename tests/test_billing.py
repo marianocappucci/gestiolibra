@@ -46,6 +46,23 @@ def test_get_arca_config_defaults_to_none(admin_client: TestClient):
     assert response.json() is None
 
 
+def test_la_fila_se_crea_con_el_slug_que_lee_la_facturacion(admin_client: TestClient):
+    """🔴 Sin `empresa`, la fila tiene que caer igual en `negocio`.
+
+    Es el slug con el que `services/billing.py` lee la configuracion. Con
+    `default` --el valor al que caia el router del motor antes de que el
+    producto pudiera declarar el suyo-- el PUT contesta 200 y la pantalla dice
+    "Guardado", pero la facturacion no lee esa fila NUNCA: se descubre al
+    emitir el primer comprobante.
+
+    La pantalla manda el slug, pero un script o el backoffice no tienen por que
+    saberlo. Ver `empresa_por_defecto` en LibraCore v1.63.0.
+    """
+    r = admin_client.put("/config/arca", json={"cuit": "20111222339", "punto_venta": 3})
+    assert r.status_code == 200, r.text
+    assert r.json()["empresa"] == "negocio"
+
+
 def test_set_and_get_arca_config(admin_client: TestClient):
     client = admin_client
     set_response = client.put("/config/arca", json={
