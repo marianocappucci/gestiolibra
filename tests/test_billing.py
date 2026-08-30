@@ -25,6 +25,21 @@ def _seeded_appointment(
     return appointment_id
 
 
+# ── ARCA: el router es el de LibraCore ───────────────────────────────────────
+#
+# Desde el 2026-08-30 `/config/arca` lo sirve `libracore.arca_router`, no un
+# router propio. El comportamiento del router --que valide el certificado antes
+# de escribirlo, que chequee que el par sea pareja, que sepa cuando vence-- lo
+# prueba el motor en `tests/test_arca_router.py`; **lo que se prueba aca es el
+# cableado**: que este producto lo monte, en esa ruta, y detras de su gate.
+#
+# 🔴 Los tests de esta seccion decian antes `certificado_path: "cert.crt"` en el
+# cuerpo del PUT y pasaban. Siguen pasando hoy --el payload del motor ignora las
+# claves de mas-- pero ya no significan lo mismo: el path lo pone el servidor al
+# recibir el archivo. Un test que no distingue esas dos cosas es exactamente el
+# que deja la migracion "verde" sin haber mirado nada.
+
+
 def test_get_arca_config_defaults_to_none(admin_client: TestClient):
     response = admin_client.get("/config/arca")
     assert response.status_code == 200
@@ -34,8 +49,7 @@ def test_get_arca_config_defaults_to_none(admin_client: TestClient):
 def test_set_and_get_arca_config(admin_client: TestClient):
     client = admin_client
     set_response = client.put("/config/arca", json={
-        "cuit": "20111222339", "punto_venta": 3,
-        "certificado_path": "cert.crt", "clave_path": "clave.key",
+        "empresa": "negocio", "cuit": "20111222339", "punto_venta": 3,
         "ambiente": "homologacion",
     })
     assert set_response.status_code == 200
@@ -46,11 +60,61 @@ def test_set_and_get_arca_config(admin_client: TestClient):
     assert fetched.json()["cuit"] == "20111222339"
 
     updated = client.put("/config/arca", json={
-        "cuit": "20111222339", "punto_venta": 5,
-        "certificado_path": "cert.crt", "clave_path": "clave.key",
+        "empresa": "negocio", "cuit": "20111222339", "punto_venta": 5,
     })
     assert updated.status_code == 200
     assert updated.json()["punto_venta"] == 5
+
+
+def test_el_certificado_ya_no_se_declara_por_json(admin_client: TestClient):
+    """🔴 El path del certificado lo pone el SERVIDOR al recibir el archivo.
+
+    Hasta hoy este endpoint aceptaba `certificado_path` en el cuerpo: una ruta
+    del filesystem que el admin escribia y el servidor abria, apuntando a un
+    archivo que alguien tenia que haber dejado dentro del volumen del
+    contenedor a mano. El alta no se podia hacer desde el navegador.
+    """
+    admin_client.put("/config/arca", json={
+        "empresa": "negocio", "cuit": "20111222339", "punto_venta": 3,
+        "certificado_path": "/tmp/mio.crt", "clave_path": "/tmp/mia.key",
+    })
+    guardado = admin_client.get("/config/arca").json()
+    assert guardado["certificado_path"] != "/tmp/mio.crt"
+    assert guardado["clave_path"] != "/tmp/mia.key"
+    # Y la pantalla se entera de que no hay nada cargado, en vez de mostrar dos
+    # rutas que apuntan a archivos que no existen.
+    assert guardado["tiene_certificado"] is False
+    assert guardado["tiene_clave"] is False
+
+
+def test_el_certificado_se_sube_y_se_valida_antes_de_escribirlo(admin_client: TestClient):
+    """Subir el `.csr` --el pedido-- en vez del `.crt` que ARCA devuelve es el
+    error habitual, y antes se aceptaba: fallaba recien al emitir el primer
+    comprobante, con un error de ARCA que no hablaba de la causa."""
+    respuesta = admin_client.post(
+        "/config/arca/certificado",
+        files={"archivo": ("pedido.pem", b"-----BEGIN CERTIFICATE REQUEST-----", "text/plain")},
+    )
+    assert respuesta.status_code == 422
+    assert "certificado" in respuesta.json()["detail"].lower()
+
+
+def test_el_estado_dice_si_la_instancia_puede_facturar(admin_client: TestClient):
+    """🔑 Es el endpoint que trae el vencimiento del certificado, que es el dato
+    que evita la falla silenciosa: duran dos anos y el dia que vencen la
+    facturacion deja de andar sin que nadie haya tocado nada."""
+    respuesta = admin_client.get("/config/arca/estado")
+    assert respuesta.status_code == 200
+    assert respuesta.json()["configurado"] is False
+
+
+def test_las_rutas_nuevas_tambien_son_de_admin(staff_client: TestClient):
+    """El gate del producto tiene que cubrir el router ENTERO, no solo el
+    `GET`/`PUT` que ya existia. Subir un certificado es la accion mas sensible
+    de esta pantalla."""
+    assert staff_client.get("/config/arca/estado").status_code == 403
+    assert staff_client.post("/config/arca/probar").status_code == 403
+    assert staff_client.delete("/config/arca/credenciales").status_code == 403
 
 
 def test_complete_without_price_configured_does_not_invoice(admin_client: TestClient):
