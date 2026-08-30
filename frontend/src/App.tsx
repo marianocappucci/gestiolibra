@@ -61,9 +61,17 @@ export default function App() {
           para el mismo `GET/PUT /config/arca`. La ruta sobrevive como
           redirección y no se borra: sin ella un favorito viejo cae en el
           catch-all y aterriza en la agenda sin explicación. */}
+      {/* 🔴 El destino cambio el 2026-08-30 con la Configuracion canonica:
+          ARCA dejo de ser una pestana de primer nivel y paso a ser una
+          SUB-SECCION de "Integraciones", junto a MercadoPago y el correo. Con
+          el `?seccion=arca` viejo la redireccion sigue funcionando --no da
+          error-- pero aterriza en la primera pestana, que es Empresa: el
+          favorito lleva a otro lado y nadie se entera. */}
       <Route
         path="/facturacion"
-        element={<Navigate to="/configuracion?seccion=arca" replace />}
+        element={
+          <Navigate to="/configuracion?seccion=integraciones&integracion=arca" replace />
+        }
       />
       <Route
         path="/usuarios"
