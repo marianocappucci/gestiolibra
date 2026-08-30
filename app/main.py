@@ -20,6 +20,7 @@ from libraauth.session_auth import (
 from libraauth.smtp_settings import SmtpSettingsRepository, resolver_smtp_config
 from libraauth.terminos import TerminosRepository, build_terminos_router
 from libracore import config_manager
+from libracore.arca_router import build_arca_router
 from libracore.config_router import (
     build_backup_router, build_empresa_admin_router, build_empresa_router,
 )
@@ -40,7 +41,7 @@ from .modules_gate import require_module
 from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
 from .routers import (
-    agenda, appointments, availability, billing as billing_router, branch_hours, branches,
+    agenda, appointments, availability, branch_hours, branches,
     business_settings, clients, dashboard as dashboard_router, deposits, health, holidays,
     medios_pago as medios_pago_router,
     reminders,
@@ -315,8 +316,29 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(
         deposits.admin_router, dependencies=admin_only + [Depends(require_module("senas"))],
     )
+    # ARCA, del motor. Reemplaza al `routers/billing.py` propio, que sobre el
+    # MISMO prefijo `/config/arca` solo tenia GET y PUT, y pedia el certificado
+    # como un PATH DEL FILESYSTEM del servidor en un campo de texto.
+    #
+    # 🔴 Eso tenia dos problemas y ninguno se veia en pantalla: el alta no se
+    # podia hacer desde el navegador --alguien tenia que dejar el .crt y el .key
+    # dentro del volumen del contenedor a mano-- y era una ruta que el admin
+    # escribe y el servidor abre.
+    #
+    # Lo que gana la pantalla con el router del motor: sube el par y lo VALIDA
+    # antes de escribirlo --subir el .csr en vez del .crt, o dos mitades que no
+    # son pareja, se rechazan al subir con el motivo escrito--, dice cuando
+    # vence el certificado, y autentica de verdad contra WSAA.
+    #
+    # 🔑 El vencimiento es el dato que evita la falla silenciosa: duran dos anos
+    # y el dia que vencen la facturacion deja de andar sin que nadie haya tocado
+    # nada.
+    #
+    # El prefijo y las dependencias son los mismos, asi que el gate del modulo
+    # "facturacion" sigue igual.
     app.include_router(
-        billing_router.router, dependencies=admin_only + [Depends(require_module("facturacion"))],
+        build_arca_router(prefix="/config/arca"),
+        dependencies=admin_only + [Depends(require_module("facturacion"))],
     )
     # MercadoPago: las tres pantallas y el webhook, todas del motor. Lo unico
     # de este producto es de donde salen los clientes -- ver app/mercadopago.py.

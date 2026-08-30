@@ -105,8 +105,13 @@ describe('/facturacion', () => {
     conSesionAdmin()
     montar('/facturacion')
     // El título de la card de ARCA, que sólo existe en esa sección: prueba a la
-    // vez que la redirección llegó a `/configuracion` y que el `?seccion=arca`
-    // eligió la pestaña correcta y no la primera.
-    expect(await screen.findByText('Facturación electrónica (ARCA)')).toBeInTheDocument()
+    // vez que la redirección llegó a `/configuracion` y que el query eligió la
+    // sección correcta y no la primera.
+    //
+    // 🔴 Desde la Configuración canónica (2026-08-30) ARCA no es una pestaña de
+    // primer nivel sino una SUB-SECCIÓN de "Integraciones", así que hacen falta
+    // las dos claves del query. Con la de antes la redirección no fallaba:
+    // aterrizaba en Empresa, que es peor que un error porque no se nota.
+    expect(await screen.findByText('ARCA (facturación electrónica)')).toBeInTheDocument()
   })
 })
