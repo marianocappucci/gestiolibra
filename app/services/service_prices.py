@@ -6,10 +6,9 @@ service x branch -> price table, not a single price on Service.
 """
 from decimal import Decimal
 
+from libragenda.sqlalchemy_repository import Base
 from sqlalchemy import ForeignKey, Numeric, String, UniqueConstraint, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
-
-from libragenda.sqlalchemy_repository import Base
 
 
 class ServicePriceRow(Base):

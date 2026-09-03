@@ -1,8 +1,8 @@
 """Create client_billing: cuit/condicion_iva extension of clients, for
 facturacion con LibraCore (mismo patron que patients de MedLibra).
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0003_client_billing"
 down_revision = "0002_business_config"

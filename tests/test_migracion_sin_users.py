@@ -31,7 +31,6 @@ from __future__ import annotations
 import pytest
 from alembic import command
 from alembic.config import Config
-
 from motor_de_test import TEST_DATABASE_URL
 
 PREVIA = "0007_entidad_id_texto"
@@ -64,7 +63,6 @@ def base_limpia(monkeypatch):
     entorno del job.
     """
     import psycopg
-
     from libracore.db.url_de_instancia import url_de_instancia
 
     monkeypatch.setenv("GESTIOLIBRA_DATABASE_URL", TEST_DATABASE_URL)

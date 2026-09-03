@@ -13,12 +13,12 @@ importa fijar acá es el borde:
    siguen exigiendo una sesión de usuario del producto.
 """
 import pytest
+from conftest import https_client
 from fastapi.testclient import TestClient
 from libraauth.session_auth import SERVICE_TOKEN_ENV, SERVICE_TOKEN_HEADER
+from motor_de_test import fresh_database_url
 
 from app.main import create_app
-from motor_de_test import fresh_database_url
-from conftest import https_client
 
 TOKEN = "un-token-de-servicio-de-prueba"
 

@@ -6,7 +6,7 @@ ni tabla propia de este módulo). Facturación/caja quedó afuera del primer
 corte (decisión explícita del usuario, ver DECISIONS.md ADR-012) y se
 sumó después, ver ADR-015.
 """
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta, timezone
 
 from libracore.db import caja as db_caja
 from libracore.db import facturas as db_facturas
@@ -14,7 +14,6 @@ from libragenda import AppointmentStatus, DepositStatus
 from libragenda.repositories import AppointmentRepository, DepositRepository, SentReminderRepository
 
 from .clients import ClientRepository
-
 
 #: Zona del negocio. Argentina es UTC-3 fijo, sin horario de verano, así que el
 #: desfasaje es una constante y no hace falta una base de husos para resolverlo.
@@ -41,8 +40,8 @@ def _day_range_utc(date_from: date, date_to: date) -> tuple[datetime, datetime]:
     inclusivo que ya tenía: 23:59:59.999999 local.
     """
     return (
-        datetime.combine(date_from, time.min, tzinfo=_ZONA).astimezone(timezone.utc),
-        datetime.combine(date_to, time.max, tzinfo=_ZONA).astimezone(timezone.utc),
+        datetime.combine(date_from, time.min, tzinfo=_ZONA).astimezone(UTC),
+        datetime.combine(date_to, time.max, tzinfo=_ZONA).astimezone(UTC),
     )
 
 
@@ -68,7 +67,7 @@ class DashboardService:
         por_estado = {status.value: 0 for status in AppointmentStatus}
         for item in in_range:
             por_estado[item.status.value] += 1
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         turnos_hoy = sum(1 for item in all_appointments if item.starts_at.date() == today)
 
         desde, hasta = date_from.isoformat(), date_to.isoformat()

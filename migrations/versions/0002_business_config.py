@@ -1,8 +1,8 @@
 """Configuracion comercial: horario por sucursal, precio por servicio y
 sucursal, contacto de sucursal, y datos del negocio (nombre/moneda).
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0002_business_config"
 down_revision = "0001_users"

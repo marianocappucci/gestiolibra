@@ -2,54 +2,77 @@
 
 import os
 
-from libracore.db.url_de_instancia import url_de_instancia
-
 from fastapi import Depends, FastAPI
-
 from libraauth.auditoria import (
-    AuditoriaBase, AuditoriaRepository, agregar_middleware_de_usuario, build_logs_router,
+    AuditoriaBase,
+    AuditoriaRepository,
+    agregar_middleware_de_usuario,
+    build_logs_router,
     configurar_auditoria,
 )
 from libraauth.auth_events import AuthEventRepository
+from libraauth.bootstrap import ensure_demo_user
 from libraauth.demo_codigos import DemoCodigoRepository
 from libraauth.models import Base as AuthBase
 from libraauth.password_reset import PasswordResetService
 from libraauth.session_auth import (
-    build_demo_codigos_router, build_smtp_settings_router, demo_username,
+    build_demo_codigos_router,
+    build_smtp_settings_router,
+    demo_username,
 )
 from libraauth.smtp_settings import SmtpSettingsRepository, resolver_smtp_config
 from libraauth.terminos import TerminosRepository, build_terminos_router
 from libracore import config_manager
 from libracore.arca_router import build_arca_router
 from libracore.config_router import (
-    build_backup_router, build_empresa_admin_router, build_empresa_router,
+    build_backup_router,
+    build_empresa_admin_router,
+    build_empresa_router,
 )
+from libracore.db.url_de_instancia import url_de_instancia
 from libracore.respaldo import Instancia
 from libracore.smtp_router import build_smtp_probe_router
+from libragenda import DepositManager, ReminderDispatcher, SqlAlchemyDepositRepository, SqlAlchemyReminderRepository
+from libragenda.availability_repository import SqlAlchemyAvailabilityRepository
+from libragenda.catalog_repository import SqlAlchemyCatalogRepository
+from libragenda.database import configure, get_engine, get_session_factory
+from libragenda.sqlalchemy_repository import Base, SqlAlchemyAppointmentRepository
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from libragenda import DepositManager, ReminderDispatcher, SqlAlchemyDepositRepository, SqlAlchemyReminderRepository
-from libragenda.availability_repository import SqlAlchemyAvailabilityRepository
-from libragenda.database import configure, get_engine, get_session_factory
-from libragenda.catalog_repository import SqlAlchemyCatalogRepository
-from libragenda.sqlalchemy_repository import Base, SqlAlchemyAppointmentRepository
-
+from . import mercadopago
 from .auditoria import AUDITABLES
 from .auth import build_session_auth, require_admin, require_admin_o_servicio, require_staff
 from .modules_gate import require_module
 from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
 from .routers import (
-    agenda, appointments, availability, branch_hours, branches,
-    business_settings, clients, dashboard as dashboard_router, deposits, health, holidays,
-    medios_pago as medios_pago_router,
+    agenda,
+    appointments,
+    availability,
+    branch_hours,
+    branches,
+    business_settings,
+    clients,
+    deposits,
+    health,
+    holidays,
     reminders,
-    resources, service_prices, services, users as users_router,
+    resources,
+    service_prices,
+    services,
 )
 from .routers import auth as auth_router
-from . import mercadopago
+from .routers import (
+    dashboard as dashboard_router,
+)
+from .routers import (
+    medios_pago as medios_pago_router,
+)
+from .routers import (
+    users as users_router,
+)
 from .services import billing
 from .services.appointments import AppointmentService
 from .services.branch_hours import BranchHoursRepository
@@ -59,7 +82,6 @@ from .services.clients import ClientRepository
 from .services.dashboard import DashboardService
 from .services.modules import ModuleRepository
 from .services.service_prices import ServicePriceRepository
-from libraauth.bootstrap import ensure_demo_user
 from .services.users import UserRepository, ensure_default_admin
 
 

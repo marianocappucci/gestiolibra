@@ -1,8 +1,6 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-
 from libragenda import (
     AppointmentConflict,
     AppointmentNotFound,
@@ -12,6 +10,7 @@ from libragenda import (
 )
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.repositories import DepositRepository
+from pydantic import BaseModel
 
 from .. import mensajes_agenda as mensajes
 from ..dependencies import (

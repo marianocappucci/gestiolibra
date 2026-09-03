@@ -2,12 +2,11 @@
 timezone) with Gestiolibra's own contact extension (phone, address) --
 same pattern as MedLibra's Patient extending LibraGenda's Client.
 """
-from sqlalchemy import ForeignKey, String, select
-from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
-
 from libragenda import Branch
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.sqlalchemy_repository import Base
+from sqlalchemy import ForeignKey, String, select
+from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 
 
 class BranchContactRow(Base):

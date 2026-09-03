@@ -31,10 +31,9 @@ instead of trying to preserve it with a volume (tried first, but an
 anonymous volume only seeds from the image once and then freezes the
 frontend at that first build forever, see ADR-022)."""
 import os
-
-from libracore.db.url_de_instancia import url_de_instancia
 from pathlib import Path
 
+from libracore.db.url_de_instancia import url_de_instancia
 
 from app.spa import montar_spa
 
