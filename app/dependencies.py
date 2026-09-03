@@ -1,7 +1,6 @@
 """FastAPI dependency providers reading shared state off the app instance."""
 
 from fastapi import Request
-
 from libraauth.auditoria import AuditoriaRepository
 from libraauth.auth_events import AuthEventRepository
 from libragenda import DepositManager, ReminderDispatcher

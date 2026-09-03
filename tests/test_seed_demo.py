@@ -101,10 +101,12 @@ def test_deja_catalogo_activo_e_inactivo(api):
 
 # ── 🔴 Los turnos, en varios estados ──────────────────────────────────────
 
-def _estados(api):
-    from datetime import date, timedelta
+def _estados(api, hoy):
+    """⚠️ La ventana se arma con la fecha que devolvió `sembrar()`, no con
+    `date.today()`. Ver `test_hay_turnos_pasados_y_futuros`."""
+    from datetime import timedelta
 
-    desde, hasta = date.today() - timedelta(days=2), date.today() + timedelta(days=5)
+    desde, hasta = hoy - timedelta(days=2), hoy + timedelta(days=5)
     estados = []
     for r in api.get("/resources"):
         agenda = api.get(f"/resources/{r['id']}/agenda"
@@ -117,9 +119,9 @@ def test_deja_turnos_en_mas_de_un_estado(api):
     """🔴 Si todos quedaran pendientes, la agenda mostraría una sola vista. Y
     completar un turno **no es un campo**: hay que confirmarlo primero, así que
     este test también prueba que la cadena de transiciones se hizo bien."""
-    sembrar(api)
+    hoy = sembrar(api)
 
-    estados = _estados(api)
+    estados = _estados(api, hoy)
     assert len(estados) >= 8, f"pocos turnos: {len(estados)}"
     assert len(set(estados)) >= 3, f"un solo estado o dos: {set(estados)}"
 
@@ -129,8 +131,24 @@ def test_hay_turnos_pasados_y_futuros(api):
     mismo día, una de las dos queda vacía."""
     from datetime import date, timedelta
 
-    sembrar(api)
-    hoy = date.today()
+    # ⚠️ **Se pregunta por la fecha que devolvió `sembrar()`, no por
+    # `date.today()`.** El mismo test en Restolibra se puso rojo el 2026-08-29 a
+    # las 00:04 de Argentina con el código que había pasado en verde una hora
+    # antes: `HOY` se resolvía al importar el seed y la suite cruzó la
+    # medianoche. Volver a preguntarle a `date.today()` acá reproduce el defecto
+    # con una ventana más chica -- entre que `sembrar()` devuelve y el assert
+    # corre, el día puede cambiar igual.
+    hoy = sembrar(api)
+
+    # 🔑 Control de que la fecha devuelta es realmente «hoy» y no cualquier
+    # cosa: sin esto, un `sembrar()` que devolviera una fecha inventada --y
+    # sembrara en esa-- pasaría los asserts de abajo sin que la agenda tenga
+    # nada el día que el operador la abre. Se admite un día de juego, que es
+    # justo el cruce de medianoche que este test dejó de mirar mal.
+    assert abs((hoy - date.today()).days) <= 1, (
+        f"sembrar() dijo haber sembrado para {hoy}, y hoy es {date.today()}"
+    )
+
     manana = hoy + timedelta(days=1)
 
     def cuantos(desde, hasta):
@@ -171,12 +189,12 @@ def test_correrlo_dos_veces_no_duplica(api, capsys):
 
 
 def test_la_segunda_corrida_no_agrega_turnos(api):
-    sembrar(api)
-    antes = len(_estados(api))
+    hoy = sembrar(api)
+    antes = len(_estados(api, hoy))
 
     sembrar(api)
 
-    assert len(_estados(api)) == antes
+    assert len(_estados(api, hoy)) == antes
 
 
 # ── La guarda ─────────────────────────────────────────────────────────────
@@ -200,3 +218,41 @@ def test_donde_si_se_puede_sembrar(url):
 ])
 def test_donde_NO(url):
     assert url_no_productiva(url) is False
+
+
+def test_LA_FECHA_NO_SE_RESUELVE_AL_IMPORTAR(monkeypatch):
+    """🔴 La guarda del defecto que puso en rojo el CI de Restolibra el 2026-08-29.
+
+    `HOY` era un `date.today()` a nivel de módulo: quedaba congelado en el
+    instante del import. Un proceso que importa antes de medianoche y siembra
+    después —la suite tarda minutos, y el cron de la demo corre sobre procesos
+    que viven días— siembra para AYER, y después la agenda se ve vacía el día
+    que alguien la abre.
+
+    No se prueba llamando a `sembrar()`: eso es una corrida entera contra la
+    base. Se prueba la pieza que decide la fecha, que es donde vivía el defecto.
+    """
+    import datetime
+
+    import scripts.seed_demo as seed
+
+    # Se mueve el reloj DESPUÉS de que el módulo ya está importado, que es
+    # exactamente el cruce de medianoche a mitad de corrida.
+    otro_dia = datetime.date(2031, 7, 4)
+
+    class RelojMovido(datetime.date):
+        @classmethod
+        def today(cls):
+            return otro_dia
+
+    monkeypatch.setattr(seed, "date", RelojMovido)
+
+    assert seed._fijar_hoy() == otro_dia, (
+        "la fecha sigue viniendo del import: mover el reloj no la cambió"
+    )
+    # Y deja el módulo consistente: `_sembrar_turnos` lee `seed.HOY`, no el
+    # valor devuelto.
+    assert seed.HOY == otro_dia, (
+        "`_fijar_hoy` devolvió la fecha nueva pero no actualizó `HOY`, que es "
+        "la que usan los sembradores"
+    )

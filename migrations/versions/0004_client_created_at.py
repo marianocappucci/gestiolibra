@@ -1,6 +1,6 @@
 """Add nullable created_at to client_billing (dashboard: clientes nuevos en un rango)."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0004_client_created_at"
 down_revision = "0003_client_billing"

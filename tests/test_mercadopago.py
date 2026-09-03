@@ -8,8 +8,7 @@ alguien que no es cliente **no dé de alta un cliente de la agenda**.
 import json
 
 import pytest
-from libracore import config_manager
-from libracore import mp_sync
+from libracore import config_manager, mp_sync
 from libracore.db import clients as db_clients
 from libracore.db import facturas as db_facturas
 from libracore.db import mp as db_mp

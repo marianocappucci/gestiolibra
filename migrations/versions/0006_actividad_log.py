@@ -16,8 +16,8 @@ completo y no lo es, que es peor que uno que declara desde cuando empieza.
 `auth_log` (accesos) NO esta aca: en este producto vive en la base de LibraCore
 y ya la crea su schema. Lo unico que cambia es que ahora alguien la escribe.
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0006_actividad_log"
 down_revision = "0005_modulos"

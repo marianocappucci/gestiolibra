@@ -4,8 +4,8 @@ Mismo patron que `modulos` de Contalibra/Restolibra (libracore.db.modulos),
 pero propio de Gestiolibra -- no vive en LibraCore porque el catalogo de
 modulos gateables es especifico de cada producto (ver plans.py).
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0005_modulos"
 down_revision = "0004_client_created_at"
