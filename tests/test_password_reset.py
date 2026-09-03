@@ -5,19 +5,17 @@ acá es lo que el motor NO puede probar: que este producto la tenga
 efectivamente montada, apuntando a la base donde vive `usuarios`, y que el
 flujo entero funcione contra la app real.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
-
+from conftest import https_client
+from libraauth.models import PasswordResetToken
+from libraauth.password_reset import _hash_token
 from motor_de_test import fresh_database_url
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from libraauth.models import PasswordResetToken
-from libraauth.password_reset import _hash_token
-
 from app.main import create_app
-from conftest import https_client
 
 
 def test_los_endpoints_estan_montados():
@@ -144,7 +142,7 @@ def test_token_vencido_no_sirve(monkeypatch):
     sesiones = app.state.smtp_settings.session_factory
     with sesiones() as s:
         fila = s.query(PasswordResetToken).filter_by(token_hash=_hash_token(token)).one()
-        fila.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1)
+        fila.expires_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=1)
         s.commit()
 
     assert cliente.post("/auth/reset-password",

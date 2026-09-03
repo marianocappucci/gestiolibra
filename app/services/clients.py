@@ -4,14 +4,13 @@ El motor sigue sin saber nada de facturacion; la extension coordina el
 Client de LibraGenda (identidad/agenda) con estos dos campos propios de
 Gestiolibra en el borde de la API, dos tablas en vez de una sola.
 """
-from datetime import datetime, timezone
-
-from sqlalchemy import DateTime, ForeignKey, String, func, select
-from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
+from datetime import UTC, datetime, timezone
 
 from libragenda import Client
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.sqlalchemy_repository import Base
+from sqlalchemy import DateTime, ForeignKey, String, func, select
+from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 
 
 class ClientBillingRow(Base):
@@ -39,7 +38,7 @@ class ClientRepository:
         with self.session_factory.begin() as session:
             session.add(ClientBillingRow(
                 id=id, cuit=cuit, condicion_iva=condicion_iva,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ))
         return self._to_out(client, cuit, condicion_iva)
 

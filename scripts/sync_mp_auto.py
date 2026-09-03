@@ -28,8 +28,9 @@ import sys
 # no /app: sin esto no encuentra el paquete `app`.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.asgi import app  # noqa: E402  -- configura dominio y libracore
 from libracore.mp_sync import sincronizar_y_facturar  # noqa: E402
+
+from app.asgi import app  # noqa: E402  -- configura dominio y libracore
 
 logging.basicConfig(
     level=logging.INFO,

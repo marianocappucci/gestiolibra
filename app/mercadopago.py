@@ -17,12 +17,12 @@ auto-facturar, se le pasa un `debe_auto_facturar` propio y queda escrito acá.
 """
 
 from fastapi import FastAPI
-
-from app.registro_de_clientes import RegistroDeGestiolibra
-from app.services.clients import ClientRepository
 from libracore.mp_bandeja_router import build_mp_bandeja_router
 from libracore.mp_config_router import build_mp_config_router
 from libracore.mp_webhook import build_mp_webhook_router
+
+from app.registro_de_clientes import RegistroDeGestiolibra
+from app.services.clients import ClientRepository
 
 
 def montar(app: FastAPI, clientes: ClientRepository, *, gates: list) -> None:

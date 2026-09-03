@@ -15,7 +15,7 @@ seña nunca genera su propia factura.
 """
 import os
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from libracore import arca_facturacion
 from libracore.db import arca_config as db_arca_config
@@ -79,10 +79,10 @@ def configure(db_path: str) -> None:
     # no hay carpeta que crear ni defecto que evitar. El bloque entero se va.
     if not libracore_core.es_url_postgres(db_path):
         raise RuntimeError(
-            "Gestiolibra corre solo sobre PostgreSQL y recibio {!r}, que es una "
+            f"Gestiolibra corre solo sobre PostgreSQL y recibio {db_path!r}, que es una "
             "ruta de archivo. El modo SQLite se retiro el 2026-08-12: no chequea "
             "las FK, tipa dinamicamente y acepta cadenas donde la base pide "
-            "enteros.".format(db_path)
+            "enteros."
         )
     libracore_core.configure(db_path)
     conn = libracore_core.get_connection()

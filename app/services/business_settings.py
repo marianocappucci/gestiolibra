@@ -3,10 +3,9 @@ comercial y moneda. Singleton -- una sola fila, id fijo, no hay CRUD de
 "varios negocios" (Gestiolibra es de un solo tenant por deploy, mismo
 supuesto que el resto del producto).
 """
+from libragenda.sqlalchemy_repository import Base
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
-
-from libragenda.sqlalchemy_repository import Base
 
 SETTINGS_ID = "default"
 

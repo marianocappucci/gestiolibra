@@ -1,9 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-
 from libragenda import ReminderDispatcher
+from pydantic import BaseModel
 
 from ..dependencies import get_reminder_dispatcher
 from ._instantes import InstanteUTC
@@ -27,4 +26,4 @@ def dispatch_reminders(dispatcher: ReminderDispatcher = Depends(get_reminder_dis
     Meant to be called periodically by a cron/scheduler (not wired here --
     see TASKS.md); idempotent, safe to call as often as needed.
     """
-    return dispatcher.dispatch(datetime.now(timezone.utc))
+    return dispatcher.dispatch(datetime.now(UTC))
