@@ -106,3 +106,5 @@ export default function App() {
     </Routes>
   )
 }
+
+// Control positivo de la salida temprana del CI (F3, 2026-09-05): este PR no se mergea.
