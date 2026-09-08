@@ -8,7 +8,7 @@
 # wiki/analyses/auditoria-duplicacion-familia-libra.md) via git+https,
 # mismo motivo que libracore/libragenda en el stage de Python: funciona
 # tambien en dev local en WSL sin identidad SSH propia. Este stage
-# node:20-slim es independiente del stage de Python de mas abajo, asi que
+# de node es independiente del stage de Python de mas abajo, asi que
 # necesita su propia copia de git+openssh-client + deploy key de solo
 # lectura (`id_ed25519_libra_ui` en el VPS). Mount SSH con id propio (no
 # el "default" generico) -- mismo patron que Contalibra/Restolibra:
