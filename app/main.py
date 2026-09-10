@@ -30,6 +30,7 @@ from libracore.config_router import (
     build_empresa_router,
 )
 from libracore.db.url_de_instancia import url_de_instancia
+from libracore.resguardo_enlace import build_resguardo_enlace_router
 from libracore.respaldo import Instancia
 from libracore.security_headers import CSP_SPA, SecurityHeadersMiddleware
 from libracore.smtp_router import build_smtp_probe_router
@@ -443,13 +444,17 @@ def create_app(database_url: str) -> FastAPI:
     # puede restaurar —o volves el dominio y te quedan usuarios de otro
     # momento, o al reves— y no falla: da un ZIP que se descarga y pesa poco.
     engine = get_engine()
+    # Una sola carpeta para los dos routers de abajo: el enlace deja su
+    # `rclone.conf` en `<backups_dir>/.resguardo/`, y el subidor del host lo
+    # busca AL LADO de los ZIP. Calcularla dos veces es invitar a que diverjan.
+    backups_dir = _carpeta_de_backups(libracore_db_path)
     app.include_router(
         build_backup_router(
             _instancia_a_respaldar(
                 database_url, libracore_db_path,
                 directorios=[config_manager.LOGO_DIR],
             ),
-            _carpeta_de_backups(libracore_db_path),
+            backups_dir,
             # Sin estos dos el restore devuelve `ok` y no tiene efecto hasta
             # que alguien reinicie el contenedor: el pool sigue con el archivo
             # viejo abierto. `dispose()` sirve para los dos momentos.
@@ -457,6 +462,18 @@ def create_app(database_url: str) -> FastAPI:
             reabrir_conexiones=engine.dispose,
         ),
         dependencies=admin_only,
+    )
+    # El enlace de la copia externa con la nube del cliente (LibraCore
+    # v1.93.0): la pantalla de Datos / Backup conecta Drive o Dropbox desde
+    # acá. Admin y, además, el add-on `resguardo_externo` — que viene apagado y
+    # se prende por instancia desde el backoffice. Sin el add-on las cuatro
+    # rutas dan 403, y la pantalla (libra-ui v0.68.0) lo lee como "sin plan".
+    #
+    # El callback de OAuth queda detrás del mismo gate a propósito: la cookie
+    # de sesión es `SameSite=Lax` y viaja en la redirección del proveedor.
+    app.include_router(
+        build_resguardo_enlace_router(backups_dir, carpeta="Resguardo Gestiolibra"),
+        dependencies=admin_only + [Depends(require_module("resguardo_externo"))],
     )
 
     return app
