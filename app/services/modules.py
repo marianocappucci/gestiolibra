@@ -8,12 +8,16 @@ recién migrada, sin plan asignado todavía) **todo queda habilitado** --
 mismo criterio que Contalibra: el seed inicial no bloquea nada, y recién
 `aplicar_plan_en_db()` (llamado por el provisioning al dar de alta un
 cliente real con un plan elegido) achica el acceso según corresponda.
+
+🔴 **Los add-ons (`plans.ADDONS`) son la excepción, y al revés: arrancan
+APAGADOS.** No pertenecen a ningún plan, así que no se siembran ni los toca
+un plan; se prenden por instancia desde el backoffice. Ver `is_enabled`.
 """
 from libragenda.sqlalchemy_repository import Base
 from sqlalchemy import select
 from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 
-from plans import TODOS_LOS_MODULOS
+from plans import ADDONS, TODOS_LOS_MODULOS
 
 
 class ModuleRow(Base):
@@ -31,16 +35,35 @@ class ModuleRepository:
     def ensure_seeded(self) -> None:
         """Inserta los módulos que falten con `habilitado=True` -- no pisa
         el estado de los que ya existen (INSERT OR IGNORE vía try/except,
-        idempotente ante reinicios)."""
+        idempotente ante reinicios).
+
+        Siembra sólo `TODOS_LOS_MODULOS`, **nunca un add-on**: sembrarlo con
+        `habilitado=True` lo prendería en todas las instancias al arrancar,
+        que es justo lo que un add-on no tiene que hacer. Su fila la crea el
+        backoffice (`app.database.set_addon`) la primera vez que lo prende."""
         with self.session_factory.begin() as session:
             existentes = {row.modulo for row in session.scalars(select(ModuleRow)).all()}
             for modulo in sorted(TODOS_LOS_MODULOS - existentes):
                 session.add(ModuleRow(modulo=modulo, habilitado=True, plan="premium"))
 
     def is_enabled(self, modulo: str) -> bool:
-        """Los módulos que no son gateables (no están en TODOS_LOS_MODULOS,
-        ej. catálogo/turnos) siempre están habilitados, incluso si nunca
-        se sembraron una fila -- no tiene sentido gatear el core."""
+        """Tres casos, y el orden importa:
+
+        1. **Add-on** (`plans.ADDONS`): prendido sólo si tiene fila y
+           `habilitado` es verdadero. Sin fila, **apagado**. Es la regla
+           inversa a la de los módulos de plan, y va primero porque un add-on
+           tampoco está en `TODOS_LOS_MODULOS`: sin esta rama caía en el caso
+           2 y quedaba prendido para todos, con `require_module` sin dar nunca
+           un 403.
+        2. Módulos que no son gateables (no están en TODOS_LOS_MODULOS, ej.
+           catálogo/turnos): siempre habilitados, incluso si nunca se
+           sembraron una fila -- no tiene sentido gatear el core.
+        3. Módulo de plan: lo que diga su fila; sin fila, habilitado (el
+           default "todo prendido" hasta que un plan achique)."""
+        if modulo in ADDONS:
+            with self.session_factory() as session:
+                row = session.get(ModuleRow, modulo)
+                return row is not None and bool(row.habilitado)
         if modulo not in TODOS_LOS_MODULOS:
             return True
         with self.session_factory() as session:

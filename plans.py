@@ -56,6 +56,23 @@ def modulos_de_plan(plan: str) -> set[str]:
 # Superset de todos los módulos gateables = los del plan más alto (Premium).
 TODOS_LOS_MODULOS = set(PLAN_MODULOS["premium"])
 
+# Add-ons opcionales: módulos que se habilitan por instancia y NO pertenecen a
+# ningún plan. Están disponibles en cualquiera, vienen APAGADOS y se prenden
+# desde el backoffice (`libracore.admin.services.set_addon`, que valida contra
+# este set y escribe por `app.database.set_addon`). No entran en `PLAN_MODULOS`
+# ni en `TODOS_LOS_MODULOS`, así que ni `apply_plan` (motor) ni
+# `aplicar_plan_en_db` (acá) los tocan al aplicar un plan — un add-on prendido
+# sobrevive a subir o bajar de plan. `libracore.db.modulos.apply_plan` lee este
+# set con `getattr(plans, "ADDONS", set())`.
+#
+# 🔴 Quedar afuera de `TODOS_LOS_MODULOS` tiene una consecuencia acá que en
+# Contalibra no: `ModuleRepository.is_enabled` trataba todo lo que no está en
+# ese set como core no gateable, o sea **siempre prendido**. Por eso los
+# add-ons tienen su propia rama ahí — ver `app/services/modules.py`.
+#   - resguardo_externo: el enlace de la copia externa con la nube del cliente
+#     (Configuración → Datos / Backup, `libracore.resguardo_enlace`).
+ADDONS = {"resguardo_externo"}
+
 
 def aplicar_plan_en_db(db_path: str, plan: str) -> None:
     """Aplica un plan escribiendo el estado de módulos directo en la DB
@@ -68,11 +85,15 @@ def aplicar_plan_en_db(db_path: str, plan: str) -> None:
     salvo el nombre de la variable, ver
     wiki/analyses/auditoria-duplicacion-familia-libra.md). Requiere que la
     tabla `modulos` ya exista (la crea la migración propia de Gestiolibra,
-    `0005_modulos`)."""
+    `0005_modulos`).
+
+    `- ADDONS`: aplicar un plan nunca toca un add-on (`resguardo_externo`).
+    Hoy es equivalente a `TODOS_LOS_MODULOS` (los add-ons ya están afuera),
+    pero deja la invariante escrita."""
     if plan not in PLAN_MODULOS:
         raise ValueError(f"Plan desconocido: {plan!r}")
     from libracore.provisioning import apply_plan_modules
     apply_plan_modules(
         db_path, active_modules=modulos_de_plan(plan),
-        all_modules=TODOS_LOS_MODULOS, plan=plan,
+        all_modules=TODOS_LOS_MODULOS - ADDONS, plan=plan,
     )
