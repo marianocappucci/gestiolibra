@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+- **La copia externa se enlaza desde Configuración, como add-on
+  `resguardo_externo`**: se monta `build_resguardo_enlace_router` de LibraCore
+  v1.93.0 (`/api/config/resguardo-externo/enlace`) sobre la misma carpeta de
+  backups que el router de backup, detrás de admin y del add-on. El add-on
+  (`plans.ADDONS`) está disponible en cualquier plan, viene **apagado** y se
+  prende por instancia desde el backoffice. 🔴 Hizo falta tocar
+  `ModuleRepository.is_enabled`: devolvía `True` para todo lo que no estuviera
+  en `TODOS_LOS_MODULOS`, así que un add-on nunca daba 403. Ahora un add-on
+  está prendido sólo con fila y `habilitado` verdadero; los módulos de plan
+  siguen igual. Y se crea `app/database.py` con `get_modulos()`/`set_addon()`,
+  el contrato que el backoffice invoca por `docker exec` — apuntado a la base
+  del dominio, no a la de LibraCore que la app configura en `billing`.
 - **La pantalla dice de qué ambiente es el token de MercadoPago**: `Ambiente de
   prueba`, `Ambiente de producción` o `Ambiente sin verificar`, con la fecha en
   que se determinó. 🔴 MercadoPago **no tiene homologación como ARCA** — no hay
