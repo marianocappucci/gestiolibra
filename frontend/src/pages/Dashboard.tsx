@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, ApiError, STATUS_LABELS, type DashboardSummary } from '../api'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -110,9 +111,18 @@ export function Dashboard() {
                   <span>Recordatorios enviados</span>
                   <span className="font-medium text-foreground">{summary.recordatorios_enviados_en_periodo}</span>
                 </li>
-                <li className="flex justify-between">
-                  <span>Señas pendientes</span>
-                  <span className="font-medium text-foreground">{summary.senas_pendientes}</span>
+                {/* 🔴 Hasta el 2026-09-11 este número no llevaba a ningún
+                    lado: el backend manejaba las señas y no había pantalla
+                    para verlas. Ahora lleva a la lista, parada en las
+                    pendientes — que son las que cuenta. */}
+                <li>
+                  <Link
+                    to="/senas?estado=pending"
+                    className="flex justify-between underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    <span>Señas pendientes</span>
+                    <span className="font-medium text-foreground">{summary.senas_pendientes}</span>
+                  </Link>
                 </li>
               </ul>
             </CardContent>

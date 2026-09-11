@@ -88,7 +88,7 @@ describe('el sidebar', () => {
     conSesionAdmin()
     montar('/agenda')
     expect((await itemsDelMenu()).map((a) => a.textContent?.trim())).toEqual([
-      'Dashboard', 'Agenda', 'Clientes', 'Usuarios', 'Logs', 'Configuración',
+      'Dashboard', 'Agenda', 'Señas', 'Clientes', 'Usuarios', 'Logs', 'Configuración',
     ])
   })
 
