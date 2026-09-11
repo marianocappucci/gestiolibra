@@ -42,6 +42,15 @@ def test_deposits_require_senas_module(admin_client: TestClient):
     assert response.status_code == 403
 
 
+def test_deposit_list_requires_senas_module(admin_client: TestClient):
+    # El listado cuelga del mismo router que el cobro y la devolución, así que
+    # hereda su gate. Se prueba igual: es la pantalla que el Dashboard enlaza,
+    # y un plan sin señas no tiene por qué ver una lista de plata.
+    assert admin_client.get("/deposits").status_code == 200
+    _disable(admin_client, "senas")
+    assert admin_client.get("/deposits").status_code == 403
+
+
 def test_billing_config_requires_facturacion_module(admin_client: TestClient):
     _disable(admin_client, "facturacion")
     assert admin_client.get("/config/arca").status_code == 403

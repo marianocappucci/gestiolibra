@@ -114,6 +114,44 @@ export type Appointment = {
   status: AppointmentStatus
 }
 
+// --- señas ------------------------------------------------------------------
+//
+// El backend las maneja desde el MVP (`app/routers/deposits.py`, sobre el
+// `DepositManager` de LibraGenda) y hasta el 2026-09-11 no tenían pantalla:
+// el Dashboard contaba las pendientes y no había dónde verlas ni cobrarlas.
+
+/** El ciclo de vida que decide el motor: una pendiente se cobra o falla, una
+ *  cobrada se devuelve, y ahí termina. Ninguna vuelve atrás. */
+export type EstadoSena = 'pending' | 'paid' | 'failed' | 'refunded'
+
+export const SENA_LABELS: Record<EstadoSena, string> = {
+  pending: 'Pendiente',
+  paid: 'Cobrada',
+  failed: 'Fallida',
+  refunded: 'Devuelta',
+}
+
+/** Una seña, tal como la devuelve `GET /appointments/{id}/deposit`. */
+export type Sena = {
+  id: string
+  appointment_id: string
+  /** ⚠️ **String**, como `PrecioDeServicio.price`: es un `Decimal` del backend.
+   *  Pasar por `formatMonto` para mostrarlo. */
+  amount: string
+  status: EstadoSena
+  medio_pago: string | null
+}
+
+/** Una fila de `GET /deposits`: la seña con su turno pegado encima. */
+export type SenaConTurno = Sena & {
+  /** Instante en UTC. La hora de pared sale de la sucursal del recurso. */
+  appointment_starts_at: string | null
+  appointment_status: AppointmentStatus | null
+  client_id: string | null
+  service_id: string | null
+  resource_id: string | null
+}
+
 // --- parametrizacion de la agenda -----------------------------------------
 //
 // Los endpoints existian desde el MVP; lo que no habia era pantalla. Hasta el

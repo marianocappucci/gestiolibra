@@ -103,3 +103,110 @@ def test_staff_can_request_a_deposit_but_not_confirm_it(staff_client: TestClient
 
     deposit_id = created.json()["id"]
     assert staff_client.post(f"/deposits/{deposit_id}/mark-paid").status_code == 403
+
+
+# ── El listado (`GET /deposits`) ────────────────────────────────────────────
+#
+# Hasta el 2026-09-11 una seña sólo se podía ver conociendo su turno: el
+# Dashboard contaba las pendientes y no había dónde verlas. El listado es lo
+# que alimenta la pantalla de Señas.
+
+
+def _otro_turno(client: TestClient, starts_at: str) -> str:
+    """Un turno más sobre el catálogo que ya sembró `_seeded_appointment`."""
+    created = client.post("/appointments", json={
+        "resource_id": "resource-1", "service_id": "service-1",
+        "client_id": "client-1", "starts_at": starts_at,
+    })
+    assert created.status_code == 201, created.text
+    return created.json()["id"]
+
+
+def _sena(client: TestClient, appointment_id: str, amount: str = "1000.00") -> str:
+    created = client.post(f"/appointments/{appointment_id}/deposit", json={"amount": amount})
+    assert created.status_code == 201, created.text
+    return created.json()["id"]
+
+
+def test_list_deposits_brings_every_status_with_its_appointment(admin_client: TestClient):
+    client = admin_client
+    primero = _seeded_appointment(client)
+    segundo = _otro_turno(client, "2099-01-01T12:00:00")
+    pendiente = _sena(client, primero, "1000.00")
+    cobrada = _sena(client, segundo, "2500.50")
+    client.post(f"/deposits/{cobrada}/mark-paid", json={"medio_pago": "efectivo"})
+
+    response = client.get("/deposits")
+    assert response.status_code == 200
+    por_id = {d["id"]: d for d in response.json()}
+    assert set(por_id) == {pendiente, cobrada}
+
+    assert por_id[pendiente]["status"] == "pending"
+    assert por_id[pendiente]["amount"] == "1000.00"
+    assert por_id[cobrada]["status"] == "paid"
+    assert por_id[cobrada]["medio_pago"] == "efectivo"
+
+    # El turno viaja pegado a la seña: es lo que dice de quién es y de cuándo.
+    fila = por_id[pendiente]
+    assert fila["appointment_id"] == primero
+    assert fila["client_id"] == "client-1"
+    assert fila["service_id"] == "service-1"
+    assert fila["resource_id"] == "resource-1"
+    assert fila["appointment_status"] == "pending"
+    # El mismo instante que publica la agenda, en UTC: comparado contra el
+    # endpoint y no contra una cuenta hecha acá, que dependería de la zona
+    # por defecto de la sucursal del fixture.
+    agenda = client.get(
+        "/resources/resource-1/agenda?date_from=2099-01-01&date_to=2099-01-01"
+    ).json()
+    inicio = {t["id"]: t["starts_at"] for t in agenda}
+    assert fila["appointment_starts_at"] == inicio[primero]
+    assert fila["appointment_starts_at"].endswith("Z")
+
+
+def test_list_deposits_filters_by_status(admin_client: TestClient):
+    client = admin_client
+    primero = _seeded_appointment(client)
+    segundo = _otro_turno(client, "2099-01-01T12:00:00")
+    pendiente = _sena(client, primero)
+    cobrada = _sena(client, segundo)
+    client.post(f"/deposits/{cobrada}/mark-paid")
+
+    solo_pendientes = client.get("/deposits?status=pending")
+    assert solo_pendientes.status_code == 200
+    assert [d["id"] for d in solo_pendientes.json()] == [pendiente]
+
+    solo_cobradas = client.get("/deposits?status=paid")
+    assert [d["id"] for d in solo_cobradas.json()] == [cobrada]
+
+
+def test_list_deposits_orders_by_the_appointment_start(admin_client: TestClient):
+    # La seña que hay que cobrar antes es la del turno que viene antes. Se
+    # crean al revés a propósito: el orden de alta no puede ser el que gane.
+    client = admin_client
+    temprano = _seeded_appointment(client)  # 10:00
+    tarde = _otro_turno(client, "2099-01-01T15:00:00")
+    de_la_tarde = _sena(client, tarde)
+    de_la_manana = _sena(client, temprano)
+
+    ids = [d["id"] for d in client.get("/deposits").json()]
+    assert ids == [de_la_manana, de_la_tarde]
+
+
+def test_list_deposits_is_empty_without_deposits(admin_client: TestClient):
+    _seeded_appointment(admin_client)
+    response = admin_client.get("/deposits")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_deposits_rejects_an_unknown_status(admin_client: TestClient):
+    assert admin_client.get("/deposits?status=cobrada").status_code == 422
+
+
+def test_staff_cannot_list_deposits(staff_client: TestClient, admin_client: TestClient):
+    # Mismo criterio que confirmar el cobro: la lista de plata a cobrar y a
+    # devolver es del admin. El staff pide la seña desde el turno.
+    appointment_id = _seeded_appointment(admin_client)
+    _sena(admin_client, appointment_id)
+    assert staff_client.get("/deposits").status_code == 403

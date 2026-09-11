@@ -1,7 +1,7 @@
 // Shim sobre libra-ui/Layout (extraído 2026-07-26, era idéntico en
 // Gestiolibra/MedLibra/VentaLibra salvo NAV_ITEMS/branding -- ver
 // wiki/analyses/auditoria-duplicacion-familia-libra.md).
-import { CalendarDays, LayoutDashboard, ScrollText, Settings, UserCog, Users } from 'lucide-react'
+import { CalendarDays, HandCoins, LayoutDashboard, ScrollText, Settings, UserCog, Users } from 'lucide-react'
 import { createLayout } from 'libra-ui/Layout'
 import { LOGO, WORDMARK } from '@/branding'
 
@@ -32,6 +32,15 @@ export const Layout = createLayout({
   navItems: [
     { to: '/reportes', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+    // Junto a la Agenda: una seña se pide desde un turno y se cobra acá, así
+    // que es trabajo de mostrador y no de configuración. `adminOnly` porque
+    // el listado y el cobro lo son en el backend.
+    //
+    // ⚠️ Sin `module: 'senas'` a propósito: este producto no le pasa
+    // `hasModule` al Layout, así que el campo no ocultaría nada y leerlo
+    // haría creer que sí. Con el módulo apagado la pantalla muestra el 403,
+    // igual que el Dashboard.
+    { to: '/senas', label: 'Señas', icon: HandCoins, adminOnly: true },
     { to: '/clientes', label: 'Clientes', icon: Users },
     // ⚠️ **No hay ítem "Facturación"** y no es un olvido. Lo único que tenía esa
     // pantalla era la configuración de ARCA, que ya vive —con el mismo

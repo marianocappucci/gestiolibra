@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+- **Reprogramar un turno y las señas, con pantalla**: los dos tenían endpoint
+  desde el MVP y ninguna pantalla. En el detalle del turno de la agenda,
+  **Reprogramar** mueve el turno a otro horario (`POST
+  /appointments/{id}/reschedule`) mandando la hora de pared sin huso, como el
+  alta, y muestra tal cual el 409 del backend (choque, fuera de horario). Sólo
+  cambia el horario: el motor reprograma sobre el mismo recurso. En el mismo
+  detalle, la **seña** del turno: pedirla (admin y staff) y, sólo admin,
+  cobrarla con su medio de pago, marcarla fallida o devolverla. Pantalla nueva
+  **Señas** (`/senas`, admin-only, en el menú junto a la Agenda) con las
+  pendientes, cobradas, devueltas y fallidas, y el contador "Señas pendientes"
+  del Dashboard lleva ahí. Para eso hizo falta un endpoint: `GET /deposits`
+  (`?status=` opcional, admin + módulo `senas`), que devuelve cada seña con su
+  turno pegado encima y ordenadas por el turno más próximo; antes una seña sólo
+  se podía ver conociendo su turno. 7 tests de backend y 24 de frontend nuevos
+  (94 en total).
 - **La copia externa se enlaza desde Configuración, como add-on
   `resguardo_externo`**: se monta `build_resguardo_enlace_router` de LibraCore
   v1.93.0 (`/api/config/resguardo-externo/enlace`) sobre la misma carpeta de
