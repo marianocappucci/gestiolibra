@@ -10,6 +10,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Usuarios } from './pages/Usuarios'
 import { Logs } from './pages/Logs'
 import { Configuracion } from './pages/Configuracion'
+import { Senas } from './pages/Senas'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -25,17 +26,31 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const { user } = useAuth()
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       {/* Públicas a propósito: quien las necesita no puede iniciar sesión. */}
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      {/* El rol viaja por prop y no lo lee la agenda con `useAuth()`: el hook
+          tira fuera del provider y los tests la montan sola (ver Agenda.tsx). */}
       <Route
         path="/agenda"
         element={
           <ProtectedRoute>
-            <Agenda />
+            <Agenda esAdmin={user?.role === 'admin'} />
+          </ProtectedRoute>
+        }
+      />
+      {/* Como Dashboard: `adminOnly` en el menú sólo esconde el ítem. El
+          gateo real es del backend (`GET /deposits` es admin + módulo
+          "senas"); un staff que escriba la URL ve el error del 403. */}
+      <Route
+        path="/senas"
+        element={
+          <ProtectedRoute>
+            <Senas />
           </ProtectedRoute>
         }
       />

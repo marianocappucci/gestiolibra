@@ -12,7 +12,17 @@
  *  El calendario en sí vive en `libra-ui/agenda`, extraído de LibraDesk. Lo que
  *  queda acá es lo que **es** de Gestiolibra: de dónde salen los turnos, qué es
  *  un evento, el alta, y las acciones sobre un turno (confirmar, cancelar,
- *  completar con su medio de pago y su factura).
+ *  completar con su medio de pago y su factura, reprogramar, y su seña).
+ *
+ *  **Reprogramar y la seña** (2026-09-11) tenían endpoint desde el MVP y no
+ *  tenían pantalla. Viven en `components/agenda/reprogramar-turno.tsx` y
+ *  `components/agenda/sena-del-turno.tsx`; la lista de todas las señas es la
+ *  pantalla `/senas`.
+ *
+ *  `esAdmin` llega por prop desde `App.tsx` y no con `useAuth()` acá adentro:
+ *  el hook de libra-ui tira fuera del `AuthProvider`, y los tests de la agenda
+ *  la montan sola. Sólo decide qué botones se muestran — el permiso real lo
+ *  pone el backend (cobrar o devolver una seña es admin-only).
  *
  *  **Todo el estado de la pantalla vive en la URL** — `?vista=`, `?dia=`,
  *  `?recurso=` y `?turno=` —, no en `useState`. Así se puede mandar "mirá el
@@ -64,6 +74,8 @@ import {
 import { useAgendaRango, type TurnoConRecurso } from '@/components/agenda/datos'
 import { armadores, porDiaComoEventos } from '@/components/agenda/eventos'
 import { VistaDia } from '@/components/agenda/vista-dia'
+import { ReprogramarTurnoDialog } from '@/components/agenda/reprogramar-turno'
+import { SenaDelTurno } from '@/components/agenda/sena-del-turno'
 
 const TODOS = '__todos__'
 
@@ -116,7 +128,7 @@ const turnoSchema = z.object({
 
 type TurnoFormValues = z.infer<typeof turnoSchema>
 
-export function Agenda() {
+export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
   const [params, setParams] = useSearchParams()
   const [resources, setResources] = useState<Resource[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
@@ -138,6 +150,7 @@ export function Agenda() {
   const [pidiendoMedioPago, setPidiendoMedioPago] = useState<TurnoConRecurso | null>(null)
   const [completando, setCompletando] = useState(false)
   const [factura, setFactura] = useState<Factura | null>(null)
+  const [reprogramando, setReprogramando] = useState<TurnoConRecurso | null>(null)
 
   const vista = vistaDeLaUrl(params.get('vista'))
   // `hoyLocal()` en cada render y no en un `useState`: si alguien deja la
@@ -320,7 +333,7 @@ export function Agenda() {
             <TituloPantalla icono={CalendarDays}>Agenda</TituloPantalla>
             <p className="text-sm text-muted-foreground">
               Qué tiene cada recurso y dónde queda lugar. Entrá a un turno para
-              confirmarlo, cancelarlo o completarlo.
+              confirmarlo, reprogramarlo, cancelarlo, completarlo o pedirle una seña.
             </p>
           </div>
         }
@@ -519,6 +532,7 @@ export function Agenda() {
                   {STATUS_LABELS[turno.status]}
                 </BadgeEstado>
               </div>
+              <SenaDelTurno turno={turno} esAdmin={esAdmin} medios={mediosPago} />
               {errorAccion && <p className="text-sm text-destructive">{errorAccion}</p>}
             </div>
           )}
@@ -529,6 +543,13 @@ export function Agenda() {
                 onClick={() => accion(() => api.post(`/appointments/${turno.id}/confirm`))}
               >
                 Confirmar
+              </Button>
+            )}
+            {/* Los mismos dos estados que admite el motor: un turno cancelado o
+                ya atendido no se mueve (`cannot reschedule ...` → 409). */}
+            {turno && (turno.status === 'pending' || turno.status === 'confirmed') && (
+              <Button variant="outline" onClick={() => setReprogramando(turno)}>
+                Reprogramar
               </Button>
             )}
             {turno && (turno.status === 'pending' || turno.status === 'confirmed') && (
@@ -546,6 +567,22 @@ export function Agenda() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Reprogramar ──────────────────────────────────────────────── */}
+      <ReprogramarTurnoDialog
+        turno={reprogramando}
+        onClose={() => setReprogramando(null)}
+        onReprogramado={async (diaNuevo) => {
+          setReprogramando(null)
+          await recargar()
+          // Se cierra el turno y se va al día nuevo: el turno movido al jueves
+          // no se ve desde el lunes, y quedarse parado ahí haría pensar que
+          // desapareció. Si el día nuevo cae en el mismo rango, el `recargar`
+          // de arriba ya trajo la grilla; si no, la trae el cambio de rango.
+          setErrorAccion(null)
+          setParams(con({ turno: '', dia: diaNuevo }))
+        }}
+      />
 
       {/* ── El medio de pago, cuando el turno tiene saldo ─────────────── */}
       <Dialog
