@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -124,7 +125,7 @@ def reschedule_appointment(
 
 
 @router.post("/appointments/{appointment_id}/complete")
-async def complete_appointment(
+def complete_appointment(
     appointment_id: str,
     data: CompleteRequest = CompleteRequest(),
     service: AppointmentService = Depends(get_appointment_service),
@@ -145,7 +146,22 @@ async def complete_appointment(
     La validacion de facturacion (medio_pago requerido si hay saldo) corre
     ANTES de completar el turno en LibraGenda -- si faltara, el turno no
     queda completado sin factura y sin forma de reintentar (COMPLETED no
-    admite otra transicion)."""
+    admite otra transicion).
+
+    🔴 **`def` y no `async def`, a propósito.** Todo lo que hace esta ruta es
+    sincrónico —los repositorios de LibraGenda sobre la base del dominio, y
+    adentro de la factura la base de LibraCore y `openssl` por subproceso—, y
+    uvicorn corre con **un solo proceso**: como `async def`, cada una de esas
+    llamadas frenaba el loop entero, y mientras se completaba un turno con
+    factura la instancia no le contestaba a nadie, `/health` incluido. Como
+    `def`, FastAPI la corre en el threadpool.
+
+    🔑 `invoice_appointment` es `async` sólo en los bordes: la numeración y el
+    CAE van por red asincrónica, pero entre medio escribe la factura y la caja
+    en la base, y en producción el numerador firma el TRA con `openssl`. Por
+    eso corre con `asyncio.run`, en un loop propio de este hilo: lo sincrónico
+    bloquea a este hilo y a nadie más. Su firma no cambia; el arreglo va del
+    lado de quien llama."""
     current = service.appointments.get(appointment_id)
     if current is None:
         raise HTTPException(404, mensajes.POR_NOMBRE["AppointmentNotFound"][1])
@@ -176,11 +192,13 @@ async def complete_appointment(
     factura = None
     if price_row is not None:
         paid = deposit is not None and deposit.status is DepositStatus.PAID
-        factura = await invoice_appointment(
+        # En un loop propio de este hilo y no con `await` en el de uvicorn: ver
+        # el docstring. Las excepciones salen de `asyncio.run` tal cual.
+        factura = asyncio.run(invoice_appointment(
             client, price_row["price"], appointment_id,
             deposit_amount=deposit.amount if paid else None,
             deposit_medio_pago=deposit.medio_pago if paid else None,
             balance_medio_pago=data.medio_pago,
-        )
+        ))
 
     return {"id": appointment.id, "status": appointment.status.value, "factura": factura}
