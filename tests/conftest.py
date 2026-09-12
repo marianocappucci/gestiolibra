@@ -12,6 +12,7 @@ _time.tzset()
 
 import pytest
 from fastapi.testclient import TestClient
+from libraauth import session_auth as _session_auth
 from motor_de_test import destino_libracore, fresh_database_url
 
 from app.main import create_app
@@ -164,3 +165,59 @@ def _terminos_ya_aceptados(request):
     mp.setattr(TerminosRepository, "esta_aceptada", lambda self: True)
     yield
     mp.undo()
+
+
+# ── Captcha ALTCHA: aprobado para el resto de la suite ─────────────────────
+#
+# Desde libraauth v0.40.0 este producto monta el router con `captcha=True`
+# (app/routers/auth.py): el login y el forgot-password exigen la solucion de un
+# desafio. La suite postea a `/auth/login` en muchos lugares (los fixtures
+# `admin_client` y `staff_client`, los tests de usuarios, de logs, del reset de
+# contrasena...) y resolver un desafio en cada uno no prueba nada de este
+# producto.
+#
+# 🔴 **El captcha lo prueba libraauth; aca solo se cablea.** Lo que es de este
+# producto —que la ruta exista, que un login sin captcha rebote— lo fija
+# `test_captcha_login.py`, que restaura la funcion real con
+# `_CAPTCHA_DE_ORIGINAL`. Si alguien sacara `captcha=True` del router, ese
+# archivo es lo que se pondria rojo.
+
+#: La funcion real, para que un test pueda volver a ponerla.
+_CAPTCHA_DE_ORIGINAL = _session_auth._captcha_de
+
+
+class _CaptchaQueAprueba:
+    """Doble del `Captcha` de libraauth: aprueba cualquier payload.
+
+    `emitir()` delega en un `Captcha` real y barato, para que `GET
+    /auth/captcha` siga devolviendo un desafio con la forma de siempre.
+    """
+
+    def __init__(self):
+        from libraauth.captcha import Captcha
+
+        self._real = Captcha("clave-de-prueba", costo=1, contador_min=1, contador_rango=5)
+
+    def emitir(self) -> dict:
+        return self._real.emitir()
+
+    def verificar(self, payload) -> bool:
+        return True
+
+
+_CAPTCHA_DE_PRUEBA = _CaptchaQueAprueba()
+
+
+@pytest.fixture(autouse=True)
+def _captcha_aprobado(monkeypatch):
+    """Todo login y forgot-password de la suite pasa el captcha.
+
+    Por que: la suite postea al login en muchos lugares y el captcha lo prueba
+    libraauth; aca solo se cablea (ver el bloque de arriba).
+
+    Se parchea la funcion de modulo `libraauth.session_auth._captcha_de`
+    porque el router la resuelve por nombre en cada request: parchear
+    `app.state.captcha` no alcanzaria a los tests que arman su propia app con
+    `create_app(...)`.
+    """
+    monkeypatch.setattr("libraauth.session_auth._captcha_de", lambda request: _CAPTCHA_DE_PRUEBA)

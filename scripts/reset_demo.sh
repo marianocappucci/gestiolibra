@@ -255,6 +255,12 @@ fi
 # --- 2. Sembrar -----------------------------------------------------------
 # Por la API y desde adentro del contenedor: la contrasena sale de su propio
 # entorno y nunca pasa por la linea de comandos del host.
+#
+# Desde el captcha (libraauth v0.40.0) el seed resuelve el desafio de
+# /auth/captcha con el paquete `altcha`, que viene con libraauth. El `python3`
+# de adentro del contenedor es el de `/opt/venv` (el PATH del Dockerfile), que
+# lo tiene: por eso esto sigue corriendo adentro y NO con el `.venv-scripts`
+# del host. Contra una imagen sin captcha, el seed loguea sin el campo.
 docker cp "$SEED_LOCAL" "$CONTENEDOR:/tmp/seed.py"
 docker exec -i "$CONTENEDOR" sh -c '
   python3 /tmp/seed.py \
