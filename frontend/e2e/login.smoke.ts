@@ -14,13 +14,19 @@ import { expect, type Page, test } from '@playwright/test'
 /** Tilda «No soy un robot» y espera a que el widget resuelva el desafío.
  *
  *  El backend monta el router con `captcha=True` (libraauth v0.40.0), así que
- *  sin esto «Ingresar» queda deshabilitado. `click()` y no `check()`: la casilla
- *  queda tildada recién cuando termina la prueba de trabajo (~1 s), y `check()`
- *  exige que el estado cambie en el acto. Lo que se espera es lo que ve el
- *  humano: el botón habilitado.
+ *  sin esto «Ingresar» queda deshabilitado.
+ *
+ *  🔴 Se clica el TEXTO del label, no el `<input>`: el widget dibuja la tilde
+ *  con un `<svg>` encima de la casilla y Playwright se niega a clicar un
+ *  elemento tapado ("svg intercepts pointer events" — la primera corrida del CI
+ *  murió así). El label está asociado a la casilla, que es de donde sale su
+ *  nombre accesible. Y `click()` y no `check()`: la casilla queda tildada
+ *  recién cuando termina la prueba de trabajo (~1 s), y `check()` exige que el
+ *  estado cambie en el acto. Lo que se espera es lo que ve el humano: el botón
+ *  habilitado.
  */
 async function tildarCaptcha(page: Page) {
-  await page.getByRole('checkbox', { name: /No soy un robot/ }).click()
+  await page.locator('altcha-widget label', { hasText: 'No soy un robot' }).click()
   await expect(page.getByRole('button', { name: 'Ingresar' })).toBeEnabled({ timeout: 30_000 })
 }
 
