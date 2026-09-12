@@ -464,6 +464,48 @@ def _cargar_logo(api, nombre: str, inicial: str, color: tuple, contar) -> None:
         print(f"  -- logo: {e}")
 
 
+def login(api: Api, usuario: str, password: str) -> None:
+    """`POST /auth/login`, resolviendo antes el captcha ALTCHA si la instancia
+    lo pide (libraauth v0.40.0, `captcha=True` en app/routers/auth.py).
+
+    El captcha se usa SOLO si `GET /auth/captcha` contesta con la forma de un
+    desafio (`parameters` + `signature`), igual que la sonda de libra-ui. No es
+    cortesia: `reset_demo.sh` toma este archivo de `origin/develop` y lo corre
+    contra la demo, que sirve la imagen de `main`. Mientras `main` no tenga el
+    captcha, esa ruta cae en el catch-all de la SPA (HTML, no JSON) y el login
+    va sin el campo, como siempre.
+    """
+    cuerpo = {"username": usuario, "password": password}
+    try:
+        desafio = api.get("/auth/captcha")
+    except (RuntimeError, ValueError):
+        desafio = None
+    es_desafio = (
+        isinstance(desafio, dict)
+        and isinstance(desafio.get("parameters"), dict)
+        and isinstance(desafio.get("signature"), str)
+    )
+    if es_desafio:
+        try:
+            from altcha import Challenge, Payload, solve_challenge
+        except ImportError:
+            print(
+                "ERROR: la instancia pide captcha y a este python le falta `altcha`.\n"
+                "Viene con libraauth >= v0.40.0: correr el script con el python de la\n"
+                "imagen del producto (asi lo corre reset_demo.sh, con docker exec) o con\n"
+                "`.venv-scripts/bin/python` del checkout del producto.",
+                file=sys.stderr,
+            )
+            raise SystemExit(3) from None
+        # Una prueba de trabajo de ~1 s: el mismo costo que paga un navegador.
+        ch = Challenge.from_dict(desafio)
+        solucion = solve_challenge(ch)
+        if solucion is None:
+            raise RuntimeError("No se pudo resolver el captcha de /auth/captcha.")
+        cuerpo["captcha"] = Payload(ch, solucion).to_base64()
+    api.post("/auth/login", cuerpo)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", required=True)
@@ -483,7 +525,7 @@ def main() -> int:
         return 2
 
     api = Api(args.url)
-    api.post("/auth/login", {"username": args.usuario, "password": args.password})
+    login(api, args.usuario, args.password)
     sembrar(api)
     return 0
 

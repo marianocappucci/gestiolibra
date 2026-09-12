@@ -65,7 +65,12 @@ dependencies = [
     # v0.12.0: una edicion que solo toca columnas ocultas deja fila igual, con
     # el valor tapado. Antes se descartaba entera — o sea que cambiar SOLO la
     # contrasena de un usuario no dejaba rastro en el log de este producto.
-    "libraauth @ git+https://github.com/marianocappucci/libraauth.git@v0.38.0",
+    #
+    # v0.38.0 -> v0.40.0 (2026-09-12): el captcha ALTCHA del login y del
+    # forgot-password (v0.40.0, ADR-014; se prende con `captcha=True` en
+    # app/routers/auth.py) y, de v0.39.0, la IP correcta del bloqueo por
+    # intentos detras del proxy. Trae `altcha` como dependencia.
+    "libraauth @ git+https://github.com/marianocappucci/libraauth.git@v0.40.0",
     "fastapi>=0.111,<1",
     "uvicorn[standard]>=0.30,<1",
     "alembic>=1.13,<2",

@@ -29,9 +29,22 @@ function json(body: unknown, status = 200) {
   })
 }
 
-/** Sin sesion: la ruta de sesion responde 401, como con la cookie vencida. */
+/** Sin sesion: la ruta de sesion responde 401, como con la cookie vencida.
+ *
+ *  🔴 Salvo la sonda del captcha, que contesta 404. El api-client de libra-ui
+ *  trata cualquier 401 como sesion vencida y navega al login; con la sonda de
+ *  `/auth/captcha` recibiendo el 401 generico, jsdom tira "navigation to
+ *  another Document" y el test de "sin errores de consola" se pone rojo por el
+ *  mock, no por la app. 404 es lo que contesta un backend sin captcha.
+ */
 function sinSesion() {
-  fetchMock.mockImplementation(() => Promise.resolve(json({ detail: 'No autenticado' }, 401)))
+  fetchMock.mockImplementation((url: string) =>
+    Promise.resolve(
+      String(url).includes('/auth/captcha')
+        ? json({ detail: 'Not Found' }, 404)
+        : json({ detail: 'No autenticado' }, 401),
+    ),
+  )
 }
 
 /** Con sesion: devuelve un usuario; el resto de las llamadas, vacio. */
@@ -107,6 +120,37 @@ describe('guard de rutas', () => {
     // Y que el usuario de la sesion llego hasta la UI, no solo que hubo shell.
     expect(await screen.findAllByText('Ana')).not.toHaveLength(0)
     expect(screen.queryByLabelText('Usuario')).not.toBeInTheDocument()
+  })
+})
+
+describe('captcha «No soy un robot»', () => {
+  // Va de la mano con `captcha=True` en app/routers/auth.py: libra-ui solo
+  // dibuja el recuadro si consulta la ruta y contesta un desafio. Si alguien
+  // borra `captchaPath` de una de las dos pantallas, el backend exige el
+  // captcha y la pantalla no lo pide: nadie puede entrar. Esto lo ve.
+  const RUTA_CAPTCHA = '/auth/captcha'
+  const consultoElCaptcha = () =>
+    fetchMock.mock.calls.some(([u]) => String(u).includes(RUTA_CAPTCHA))
+
+  it('el login consulta /auth/captcha', async () => {
+    sinSesion()
+    montar('/login')
+    await waitFor(() => expect(consultoElCaptcha()).toBe(true))
+  })
+
+  it('olvide mi contrasena consulta /auth/captcha', async () => {
+    sinSesion()
+    montar('/forgot-password')
+    await waitFor(() => expect(consultoElCaptcha()).toBe(true))
+  })
+
+  it('el control: una pantalla sin captcha no la consulta', async () => {
+    // Sin esto, las dos de arriba pasarian igual si cualquier pantalla
+    // consultara la ruta por su cuenta.
+    sinSesion()
+    montar('/reset-password?token=abc123')
+    expect(await screen.findByLabelText('Contraseña nueva')).toBeInTheDocument()
+    expect(consultoElCaptcha()).toBe(false)
   })
 })
 
