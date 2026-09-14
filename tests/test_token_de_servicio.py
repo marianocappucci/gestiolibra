@@ -16,6 +16,7 @@ import pytest
 from conftest import https_client
 from fastapi.testclient import TestClient
 from libraauth.session_auth import SERVICE_TOKEN_ENV, SERVICE_TOKEN_HEADER
+from libraauth.testing import verificar_contrato_de_usuarios
 from motor_de_test import fresh_database_url
 
 from app.main import create_app
@@ -97,3 +98,15 @@ def test_el_admin_de_siempre_sigue_entrando(admin_client: TestClient, monkeypatc
     """El token se suma, no reemplaza."""
     monkeypatch.setenv(SERVICE_TOKEN_ENV, TOKEN)
     assert admin_client.get("/users").status_code == 200
+
+
+def test_contrato_de_usuarios_via_token_de_servicio(sin_sesion, monkeypatch):
+    """Es EXACTAMENTE así como entra el backoffice real -- sin sesión, sólo
+    con el header. `admin_guard` de `build_users_router()` acepta esta
+    identidad (`SERVICE_USER`, `id: None`) igual que la de una sesión admin;
+    este test corre el mismo ciclo de contrato que `test_contrato_de_usuarios`
+    de `test_users.py` pero por esta otra puerta."""
+    monkeypatch.setenv(SERVICE_TOKEN_ENV, TOKEN)
+    verificar_contrato_de_usuarios(
+        sin_sesion, "/users", role="staff", headers={SERVICE_TOKEN_HEADER: TOKEN},
+    )

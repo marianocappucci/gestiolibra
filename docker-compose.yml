@@ -84,7 +84,7 @@ services:
       retries: 3
       start_period: 10s
     ports:
-      - "8075:8000"
+      - "127.0.0.1:8075:8000"
     # El bind mount de abajo (necesario para --reload en vivo del codigo
     # Python) taparia el build del frontend si viviera dentro de /app --
     # por eso el Dockerfile lo hornea en /opt/frontend-dist, fuera del
