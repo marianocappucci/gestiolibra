@@ -56,7 +56,7 @@ dependencies = [
     # cuenta en cuenta corriente" terminaba en 202,2 mm en una hoja de 210.
     #
     # Es anterior a v1.37.0 y aquel arreglo no lo cubria.
-    "libracore @ git+https://github.com/marianocappucci/libracore.git@v1.105.0",
+    "libracore @ git+https://github.com/marianocappucci/libracore.git@v1.106.1",
     # v0.8.0 trae el log de accesos, v0.9.0 el de actividad y v0.10.0 el router
     # que los lee. Los tres nacieron en LibraDesk y se extrajeron para que este
     # producto no los copie: aca el trabajo es la lista blanca de que se audita
@@ -78,7 +78,7 @@ dependencies = [
     # sola con este bump porque `app/auth.py` re-exporta las dependencias de
     # `libraauth.session_auth` sin envolverlas (verificado, no hace falta
     # sumarles el parametro `response` a mano).
-    "libraauth[migrations] @ git+https://github.com/marianocappucci/libraauth.git@v0.44.0",
+    "libraauth[migrations] @ git+https://github.com/marianocappucci/libraauth.git@v0.45.0",
     "fastapi>=0.111,<1",
     "uvicorn[standard]>=0.30,<1",
     "alembic>=1.13,<2",
