@@ -1,5 +1,6 @@
 """Gestiolibra app factory: wires LibraGenda and mounts the routers."""
 
+import logging
 import os
 
 from fastapi import Depends, FastAPI
@@ -16,6 +17,7 @@ from libraauth.demo_codigos import DemoCodigoRepository
 from libraauth.migrar import exigir_schema_al_dia
 from libraauth.models import Base as AuthBase
 from libraauth.password_reset import PasswordResetService
+from libraauth.secretos import SecretosRepository
 from libraauth.session_auth import (
     build_demo_codigos_router,
     build_smtp_settings_router,
@@ -86,6 +88,41 @@ from .services.dashboard import DashboardService
 from .services.modules import ModuleRepository
 from .services.service_prices import ServicePriceRepository
 from .services.users import UserRepository, ensure_default_admin
+
+_log = logging.getLogger(__name__)
+
+
+def migrar_secretos(secretos: SecretosRepository) -> dict:
+    """Saca de `config.json` los secretos que quedaron en claro. Idempotente.
+
+    Corre en cada `create_app()` -- este producto no tiene un hook `startup`
+    separado, `create_app()` ES el arranque (lo llama `app/asgi.py` una vez
+    por proceso, y cada test que arma su propia app lo dispara igual) -- asi
+    que la migracion de una instancia viva **es su deploy**. Loguea NOMBRES de
+    claves, nunca valores: un log con el secreto lo muda del archivo a una
+    superficie peor, porque los logs se copian y se mandan.
+
+    Si cifrar falla, el `config.json` **no se toca** -- la instancia sigue
+    cobrando con la credencial que tiene -- y se loguea como error, que es lo
+    que despues ve la sonda `auditar_secretos.py`.
+    """
+    informe = config_manager.migrar_secretos_al_almacen()
+    if informe["migradas"]:
+        _log.warning(
+            "secretos movidos de config.json al almacen cifrado: %s",
+            ", ".join(informe["migradas"]),
+        )
+    if informe["ya_estaban"]:
+        _log.warning(
+            "config.json tenia una copia vieja de %s; se vacio (el almacen manda)",
+            ", ".join(informe["ya_estaban"]),
+        )
+    if informe["fallaron"]:
+        _log.error(
+            "no se pudieron cifrar y QUEDAN EN CLARO en config.json: %s",
+            ", ".join(f"{k} ({v})" for k, v in informe["fallaron"].items()),
+        )
+    return informe
 
 
 def _carpeta_de_backups(libracore_db_path: str) -> str:
@@ -188,6 +225,22 @@ def create_app(database_url: str) -> FastAPI:
     exigir_schema_al_dia(auth_engine, prefijo="gestiolibra", base="core")
     auth_sessions = sessionmaker(bind=auth_engine)
 
+    # 🔴 Los secretos de terceros de `config.json` -- el access token y la
+    # firma de webhook de MercadoPago, y la contrasena SMTP -- dejan de vivir
+    # en texto plano (libracore v1.108.0 + libraauth v0.46.0, 2026-09-17). Se
+    # enchufa ACA porque es donde nace `auth_sessions`, que apunta a la base
+    # de LibraCore -- ahi viven las tablas de libraauth (`usuarios` y, desde
+    # la revision `0002`, `secretos_instancia`), NO la base del dominio de
+    # LibraGenda. `exigir_schema_al_dia()` de arriba ya garantiza que esa
+    # revision esta aplicada, asi que migrar aca -- despues de esa linea --
+    # no puede pisar un schema viejo.
+    #
+    # LibraCore no importa libraauth: recibe el almacen inyectado. Por eso el
+    # enganche es del producto, que es el unico que tiene los dos paquetes.
+    secretos_repository = SecretosRepository(auth_sessions)
+    config_manager.usar_almacen_de_secretos(secretos_repository)
+    migrar_secretos(secretos_repository)
+
     sessions = get_session_factory()
 
     # Log de actividad (libraauth v0.9.0). Va contra el engine del DOMINIO
@@ -230,6 +283,10 @@ def create_app(database_url: str) -> FastAPI:
     # `max_connections`, y el sintoma son errores de conexion en tests que no
     # tienen nada que ver con el que los causo. Ver `fresh_database_url()`.
     app.state.auth_engine = auth_engine
+    # Para que la suite pueda verificar el enganche (`config_manager.
+    # almacen_de_secretos() is app.state.secretos_repository`) y correr la
+    # migracion a mano, sin reconstruir el repositorio por su cuenta.
+    app.state.secretos_repository = secretos_repository
     app.state.catalog = catalog
     app.state.availability = availability_repository
     app.state.branches = BranchRepository(catalog, sessions)
