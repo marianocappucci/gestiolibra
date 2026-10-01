@@ -2,8 +2,33 @@
 // Gestiolibra/MedLibra/VentaLibra salvo NAV_ITEMS/branding -- ver
 // wiki/analyses/auditoria-duplicacion-familia-libra.md).
 import { CalendarDays, HandCoins, LayoutDashboard, ScrollText, Settings, UserCog, Users } from 'lucide-react'
-import { createLayout } from 'libra-ui/Layout'
+import { createLayout, type NavSection } from 'libra-ui/Layout'
 import { LOGO, WORDMARK } from '@/branding'
+
+// ⚠️ No hay ítem «Facturación» a propósito: la configuración de ARCA vive dentro de Configuración (pedido del humano, 2026-08-22).
+// Dashboard va primero (pedido del humano, 2026-08-22) y es `adminOnly`: el catch-all de `App.tsx` sigue mandando a `/agenda`.
+// Menú en dos niveles (sección + ítems), la forma de Contalibra y VentaLibra (ADR-054 de VentaLibra, 2026-10-01).
+const NAV_SECCIONES: NavSection<{ role?: string; name?: string }>[] = [
+  { items: [{ to: '/reportes', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true }] },
+  {
+    label: 'Atención',
+    items: [
+      { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+      // Junto a la Agenda: una seña se pide desde un turno y se cobra acá. `adminOnly` porque el listado y el cobro lo son
+      // en el backend. ⚠️ Sin `module: 'senas'` a propósito: este producto no le pasa `hasModule` al Layout.
+      { to: '/senas', label: 'Señas', icon: HandCoins, adminOnly: true },
+      { to: '/clientes', label: 'Clientes', icon: Users },
+    ],
+  },
+  {
+    label: 'Administración',
+    items: [
+      { to: '/usuarios', label: 'Usuarios', icon: UserCog, adminOnly: true },
+      { to: '/logs', label: 'Logs', icon: ScrollText, adminOnly: true },
+      { to: '/configuracion', label: 'Configuración', icon: Settings, adminOnly: true },
+    ],
+  },
+]
 
 export const Layout = createLayout({
   productName: 'Gestiolibra',
@@ -29,29 +54,7 @@ export const Layout = createLayout({
   // operar. Ojo con leerlo como "es la pantalla de arranque": el ítem es
   // `adminOnly`, así que un usuario `staff` no lo ve, y por eso el catch-all de
   // `App.tsx` sigue mandando a `/agenda` y no acá.
-  navItems: [
-    { to: '/reportes', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
-    { to: '/agenda', label: 'Agenda', icon: CalendarDays },
-    // Junto a la Agenda: una seña se pide desde un turno y se cobra acá, así
-    // que es trabajo de mostrador y no de configuración. `adminOnly` porque
-    // el listado y el cobro lo son en el backend.
-    //
-    // ⚠️ Sin `module: 'senas'` a propósito: este producto no le pasa
-    // `hasModule` al Layout, así que el campo no ocultaría nada y leerlo
-    // haría creer que sí. Con el módulo apagado la pantalla muestra el 403,
-    // igual que el Dashboard.
-    { to: '/senas', label: 'Señas', icon: HandCoins, adminOnly: true },
-    { to: '/clientes', label: 'Clientes', icon: Users },
-    // ⚠️ **No hay ítem "Facturación"** y no es un olvido. Lo único que tenía esa
-    // pantalla era la configuración de ARCA, que ya vive —con el mismo
-    // formulario, el de `libra-ui/Configuracion`— dentro de Configuración. Eran
-    // dos pantallas para el mismo `GET/PUT /config/arca`; el humano pidió
-    // (2026-08-22) que la configuración de facturación esté adentro de
-    // Configuración y no por fuera.
-    { to: '/usuarios', label: 'Usuarios', icon: UserCog, adminOnly: true },
-    // Junto a Usuarios: se mira para responder "quién hizo esto", que es una
-    // pregunta sobre la gente.
-    { to: '/logs', label: 'Logs', icon: ScrollText, adminOnly: true },
-    { to: '/configuracion', label: 'Configuración', icon: Settings, adminOnly: true },
-  ],
+  navSections: NAV_SECCIONES,
+  // El nombre del negocio, debajo del nombre del producto (viene de Configuración > Datos de empresa, vía `/auth/me`).
+  getUserSubtitle: (u) => (u as { empresa_nombre?: string }).empresa_nombre,
 })
