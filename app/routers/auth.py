@@ -19,6 +19,16 @@ configurado `app.state.password_reset`; sin eso los endpoints existirían pero
 fallarían al primer pedido.
 """
 from libraauth.session_auth import build_json_api_auth_router
+from libracore import config_manager
+
+
+def _empresa_nombre(_request) -> str | None:
+    """El nombre del negocio de esta instancia, para el subtítulo del sidebar (debajo del nombre del producto).
+
+    Sale de la config de LibraCore —la que edita Configuración > Datos de empresa—, igual que LibraDesk. Se lee en cada
+    request: cambiarlo se ve en el próximo login. Vacío = `None`, y el sidebar no dibuja un subtítulo en blanco."""
+    return (config_manager.load().get("empresa_nombre") or "").strip() or None
+
 
 # `incluir_demo=True` NO enciende nada por si solo: `POST /auth/demo` se
 # registra unicamente si la instancia ademas tiene `DEMO_MODE` y
@@ -32,4 +42,5 @@ from libraauth.session_auth import build_json_api_auth_router
 # pages/PasswordReset.tsx).
 router = build_json_api_auth_router(
     incluir_verify=True, incluir_password_reset=True, incluir_demo=True, captcha=True,
+    get_empresa_nombre=_empresa_nombre,
 )
