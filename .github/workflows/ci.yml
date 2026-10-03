@@ -185,11 +185,17 @@ jobs:
       # Una sola corrida, contra el motor real. Hasta el 2026-08-25 habia dos:
       # esta --- SIN la variable, o sea SQLite --- y otra despues. El guard de
       # `tests/motor_de_test.py` ahora hace imposible la primera.
+      #
+      # xdist (reglas/ci.md del wiki): 4 workers, las vCPU del runner. Cada uno
+      # trabaja en SUS dos bases (`gestiolibra_gw0` y `gestiolibra_core_gw0`, ...;
+      # ver `tests/motor_de_test.py`), porque la limpieza entre tests borra la base
+      # entera. La cobertura sigue siendo una sola: pytest-cov junta la de los
+      # workers y el piso (`fail_under`) aplica igual.
       - name: Run tests
         if: steps.cambios.outputs.backend == 'true'
         env:
           GESTIOLIBRA_TEST_DATABASE_URL: postgresql+psycopg://gestiolibra:gestiolibra-ci@localhost:5432/gestiolibra
-        run: pytest -v --cov --cov-report=term-missing
+        run: pytest -n 4 -v --cov --cov-report=term-missing
 
       # La misma suite contra el motor de destino. Sin `--cov`: la cobertura ya
       # se midio arriba y es la misma, y el trinquete no tiene por que contarse
