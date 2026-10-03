@@ -97,6 +97,28 @@ def test_el_deploy_declara_las_migraciones_que_este_repo_tiene(script):
     )
 
 
+@pytest.mark.parametrize("script", ["nuevo_cliente", "panel_admin"])
+def test_clientes_dir_de_los_scripts_sale_del_motor(script, monkeypatch, tmp_path):
+    """`CLIENTES_DIR` de cada script es `get_config().clientes_dir`, no `REPO_ROOT / "clientes"`.
+
+    Es el eslabón de la etapa 1 de «sacar clientes/ del árbol del repo»: la única fuente de
+    verdad del directorio es el motor (`configure(clientes_dir=)` > env `LIBRA_CLIENTES_DIR` >
+    `repo_root/"clientes"`), y el re-export de estos módulos tiene que seguirla. Sin la variable
+    el default es el de siempre, así que el cambio no mueve nada en producción.
+    """
+    from libracore.provisioning import get_config
+
+    raiz = pathlib.Path(__file__).parent.parent.resolve()
+
+    monkeypatch.delenv("LIBRA_CLIENTES_DIR", raising=False)
+    modulo = importlib.reload(importlib.import_module(f"scripts.{script}"))
+    assert modulo.CLIENTES_DIR == get_config().clientes_dir == raiz / "clientes"
+
+    monkeypatch.setenv("LIBRA_CLIENTES_DIR", str(tmp_path))
+    modulo = importlib.reload(importlib.import_module(f"scripts.{script}"))
+    assert modulo.CLIENTES_DIR == get_config().clientes_dir == tmp_path
+
+
 def _bloque_del_servicio_de_dev() -> str:
     """El bloque del servicio `*-dev` del compose del repo, como texto.
 

@@ -64,7 +64,11 @@ dependencies = [
     # se guarda en la factura) y con DOS migraciones del motor, que `libracore-migrar upgrade --prefijo
     # gestiolibra` corre al desplegar: 0014 (`fce_*` en `arca_config` y `facturas`) y 0015 (`facturas.cae_error`).
     # Las dos son aditivas (`TEXT NOT NULL DEFAULT ''`): ver el CHANGELOG de libracore.
-    "libracore @ git+https://github.com/marianocappucci/libracore.git@v1.122.0",
+    #
+    # v1.122.0 -> v1.123.0 (2026-10-03): `get_config().clientes_dir` (precedencia `configure(clientes_dir=)` >
+    # env `LIBRA_CLIENTES_DIR` > `repo_root/"clientes"`). El default no cambia: sin la variable, todo sigue en
+    # `clientes/`. Sin migraciones ni cambios de esquema.
+    "libracore @ git+https://github.com/marianocappucci/libracore.git@v1.123.0",
     # v0.8.0 trae el log de accesos, v0.9.0 el de actividad y v0.10.0 el router
     # que los lee. Los tres nacieron en LibraDesk y se extrajeron para que este
     # producto no los copie: aca el trabajo es la lista blanca de que se audita
