@@ -13,13 +13,77 @@ _time.tzset()
 import pytest
 from fastapi.testclient import TestClient
 from libraauth import session_auth as _session_auth
-from motor_de_test import destino_libracore, fresh_database_url
+from motor_de_test import destino_libracore, fresh_database_url, url_libracore
 
 from app.main import create_app
 
 
 @pytest.fixture(autouse=True)
-def _dev_env(monkeypatch, tmp_path):
+def _sin_almacen_de_secretos_colgado():
+    """El almacen de secretos de `config_manager` no se filtra entre tests.
+
+    `create_app()` llama a `config_manager.usar_almacen_de_secretos(...)`
+    (libracore v1.108.0) con un repositorio atado a la base de ESE test, y es un
+    global del proceso. Como la base de LibraCore se restaura entre tests (se la
+    borra con `FORCE`, ver `motor_de_test.py`), el almacen queda apuntando a
+    conexiones que el servidor ya cerro, y el primer test posterior que llame a
+    `config_manager.load()` sin levantar su propia app muere con `AdminShutdown`,
+    lejisimos de su causa. Lo midio VentaLibra al adoptar las plantillas.
+
+    Antes y despues: antes por si un test anterior lo dejo puesto, despues para
+    no ensuciar al que viene. Sin almacen, `config_manager` lee el JSON.
+    """
+    from libracore import config_manager
+
+    config_manager.usar_almacen_de_secretos(None)
+    yield
+    config_manager.usar_almacen_de_secretos(None)
+
+
+def _armar_app(url_dominio: str, url_core: str) -> None:
+    """Deja las dos bases como las deja `create_app()`: es lo que contienen las plantillas "armada".
+
+    Se corre una vez por worker y por base (ver `motor_de_test.py`), con el mismo
+    entorno que `_dev_env` le pone a cada test, y no deja nada vivo: ni el pool del
+    engine de auth, ni el de LibraGenda, ni el almacen de secretos, ni la ruta de
+    `libracore.db.core` apuntando a una plantilla (una escritura posterior caeria
+    ahi y la copia dejaria de ser la que se restaura).
+    """
+    import shutil
+    import tempfile
+
+    from libracore import config_manager
+    from libracore.db import core as libracore_core
+
+    carpeta = tempfile.mkdtemp(prefix="gestiolibra-plantilla-")
+    mp = pytest.MonkeyPatch()
+    try:
+        mp.setenv("ENV", "development")
+        mp.setenv("GESTIOLIBRA_LIBRACORE_DB_PATH", url_core)
+        mp.setattr(config_manager, "CONFIG_PATH", f"{carpeta}/config.json")
+        mp.setattr(config_manager, "LOGO_DIR", f"{carpeta}/logos")
+        app = create_app(url_dominio)
+        app.state.auth_engine.dispose()
+    finally:
+        mp.undo()
+        from libragenda.database import reset as soltar_engine_de_libragenda
+
+        soltar_engine_de_libragenda()
+        config_manager.usar_almacen_de_secretos(None)
+        libracore_core.configure(url_libracore())
+        shutil.rmtree(carpeta, ignore_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def _dev_env(request, monkeypatch, tmp_path):
+    # La base de LibraCore se restaura UNA VEZ POR TEST de una plantilla (ver
+    # `motor_de_test.py`): la ARMADA para los tests que usan `admin_client`
+    # (`staff_client` lo arrastra en `fixturenames`), la VACIA (solo auth) para el
+    # resto, que arma su app o prueba el arranque y las migraciones desde cero.
+    usa_admin_client = "admin_client" in request.fixturenames
+    base_de_libracore = destino_libracore(
+        tmp_path / "gestiolibra_libracore.db", _armar_app if usa_admin_client else None
+    )
     # SessionAuth's SECRET_KEY resolution and the admin bootstrap both
     # fail closed unless ENV=development -- see app/auth.py and
     # app/services/users.py::ensure_default_admin.
@@ -33,10 +97,7 @@ def _dev_env(monkeypatch, tmp_path):
     # la corrida fuera a PostgreSQL: la mitad cruda del producto -- las ~340
     # consultas de LibraCore -- nunca se ejercitaba contra el motor nuevo, y el
     # verde de la suite no decia nada sobre ella.
-    monkeypatch.setenv(
-        "GESTIOLIBRA_LIBRACORE_DB_PATH",
-        destino_libracore(tmp_path / "gestiolibra_libracore.db"),
-    )
+    monkeypatch.setenv("GESTIOLIBRA_LIBRACORE_DB_PATH", base_de_libracore)
     # `libracore.config_manager` resuelve sus rutas AL IMPORTARSE, desde
     # DATA_DIR o -- si no esta -- el cwd, que corriendo pytest es la raiz del
     # repo. Setear la variable de entorno aca ya llega tarde, por eso se
@@ -98,7 +159,7 @@ def admin_client():
     confirmed and the real cause (WSL2 clock jumps) has nothing to do with
     threading or connection pooling.
     """
-    with https_client(create_app(fresh_database_url())) as client:
+    with https_client(create_app(fresh_database_url(_armar_app))) as client:
         response = client.post("/auth/login", json={"username": "admin", "password": "admin"})
         assert response.status_code == 200, response.text
         try:

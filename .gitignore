@@ -7,7 +7,7 @@ __pycache__/
 
 # Datos por cliente (generados por scripts/nuevo_cliente.py, mismo patrón
 # que Contalibra/Restolibra) y datos locales de -dev.
-/clientes/
+/clientes
 dev-data/
 
 # Estado de la instancia, no codigo (agregado 2026-08-16). `config.json` y

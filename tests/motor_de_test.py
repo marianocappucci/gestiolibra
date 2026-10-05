@@ -43,30 +43,129 @@ if not TEST_DATABASE_URL.startswith("postgresql"):
     )
 
 
-def fresh_database_url() -> str:
-    """La URL para un `create_app()` nuevo, con la base vacia.
+# --- Una base por worker y plantillas restauradas con CREATE DATABASE ... TEMPLATE ---
+# Cada test arranca de bases **nuevas** y rearmarlas es lo que mas cuesta. Medido
+# sobre PostgreSQL 16 y libracore v1.118.0, por test: ~0,25 s en el schema de auth
+# de la base de LibraCore (`crear_schema_de_auth`, la cadena de Alembic de
+# libraauth), ~0,9 s en `create_app()` (las tablas de LibraGenda, el schema del
+# core, los modulos, el admin) y ~0,03 s en vaciar el schema del dominio. Con
+# `CREATE DATABASE ... TEMPLATE` la base sale de una copia ya armada, ~0,2 s cada
+# una (son dos por test) y `create_app()` posterior, ya sobre bases armadas, baja a
+# ~0,3 s.
+#
+# Ojo con el disco: crear y borrar bases fuerza checkpoints, y con 4 workers a la vez
+# lo que manda es el `fsync` del servidor, no la CPU. Medido en una maquina cargada, la
+# suite entera tardo 335 s con `fsync` y 120 s sin el. Ver `reglas/ci.md` del wiki.
+#
+# El mecanismo (una base por worker de xdist, plantillas, `FORCE` para echar las
+# conexiones del test anterior) vive en `libracore.testing.pg_por_worker`; aca
+# queda lo propio de Gestiolibra: que hay en cada plantilla.
+#
+# 🔴 **Este producto tiene DOS bases** (dominio y LibraCore, ver `url_libracore`),
+# asi que cada una tiene su propia `BasePorWorker` y sus propias plantillas:
+#
+# | plantilla | dominio                  | LibraCore (`_core`)                    |
+# |-----------|--------------------------|----------------------------------------|
+# | `vacia`   | nada (schema public)     | solo el schema de auth                 |
+# | `armada`  | lo que deja `create_app` | auth + lo que `create_app` le agrega   |
+#
+# - **vacia** es EXACTAMENTE lo que dejaban antes `fresh_database_url()` (vaciar
+#   `public`) y `_preparar_libracore()` (vaciar `public` + `crear_schema_de_auth`),
+#   asi que los tests que arman su propia app, prueban el arranque sin la cadena
+#   de auth o corren migraciones desde cero ven lo mismo que siempre.
+# - **armada** es lo que `admin_client` le hacia a esas dos bases (`create_app()`).
+#   Solo la piden los tests que usan `admin_client`; su `create_app` posterior es
+#   idempotente sobre ella, que es lo que el producto hace en cada arranque. La
+#   arma una funcion `(url_dominio, url_core) -> None` que pasa el conftest
+#   (`construir_armada`), porque `create_app` vive en el producto y no aca.
+#
+# `from motor_de_test import TEST_DATABASE_URL` es como lo leen los tests, asi que
+# reasignarla aca alcanza: ninguno compone la URL por su cuenta.
+#
+# 🔴 Una base por worker **tambien para LibraCore**: la de antes era una sola
+# (`gestiolibra_core`) y dos workers se la vaciaban por debajo.
+#
+# 🔴 Si un test importara `tests.motor_de_test` y otro `motor_de_test` serian DOS
+# modulos y este codigo correria dos veces por proceso. `base_por_worker` es
+# idempotente a proposito, asi que no recrea la base la segunda vez. Hoy todos
+# importan `motor_de_test`.
+from libracore.respaldo_postgres import con_base  # noqa: E402
+from libracore.testing.pg_por_worker import base_por_worker  # noqa: E402
+
+_PG = base_por_worker("gestiolibra", TEST_DATABASE_URL)
+TEST_DATABASE_URL = _PG.url
+# 🔴 La variable se pisa con la URL de ESTE worker. No es adorno: el restore de un backup
+# (`test_config_backup.py`) se niega si "ninguna variable de entorno apunta" a la base
+# que va a restaurar, porque las migraciones se la encuentran por el entorno (ver
+# `libracore.respaldo_postgres.bases_sin_variable`). Con la variable en la base original
+# esos dos tests morian con un 422 que no se parece en nada a la causa.
+os.environ["GESTIOLIBRA_TEST_DATABASE_URL"] = TEST_DATABASE_URL
+
+
+def _url_cruda(url: str) -> str:
+    return url.replace("postgresql+psycopg://", "postgresql://", 1)
+
+
+def _asegurar_base(nombre: str) -> None:
+    """Crea `nombre` en el servidor si no esta. La necesita `base_por_worker`: administra
+    conectada a la base ORIGINAL, que tiene que existir.
+
+    Tolera la carrera de dos procesos que la crean a la vez; en la practica la crea el
+    proceso que lanza a los workers (importa este modulo antes de que ellos arranquen).
+    """
+    import psycopg
+    from psycopg import sql
+
+    with psycopg.connect(_url_cruda(_PG.url_original), autocommit=True) as conexion:
+        existe = conexion.execute("SELECT 1 FROM pg_database WHERE datname = %s", (nombre,)).fetchone()
+        if not existe:
+            try:
+                conexion.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(nombre)))
+            except psycopg.errors.DuplicateDatabase:  # pragma: no cover - carrera entre procesos
+                pass
+
+
+# LibraCore va a OTRA base del mismo servidor (`<base>_core`); su base por worker sale de ahi.
+_NOMBRE_CORE = _url_cruda(_PG.url_original).rsplit("/", 1)[1].split("?")[0] + "_core"
+_asegurar_base(_NOMBRE_CORE)
+_PG_CORE = base_por_worker("gestiolibra_core", con_base(_PG.url_original, _NOMBRE_CORE))
+
+
+def _no_hacer_nada(url: str) -> None:
+    """La plantilla `vacia` del dominio: una base recien creada, sin tablas."""
+
+
+def _construir_core_vacia(url: str) -> None:
+    # Las seis tablas de auth viven en la base de LibraCore (`--base core`) y desde
+    # libraauth v0.45.0 el arranque exige su cadena en vez de crearlas. Es el mismo
+    # orden que el deploy, donde `libraauth-migrar` va antes de `libracore-migrar`.
+    from libraauth.testing import crear_schema_de_auth
+
+    crear_schema_de_auth(_url_cruda(url))
+
+
+def fresh_database_url(construir_armada=None) -> str:
+    """La URL para un `create_app()` nuevo, con la base del dominio **de este worker** restaurada.
 
     Cada test arma su propia app y espera una base limpia. Con
     `sqlite:///:memory:` eso sale gratis: cada conexion nueva ES una base
     nueva. Un PostgreSQL, en cambio, es **uno solo y compartido** por toda la
-    corrida, asi que hay que vaciarlo entre test y test o el segundo ve las
+    corrida, asi que hay que restaurarlo entre test y test o el segundo ve las
     filas del primero.
 
-    Se borra el SCHEMA y no la base: `DROP DATABASE` exige que no quede ninguna
-    conexion abierta, y el engine de la app del test anterior todavia puede
-    tener una.
+    Sin argumentos: la plantilla **vacia** (lo que dejaba el `DROP SCHEMA` de
+    antes). Con `construir_armada` (una funcion `(url_dominio, url_core) -> None`
+    que deja las dos bases como las deja `create_app()`): la plantilla **armada**,
+    que se construye la primera vez en cada worker.
 
-    🔴 **Y hay que soltar el engine anterior, no solo vaciar el schema.**
-    `libragenda.database.configure()` reemplaza el engine del proceso **sin
-    hacerle `dispose()`**, asi que cada `create_app()` deja vivo un pool
-    entero. Con `sqlite:///:memory:` da igual -- es un `StaticPool` de una
-    conexion que se recolecta sola -- pero contra PostgreSQL son conexiones TCP
-    que se acumulan hasta `max_connections`, y el sintoma (errores de conexion
-    lejos del test que los causo) no se parece en nada a la causa. Lo pago
-    medlibra antes que nosotros.
+    🔴 **Se borra la base con `FORCE` y no se hace un `DROP SCHEMA`**: la app del test
+    anterior puede seguir conectada y `DROP DATABASE` sin `FORCE` fallaria. Y hay
+    que soltar tambien su engine: `libragenda.database.configure()` reemplaza el
+    engine del proceso **sin hacerle `dispose()`**, asi que cada `create_app()`
+    deja vivo un pool entero. Contra PostgreSQL son conexiones TCP que se acumulan
+    hasta `max_connections`, y el sintoma (errores de conexion lejos del test que
+    los causo) no se parece en nada a la causa. Lo pago medlibra antes que nosotros.
     """
-    import psycopg
-
     try:
         from libragenda.database import reset as soltar_engine_anterior
 
@@ -74,21 +173,17 @@ def fresh_database_url() -> str:
     except ImportError:  # pragma: no cover - depende de la version pineada
         pass
 
-    with psycopg.connect(
-        TEST_DATABASE_URL.replace("postgresql+psycopg://", "postgresql://", 1),
-        autocommit=True,
-    ) as conexion:
-        conexion.execute("DROP SCHEMA public CASCADE")
-        conexion.execute("CREATE SCHEMA public")
+    if construir_armada is None:
+        _PG.restaurar("vacia", _no_hacer_nada)
+    else:
+        # La base de LibraCore ya esta restaurada (la fixture autouse la dejo ANTES): `create_app`
+        # le agrega lo suyo, que es idempotente sobre una base que ya lo tiene.
+        _PG.restaurar("armada", lambda url: construir_armada(url, url_libracore()))
     return TEST_DATABASE_URL
 
 
-def _url_cruda(url: str) -> str:
-    return url.replace("postgresql+psycopg://", "postgresql://", 1)
-
-
 def url_libracore() -> str:
-    """La URL de la base de LibraCore: **otra base**, en el mismo servidor.
+    """La URL de la base de LibraCore **de este worker**: **otra base**, en el mismo servidor.
 
     🔴 **No puede ser el mismo schema que el dominio, y esto no es preferencia.**
     LibraCore y LibraGenda declaran los dos una tabla `clients`, con formas
@@ -107,44 +202,14 @@ def url_libracore() -> str:
     Dos bases en el mismo servidor es la traduccion fiel de los dos archivos, y
     es la topologia que va a necesitar tambien la instancia de produccion.
     """
-    cruda = _url_cruda(TEST_DATABASE_URL)
-    base, _, _ = cruda.rpartition("/")
-    nombre = cruda.rsplit("/", 1)[1].split("?")[0]
-    return f"{base}/{nombre}_core"
+    return _url_cruda(_PG_CORE.url)
 
 
-def _preparar_libracore() -> None:
-    """Crea la base de LibraCore si no esta, y la deja vacia."""
-    import psycopg
+def destino_libracore(ruta_sqlite, construir_armada=None) -> str:  # noqa: ARG001
+    """El destino de la base de LIBRACORE (facturacion, caja, ARCA), restaurada de una plantilla.
 
-    cruda = _url_cruda(TEST_DATABASE_URL)
-    servidor = cruda.rsplit("/", 1)[0] + "/postgres"
-    nombre = cruda.rsplit("/", 1)[1].split("?")[0] + "_core"
-
-    with psycopg.connect(servidor, autocommit=True) as conexion:
-        existe = conexion.execute(
-            "SELECT 1 FROM pg_database WHERE datname = %s", (nombre,)
-        ).fetchone()
-        if not existe:
-            conexion.execute(f'CREATE DATABASE "{nombre}"')
-
-    with psycopg.connect(url_libracore(), autocommit=True) as conexion:
-        # `IF EXISTS` por lo mismo que arriba: una corrida cortada a mitad no
-        # puede envenenar las siguientes.
-        conexion.execute("DROP SCHEMA IF EXISTS public CASCADE")
-        conexion.execute("CREATE SCHEMA public")
-
-    # Las seis tablas de auth viven en ESTA base (`--base core`) y desde
-    # libraauth v0.45.0 el arranque exige su cadena en vez de crearlas. Se corre
-    # acá, antes de `create_app()`: es el mismo orden que el deploy, donde
-    # `libraauth-migrar` va antes de `libracore-migrar`.
-    from libraauth.testing import crear_schema_de_auth
-
-    crear_schema_de_auth(url_libracore())
-
-
-def destino_libracore(ruta_sqlite) -> str:
-    """El destino de la base de LIBRACORE (facturacion, caja, ARCA).
+    Sin `construir_armada`: la plantilla **vacia**, solo el schema de auth (lo que
+    dejaba `_preparar_libracore()`). Con ella: la plantilla **armada**.
 
     🔴 **Esta era la mitad que la suite no ejercitaba.** El conftest le daba un
     archivo SQLite temporal aunque el resto de la corrida fuera a PostgreSQL, asi
@@ -152,7 +217,18 @@ def destino_libracore(ruta_sqlite) -> str:
     LibraCore. Se vio al cablear [[ventalibra]], que tiene la misma estructura de
     dos bases y las apunto a las dos.
     """
-    _preparar_libracore()
+    if construir_armada is None:
+        _PG_CORE.restaurar("vacia", _construir_core_vacia)
+    else:
+
+        def construir(url: str) -> None:
+            _construir_core_vacia(url)
+            # `create_app` tambien arma el dominio: se le da el de este worker, limpio. El
+            # test lo restaura enseguida (`fresh_database_url`), asi que no queda nada de esto.
+            _PG.restaurar("vacia", _no_hacer_nada)
+            construir_armada(_PG.url, _url_cruda(url))
+
+        _PG_CORE.restaurar("armada", construir)
     return url_libracore()
 
 
@@ -161,7 +237,7 @@ def url_para_archivo(ruta) -> str:
     base sobreviva a la app (backup, restore, migraciones).
 
     Contra PostgreSQL no hay archivo: se devuelve el mismo destino compartido,
-    vaciado. El test que de verdad necesite un archivo aparte tiene que
+    restaurado. El test que de verdad necesite un archivo aparte tiene que
     saltearse solo, no simularlo.
     """
     return fresh_database_url()
