@@ -36,14 +36,13 @@
  *  diferencia de la agenda y los clientes, que se usan todos los días.
  */
 import { createConfiguracion } from 'libra-ui/Configuracion'
-import { CalendarClock, MapPin, Scissors, Settings } from 'lucide-react'
+import { CalendarClock, MapPin, Scissors } from 'lucide-react'
 import { SucursalesCard } from './configuracion/sucursales'
 import { ServiciosCard } from './configuracion/servicios'
 import { RecursosCard } from './configuracion/recursos'
 
 export const Configuracion = createConfiguracion({
-  // El icono que el sidebar de este producto le da a /configuracion.
-  icono: Settings,
+  // Sin `icono`: el default del kit es `ICONOS.configuracion` (ADR-035), el mismo que el sidebar de este producto.
   // Sale en el tutorial de Gmail —es el nombre que hay que ponerle a la
   // contraseña de aplicación— y en el de Padrón A13.
   producto: 'Gestiolibra',
