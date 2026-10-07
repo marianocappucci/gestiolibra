@@ -17,8 +17,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { HandCoins } from 'lucide-react'
 import { TituloPantalla } from 'libra-ui/titulo-pantalla'
+import { ICONOS } from 'libra-ui/iconos-identidad'
 import type { ColumnDef } from 'libra-ui/data-table'
 import {
   api, ApiError, SENA_LABELS,
@@ -236,7 +236,7 @@ export function Senas() {
     <div className="grid gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <TituloPantalla icono={HandCoins}>Señas</TituloPantalla>
+          <TituloPantalla icono={ICONOS.senas}>Señas</TituloPantalla>
           <p className="text-sm text-muted-foreground">
             Las señas se piden desde el turno, en la Agenda. Acá se cobran y se
             devuelven.
