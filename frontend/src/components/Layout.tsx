@@ -1,31 +1,31 @@
 // Shim sobre libra-ui/Layout (extraído 2026-07-26, era idéntico en
 // Gestiolibra/MedLibra/VentaLibra salvo NAV_ITEMS/branding -- ver
 // wiki/analyses/auditoria-duplicacion-familia-libra.md).
-import { CalendarDays, HandCoins, LayoutDashboard, ScrollText, Settings, UserCog, Users } from 'lucide-react'
 import { createLayout, type NavSection } from 'libra-ui/Layout'
+import { ICONOS } from 'libra-ui/iconos-identidad'
 import { WORDMARK } from '@/branding'
 
 // ⚠️ No hay ítem «Facturación» a propósito: la configuración de ARCA vive dentro de Configuración (pedido del humano, 2026-08-22).
 // Dashboard va primero (pedido del humano, 2026-08-22) y es `adminOnly`: el catch-all de `App.tsx` sigue mandando a `/agenda`.
 // Menú en dos niveles (sección + ítems), la forma de Contalibra y VentaLibra (ADR-054 de VentaLibra, 2026-10-01).
 const NAV_SECCIONES: NavSection<{ role?: string; name?: string }>[] = [
-  { items: [{ to: '/reportes', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true }] },
+  { items: [{ to: '/reportes', label: 'Dashboard', icon: ICONOS.dashboard, adminOnly: true }] },
   {
     label: 'Atención',
     items: [
-      { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+      { to: '/agenda', label: 'Agenda', icon: ICONOS.agenda },
       // Junto a la Agenda: una seña se pide desde un turno y se cobra acá. `adminOnly` porque el listado y el cobro lo son
       // en el backend. ⚠️ Sin `module: 'senas'` a propósito: este producto no le pasa `hasModule` al Layout.
-      { to: '/senas', label: 'Señas', icon: HandCoins, adminOnly: true },
-      { to: '/clientes', label: 'Clientes', icon: Users },
+      { to: '/senas', label: 'Señas', icon: ICONOS.senas, adminOnly: true },
+      { to: '/clientes', label: 'Clientes', icon: ICONOS.clientes },
     ],
   },
   {
     label: 'Administración',
     items: [
-      { to: '/usuarios', label: 'Usuarios', icon: UserCog, adminOnly: true },
-      { to: '/logs', label: 'Logs', icon: ScrollText, adminOnly: true },
-      { to: '/configuracion', label: 'Configuración', icon: Settings, adminOnly: true },
+      { to: '/usuarios', label: 'Usuarios', icon: ICONOS.usuarios, adminOnly: true },
+      { to: '/logs', label: 'Logs', icon: ICONOS.logDeActividad, adminOnly: true },
+      { to: '/configuracion', label: 'Configuración', icon: ICONOS.configuracion, adminOnly: true },
     ],
   },
 ]

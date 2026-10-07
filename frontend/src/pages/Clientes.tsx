@@ -16,8 +16,9 @@ import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form'
 import { DataTable, sortableHeader } from '@/components/data-table'
-import { Pencil, Trash2, Users } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { TituloPantalla } from 'libra-ui/titulo-pantalla'
+import { ICONOS } from 'libra-ui/iconos-identidad'
 
 const CONDICIONES_IVA = [
   'Responsable Inscripto',
@@ -174,7 +175,7 @@ export function Clientes() {
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
-        <TituloPantalla icono={Users}>Clientes</TituloPantalla>
+        <TituloPantalla icono={ICONOS.clientes}>Clientes</TituloPantalla>
         {isAdmin && editingId === null && (
           <Button onClick={startCreate}>+ Nuevo cliente</Button>
         )}
