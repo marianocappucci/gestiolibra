@@ -3,7 +3,7 @@
 // wiki/analyses/auditoria-duplicacion-familia-libra.md).
 import { CalendarDays, HandCoins, LayoutDashboard, ScrollText, Settings, UserCog, Users } from 'lucide-react'
 import { createLayout, type NavSection } from 'libra-ui/Layout'
-import { LOGO, WORDMARK } from '@/branding'
+import { WORDMARK } from '@/branding'
 
 // ⚠️ No hay ítem «Facturación» a propósito: la configuración de ARCA vive dentro de Configuración (pedido del humano, 2026-08-22).
 // Dashboard va primero (pedido del humano, 2026-08-22) y es `adminOnly`: el catch-all de `App.tsx` sigue mandando a `/agenda`.
@@ -33,22 +33,15 @@ const NAV_SECCIONES: NavSection<{ role?: string; name?: string }>[] = [
 export const Layout = createLayout({
   productName: 'Gestiolibra',
   productInitial: 'G',
-  // El logo y el nombre en Montserrat Bold. Las clases salen de `@/branding`,
-  // el mismo archivo que usa el login: es lo que garantiza que las dos
-  // pantallas escriban "Gestiolibra" igual.
-  //
-  // El override de colapsado NO es decorativo: con la sidebar en modo icono el
-  // ancho util son 32 px y sin bajarlo el logo de 36 se sale de la barra.
-  logo: {
-    src: LOGO,
-    className: 'h-9 w-9 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8',
-  },
-  // 🔴 El interlineado va PEGADO al tamano (`/[21px]`) y no como `leading-*`
+  // La marca (ícono + color del producto) la dibuja libra-ui con `producto` (ADR-033) y el nombre va en Montserrat Bold. Las clases del
+  // nombre salen de `@/branding`, el mismo archivo que usa el login: es lo que garantiza que las dos pantallas escriban "Gestiolibra" igual.
+  producto: 'gestiolibra',
+  // 🔴 El interlineado va PEGADO al tamano (`/[17px]`) y no como `leading-*`
   // aparte: en Tailwind v4 una utilidad de tamano emite tambien `line-height`,
   // asi que el `leading-none` que libra-ui pone por defecto perderia contra
   // este `text-[15px]` y el nombre se quedaria con 22,5 px de caja.
-  // 21 = 36 (el alto del logo) menos los 15 de la linea de la empresa.
-  wordmarkClassName: `${WORDMARK} text-[15px]/[21px]`,
+  // 17 = 32 (el alto de `MarcaProducto`) menos los 15 de la linea de la empresa.
+  wordmarkClassName: `${WORDMARK} text-[15px]/[17px]`,
   // 🔴 **Dashboard va primero**, pedido del humano (2026-08-22). Es la pantalla
   // de resumen: lo que se abre para saber cómo viene el día antes de entrar a
   // operar. Ojo con leerlo como "es la pantalla de arranque": el ítem es
