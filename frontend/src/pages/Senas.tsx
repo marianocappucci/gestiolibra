@@ -234,24 +234,28 @@ export function Senas() {
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <TituloPantalla icono={ICONOS.senas}>Señas</TituloPantalla>
-          <p className="text-sm text-muted-foreground">
-            Las señas se piden desde el turno, en la Agenda. Acá se cobran y se
-            devuelven.
-          </p>
-        </div>
-        {/* Controlado por la URL, como la vista de la agenda: con
-            `defaultValue`, entrar con `?estado=paid` pintaría la primera
-            pestaña y mostraría otra cosa. */}
-        <Tabs value={filtro} onValueChange={(v) => setParams({ estado: v })}>
-          <TabsList aria-label="Estado de las señas">
-            {FILTROS.map((f) => (
-              <TabsTrigger key={f.valor} value={f.valor}>{f.label}</TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+      <div>
+        {/* Las pestañas van a la altura del título. Controladas por la URL,
+            como la vista de la agenda: con `defaultValue`, entrar con
+            `?estado=paid` pintaría la primera pestaña y mostraría otra cosa. */}
+        <TituloPantalla
+          icono={ICONOS.senas}
+          acciones={
+            <Tabs value={filtro} onValueChange={(v) => setParams({ estado: v })}>
+              <TabsList aria-label="Estado de las señas">
+                {FILTROS.map((f) => (
+                  <TabsTrigger key={f.valor} value={f.valor}>{f.label}</TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          }
+        >
+          Señas
+        </TituloPantalla>
+        <p className="text-sm text-muted-foreground">
+          Las señas se piden desde el turno, en la Agenda. Acá se cobran y se
+          devuelven.
+        </p>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
