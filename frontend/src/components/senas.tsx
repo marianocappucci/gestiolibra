@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { BadgeEstado } from 'libra-ui/badge-estado'
+import { SelectBuscable } from 'libra-ui/SelectBuscable'
 import { api, ApiError, SENA_LABELS, type EstadoSena, type MedioPago } from '../api'
 import { SENA_TONO, formatMonto } from '@/lib/senas'
 import { Button } from '@/components/ui/button'
@@ -15,9 +16,6 @@ import {
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 
 export function BadgeSena({ estado }: { estado: EstadoSena }) {
   return <BadgeEstado tono={SENA_TONO[estado]}>{SENA_LABELS[estado]}</BadgeEstado>
@@ -88,16 +86,15 @@ export function CobrarSenaDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Medio de pago</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue placeholder="Medio de pago…" /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {medios.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <SelectBuscable
+                      value={field.value}
+                      onChange={field.onChange}
+                      opciones={medios.map((m) => ({ value: m.id, label: m.label }))}
+                      placeholder="Medio de pago…"
+                      ariaLabel="Medio de pago"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

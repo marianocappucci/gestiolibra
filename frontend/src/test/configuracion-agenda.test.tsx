@@ -220,6 +220,24 @@ describe('Recursos', () => {
     })
   })
 
+  it('la sucursal se busca escribiendo, y «Sin sucursal» (la de siempre) manda branch_id null', async () => {
+    servir({ '/resources': [], '/branches': [SUCURSAL, { ...SUCURSAL, id: 'norte', name: 'Norte' }] })
+    montar(<RecursosCard />)
+    await userEvent.type(await screen.findByLabelText('Nombre'), 'Sillón 3')
+    const sucursal = screen.getByLabelText('Sucursal')
+    expect(sucursal).toHaveValue('Sin sucursal')
+    await userEvent.click(sucursal)
+    await userEvent.keyboard('{Control>}a{/Control}nor')
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['Norte'])
+    await userEvent.keyboard('{Escape}')
+    expect(sucursal).toHaveValue('Sin sucursal')
+    await userEvent.click(screen.getByRole('button', { name: 'Crear' }))
+    await waitFor(() => expect(mandado('/resources')).toBeTruthy())
+    expect(mandado('/resources')!.cuerpo).toEqual({
+      id: 'sillon-3', name: 'Sillón 3', branch_id: null, active: true,
+    })
+  })
+
   it('🔴 avisa que sin disponibilidad el recurso no recibe ningún turno', async () => {
     // Es la asimetría que deja la agenda muerta: el horario de la sucursal es
     // opt-in, la disponibilidad del recurso NO. Cargar sólo el primero -- que
