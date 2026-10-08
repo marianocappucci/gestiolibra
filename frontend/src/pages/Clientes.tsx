@@ -174,12 +174,14 @@ export function Clientes() {
 
   return (
     <div className="grid gap-4">
-      <div className="flex items-center justify-between">
-        <TituloPantalla icono={ICONOS.clientes}>Clientes</TituloPantalla>
-        {isAdmin && editingId === null && (
+      <TituloPantalla
+        icono={ICONOS.clientes}
+        acciones={isAdmin && editingId === null && (
           <Button onClick={startCreate}>+ Nuevo cliente</Button>
         )}
-      </div>
+      >
+        Clientes
+      </TituloPantalla>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
