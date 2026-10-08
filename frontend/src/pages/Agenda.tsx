@@ -62,9 +62,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
@@ -77,8 +74,6 @@ import { armadores, porDiaComoEventos } from '@/components/agenda/eventos'
 import { VistaDia } from '@/components/agenda/vista-dia'
 import { ReprogramarTurnoDialog } from '@/components/agenda/reprogramar-turno'
 import { SenaDelTurno } from '@/components/agenda/sena-del-turno'
-
-const TODOS = '__todos__'
 
 // 🔴 Acá había un `MEDIO_PAGO_LABELS` con cuatro medios escritos a mano, y uno
 // de ellos —`tarjeta`— **no existía en el vocabulario de la familia**: ni
@@ -158,7 +153,7 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
   // pantalla abierta pasada la medianoche, "hoy" tiene que ser el día nuevo.
   const hoy = hoyLocal()
   const dia = diaDeLaUrl(params.get('dia'), hoy)
-  const filtro = params.get('recurso') ?? TODOS
+  const filtro = params.get('recurso') ?? ''
   const turnoAbierto = params.get('turno')
 
   useEffect(() => {
@@ -228,12 +223,12 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
   )
 
   // El filtro recorta lo que se dibuja, no lo que se pide (ver `datos.ts`).
-  const visibles = filtro === TODOS
+  const visibles = filtro === ''
     ? porDia
     : Object.fromEntries(Object.entries(porDia).map(([d, ts]) => [
       d, ts.filter((t) => t.resource_id === filtro),
     ]))
-  const recursosVisibles = filtro === TODOS
+  const recursosVisibles = filtro === ''
     ? activos
     : activos.filter((r) => r.id === filtro)
 
@@ -315,7 +310,7 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
 
   function abrirAlta() {
     form.reset({
-      resource_id: filtro !== TODOS ? filtro : (activos[0]?.id ?? ''),
+      resource_id: filtro !== '' ? filtro : (activos[0]?.id ?? ''),
       service_id: '', client_id: '',
       // Prellenado con el día que se está mirando: quien abre el alta parado en
       // el jueves quiere un turno el jueves, no hoy.
@@ -342,20 +337,16 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
         <div className="flex flex-wrap items-end gap-2">
           <div className="grid gap-2">
             <Label htmlFor="filtro-recurso">Recurso</Label>
-            <Select
+            <SelectBuscable
+              id="filtro-recurso" className="w-52"
               value={filtro}
-              onValueChange={(v) => setParams(con({ recurso: v }))}
-            >
-              <SelectTrigger id="filtro-recurso" className="w-52">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Todos los recursos</SelectItem>
-                {activos.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(v) => setParams(con({ recurso: v }))}
+              opciones={[
+                { value: '', label: 'Todos los recursos' },
+                ...activos.map((r) => ({ value: r.id, label: r.name })),
+              ]}
+              placeholder="Buscar recurso…"
+            />
           </div>
           <Button onClick={abrirAlta} disabled={activos.length === 0}>
             <Plus />Nuevo turno
@@ -430,16 +421,15 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Recurso</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Recurso…" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {activos.map((r) => (
-                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SelectBuscable
+                        value={field.value}
+                        onChange={field.onChange}
+                        opciones={activos.map((r) => ({ value: r.id, label: r.name }))}
+                        placeholder="Recurso…"
+                        ariaLabel="Recurso"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -598,14 +588,14 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
               completarlo y facturarlo.
             </DialogDescription>
           </DialogHeader>
-          <Select value={medioPago} onValueChange={setMedioPago}>
-            <SelectTrigger><SelectValue placeholder="Medio de pago…" /></SelectTrigger>
-            <SelectContent>
-              {mediosPago.map((m) => (
-                <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SelectBuscable
+            value={medioPago}
+            onChange={setMedioPago}
+            opciones={mediosPago.map((m) => ({ value: m.id, label: m.label }))}
+            placeholder="Medio de pago…"
+            ariaLabel="Medio de pago"
+            limpiable={false}
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setPidiendoMedioPago(null)}>Cancelar</Button>
             <Button

@@ -220,6 +220,64 @@ describe('la agenda como calendario', () => {
     })
   })
 
+  it('el encabezado: título con su descripción a la izquierda y las acciones a la derecha, en una fila', async () => {
+    servir([])
+    montar()
+    const titulo = await screen.findByRole('heading', { name: 'Agenda' })
+    const textos = titulo.parentElement as HTMLElement
+    expect(textos).toContainElement(screen.getByText(/Qué tiene cada recurso/))
+    const fila = textos.parentElement?.parentElement as HTMLElement
+    expect(fila.className).toContain('items-end')
+    const nuevo = screen.getByRole('button', { name: /Nuevo turno/ })
+    expect(fila).toContainElement(nuevo)
+    expect(textos).not.toContainElement(nuevo)
+  })
+
+  // Los desplegables de datos se buscan escribiendo (libra-ui ADR-039): el filtro de recurso y el del alta.
+  it('el filtro de recurso se busca escribiendo, y «Todos» deja la URL limpia (sin centinela)', async () => {
+    servir([])
+    montar()
+    await waitFor(() => expect(document.querySelectorAll('[data-columna]')).toHaveLength(7))
+    const filtro = screen.getByRole('combobox', { name: 'Recurso' })
+    expect(filtro).toHaveValue('Todos los recursos')
+
+    await userEvent.click(filtro)
+    await userEvent.keyboard('{Control>}a{/Control}box 2')
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['Box 2'])
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(urlActual).toContain('recurso=box-2'))
+    expect(filtro).toHaveValue('Box 2')
+
+    await userEvent.click(filtro)
+    await userEvent.click(await screen.findByRole('option', { name: 'Todos los recursos' }))
+    await waitFor(() => expect(urlActual).not.toContain('recurso'))
+    expect(urlActual).not.toContain('__todos__')
+  })
+
+  it('en el alta, el recurso se elige escribiendo y viaja su id', async () => {
+    servir([])
+    montar()
+    await waitFor(() => expect(document.querySelectorAll('[data-columna]')).toHaveLength(7))
+    await userEvent.click(screen.getByRole('button', { name: /Nuevo turno/ }))
+    const dialogo = await screen.findByRole('dialog')
+
+    const recurso = within(dialogo).getByLabelText('Recurso')
+    expect(recurso).toHaveValue('Box 1')
+    await userEvent.click(recurso)
+    await userEvent.keyboard('{Control>}a{/Control}box 2{Enter}')
+    expect(recurso).toHaveValue('Box 2')
+    await userEvent.click(within(dialogo).getByLabelText('Servicio'))
+    await userEvent.click(await screen.findByText('Corte'))
+    await userEvent.click(within(dialogo).getByLabelText('Cliente'))
+    await userEvent.click(await screen.findByText(/Ana Gómez/))
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Crear turno' }))
+
+    await waitFor(() => {
+      const alta = pedidos.find((p) => p.url === '/appointments' && p.metodo === 'POST')
+      expect(alta?.cuerpo).toMatchObject({ resource_id: 'box-2', service_id: 'corte', client_id: 'ana' })
+    })
+  })
+
   it('sin recursos activos lo dice y manda a Configuración', async () => {
     fetchMock.mockImplementation((url: string) => {
       const u = String(url)

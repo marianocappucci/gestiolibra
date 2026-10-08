@@ -175,6 +175,36 @@ describe('la lista de señas', () => {
     })
   })
 
+  it('el medio de cobro se elige escribiendo, sin tocar la lista', async () => {
+    servir([PENDIENTE])
+    montar()
+    const renglon = await fila('Ana Gómez')
+    await userEvent.click(within(renglon).getByRole('button', { name: 'Cobrar la seña de Ana Gómez' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Cobrar seña' })
+
+    const medio = within(dialogo).getByRole('combobox', { name: 'Medio de pago' })
+    await userEvent.click(medio)
+    await userEvent.keyboard('transf{Enter}')
+    expect(medio).toHaveValue('Transferencia')
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Registrar cobro' }))
+    await waitFor(() => {
+      expect(pedidos.find((p) => p.url === '/deposits/d-1/mark-paid')?.cuerpo).toEqual({ medio_pago: 'transferencia' })
+    })
+  })
+
+  it('el encabezado: título con su descripción a la izquierda y las pestañas a la derecha, en una fila', async () => {
+    servir([PENDIENTE])
+    montar()
+    const titulo = await screen.findByRole('heading', { name: 'Señas' })
+    const textos = titulo.parentElement as HTMLElement
+    expect(textos).toContainElement(screen.getByText(/Las señas se piden desde el turno/))
+    const fila = textos.parentElement?.parentElement as HTMLElement
+    expect(fila.className).toContain('items-end')
+    const pestanas = screen.getByRole('tablist', { name: 'Estado de las señas' })
+    expect(fila).toContainElement(pestanas)
+    expect(textos).not.toContainElement(pestanas)
+  })
+
   it('🔴 devolver una cobrada pide confirmación y manda el refund', async () => {
     servir([COBRADA])
     montar('/senas?estado=paid')
