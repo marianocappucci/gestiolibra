@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { TituloPantalla } from 'libra-ui/titulo-pantalla'
+import { EncabezadoDePantalla } from 'libra-ui/acciones'
 import { ICONOS } from 'libra-ui/iconos-identidad'
 import type { ColumnDef } from 'libra-ui/data-table'
 import {
@@ -234,29 +235,29 @@ export function Senas() {
 
   return (
     <div className="grid gap-4">
-      <div>
-        {/* Las pestañas van a la altura del título. Controladas por la URL,
-            como la vista de la agenda: con `defaultValue`, entrar con
-            `?estado=paid` pintaría la primera pestaña y mostraría otra cosa. */}
-        <TituloPantalla
-          icono={ICONOS.senas}
-          acciones={
-            <Tabs value={filtro} onValueChange={(v) => setParams({ estado: v })}>
-              <TabsList aria-label="Estado de las señas">
-                {FILTROS.map((f) => (
-                  <TabsTrigger key={f.valor} value={f.valor}>{f.label}</TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          }
-        >
-          Señas
-        </TituloPantalla>
-        <p className="text-sm text-muted-foreground">
-          Las señas se piden desde el turno, en la Agenda. Acá se cobran y se
-          devuelven.
-        </p>
-      </div>
+      {/* Las pestañas van a la altura del título. Controladas por la URL,
+          como la vista de la agenda: con `defaultValue`, entrar con
+          `?estado=paid` pintaría la primera pestaña y mostraría otra cosa. */}
+      <EncabezadoDePantalla
+        className="items-end"
+        titulo={
+          <div>
+            <TituloPantalla icono={ICONOS.senas}>Señas</TituloPantalla>
+            <p className="text-sm text-muted-foreground">
+              Las señas se piden desde el turno, en la Agenda. Acá se cobran y se
+              devuelven.
+            </p>
+          </div>
+        }
+      >
+        <Tabs value={filtro} onValueChange={(v) => setParams({ estado: v })}>
+          <TabsList aria-label="Estado de las señas">
+            {FILTROS.map((f) => (
+              <TabsTrigger key={f.valor} value={f.valor}>{f.label}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </EncabezadoDePantalla>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       {errorAccion && <p className="text-sm text-destructive">{errorAccion}</p>}

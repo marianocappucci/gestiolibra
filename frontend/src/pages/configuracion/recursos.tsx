@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SelectBuscable } from 'libra-ui/SelectBuscable'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -35,8 +36,7 @@ import {
 } from './catalogo'
 import { fecha, fechaHora } from '@/lib/fechas'
 
-const SIN_SUCURSAL = '__ninguna__'
-const VACIO = { id: '', name: '', branch_id: SIN_SUCURSAL, active: true }
+const VACIO = { id: '', name: '', branch_id: '', active: true }
 
 export function RecursosCard() {
   const [recursos, setRecursos] = useState<Resource[]>([])
@@ -74,7 +74,7 @@ export function RecursosCard() {
     setEditando(true)
     setForm({
       id: r.id, name: r.name,
-      branch_id: r.branch_id ?? SIN_SUCURSAL, active: r.active,
+      branch_id: r.branch_id ?? '', active: r.active,
     })
   }
 
@@ -90,7 +90,7 @@ export function RecursosCard() {
     setError(null)
     const cuerpo = {
       name: form.name, active: form.active,
-      branch_id: form.branch_id === SIN_SUCURSAL ? null : form.branch_id,
+      branch_id: form.branch_id === '' ? null : form.branch_id,
     }
     try {
       if (editando) {
@@ -169,18 +169,15 @@ export function RecursosCard() {
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="rec-sucursal">Sucursal</Label>
-                <Select
+                <SelectBuscable
+                  id="rec-sucursal"
                   value={form.branch_id}
-                  onValueChange={(v) => setForm({ ...form, branch_id: v })}
-                >
-                  <SelectTrigger id="rec-sucursal"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SIN_SUCURSAL}>Sin sucursal</SelectItem>
-                    {sucursales.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setForm({ ...form, branch_id: v })}
+                  opciones={[
+                    { value: '', label: 'Sin sucursal' },
+                    ...sucursales.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                />
               </div>
             </div>
             <CampoActivo
