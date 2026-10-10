@@ -116,7 +116,7 @@ describe('la Configuración de Gestiolibra', () => {
     // Es el cambio de fondo de la migración. Mientras hubo un campo de texto,
     // el alta no se podía hacer desde el navegador: alguien tenía que dejar el
     // .crt dentro del volumen del contenedor a mano.
-    montar('/configuracion?seccion=integraciones&integracion=arca')
+    montar('/configuracion?seccion=integraciones&integracion=arca&arca=homologacion')
 
     // 🔑 Se nombra el ambiente: desde libra-ui v0.57.0 la tarjeta muestra los
     // DOS pares de credenciales, así que hay dos "Certificado (.crt)" y dos
@@ -127,7 +127,9 @@ describe('la Configuración de Gestiolibra', () => {
     expect(screen.getByLabelText(/Clave privada.*Homologaci/))
       .toHaveAttribute('type', 'file')
     // Y el par de producción también está, que es lo que el cambio agrega.
-    expect(screen.getByLabelText(/Certificado.*Producci/)).toHaveAttribute('type', 'file')
+    // Desde libra-ui v0.135.0 (ADR-047) cada ambiente va en su pestaña: el de producción se abre por la URL.
+    montar('/configuracion?seccion=integraciones&integracion=arca&arca=produccion')
+    expect(await screen.findByLabelText(/Certificado.*Producci/)).toHaveAttribute('type', 'file')
     expect(screen.queryByLabelText(/Path del certificado/)).toBeNull()
   })
 
