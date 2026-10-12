@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { TonoEstado } from 'libra-ui/badge-estado'
+import { formatoMoneda } from 'libra-ui/formatos'
 import { api, type EstadoSena, type MedioPago } from '../api'
 
 /** 🔴 **La pendiente es `atencion`, no `neutro`.** Es la única que pide que
@@ -22,8 +23,7 @@ export const SENA_TONO: Record<EstadoSena, TonoEstado> = {
 
 /** `$ 1.000,50`. El monto llega como string (`Decimal` del backend). */
 export function formatMonto(monto: string | number): string {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' })
-    .format(Number(monto))
+  return formatoMoneda(Number(monto))
 }
 
 /** El nombre de un medio de pago a partir de su id, con el id como respaldo:

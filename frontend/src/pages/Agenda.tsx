@@ -51,6 +51,7 @@ import {
   LABEL_VISTA, NavegadorCalendario, ReferenciaDeColores, VISTAS, VistaMes,
   VistaSemana, clasePunto, diaDeLaUrl, hoyLocal, rangoDeVista, vistaDeLaUrl,
 } from 'libra-ui/agenda'
+import { formatoMoneda } from 'libra-ui/formatos'
 import {
   api, ApiError, STATUS_LABELS, TIPO_COMPROBANTE_LABELS,
   opcionesCliente, opcionesServicio,
@@ -95,10 +96,6 @@ const STATUS_TONO: Record<AppointmentStatus, TonoEstado> = {
   completed: 'ok',
   cancelled: 'negativo',
   no_show: 'negativo',
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value)
 }
 
 function formatNumeroComprobante(f: Factura): string {
@@ -620,7 +617,7 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
                 ['Tipo', TIPO_COMPROBANTE_LABELS[factura.tipo] ?? String(factura.tipo)],
                 ['Número', formatNumeroComprobante(factura)],
                 ['CAE', factura.cae || '—'],
-                ['Total', formatCurrency(factura.total)],
+                ['Total', formatoMoneda(factura.total)],
               ].map(([rotulo, valor]) => (
                 <div key={rotulo} className="flex justify-between">
                   <span className="text-muted-foreground">{rotulo}</span>
