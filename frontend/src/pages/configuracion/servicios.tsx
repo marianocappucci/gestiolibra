@@ -24,12 +24,12 @@ import { Label } from '@/components/ui/label'
 import {
   CampoActivo, ListaDelCatalogo, PieDeFormulario, comoIdentificador, describirError,
 } from './catalogo'
+import { formatoMoneda } from 'libra-ui/formatos'
 
 const VACIO = { id: '', name: '', duration_minutes: '30', active: true }
 
 function pesos(valor: string | number): string {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' })
-    .format(Number(valor))
+  return formatoMoneda(Number(valor))
 }
 
 export function ServiciosCard() {
