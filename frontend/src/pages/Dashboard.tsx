@@ -8,10 +8,7 @@ import { TarjetaIndicador } from 'libra-ui/TarjetaIndicador'
 import { TituloPantalla } from 'libra-ui/titulo-pantalla'
 import { ICONOS } from 'libra-ui/iconos-identidad'
 import { hoyISO } from 'libra-ui/fechas'
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value)
-}
+import { formatoMoneda } from 'libra-ui/formatos'
 
 export function Dashboard() {
   const [dateFrom, setDateFrom] = useState(hoyISO())
@@ -127,19 +124,19 @@ export function Dashboard() {
             <ul className="space-y-1">
               <li className="flex justify-between">
                 <span>Ingresos del período</span>
-                <span className="font-medium text-foreground">{formatCurrency(summary.facturacion.caja.ingresos_en_periodo)}</span>
+                <span className="font-medium text-foreground">{formatoMoneda(summary.facturacion.caja.ingresos_en_periodo)}</span>
               </li>
               <li className="flex justify-between">
                 <span>Egresos del período</span>
-                <span className="font-medium text-foreground">{formatCurrency(summary.facturacion.caja.egresos_en_periodo)}</span>
+                <span className="font-medium text-foreground">{formatoMoneda(summary.facturacion.caja.egresos_en_periodo)}</span>
               </li>
               <li className="flex justify-between">
                 <span>Saldo del período</span>
-                <span className="font-medium text-foreground">{formatCurrency(summary.facturacion.caja.saldo_periodo)}</span>
+                <span className="font-medium text-foreground">{formatoMoneda(summary.facturacion.caja.saldo_periodo)}</span>
               </li>
               <li className="flex justify-between">
                 <span>Saldo total</span>
-                <span className="font-medium text-foreground">{formatCurrency(summary.facturacion.caja.saldo_total)}</span>
+                <span className="font-medium text-foreground">{formatoMoneda(summary.facturacion.caja.saldo_total)}</span>
               </li>
             </ul>
           </TarjetaIndicador>
