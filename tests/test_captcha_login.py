@@ -96,3 +96,41 @@ def test_el_login_del_seed_de_la_demo_resuelve_el_captcha(client):
 
     login(_ApiDeTest(client), ADMIN_USER, ADMIN_PASS)
     assert client.get("/auth/me").status_code == 200
+
+
+# ── Varios procesos (libraauth v0.50.0, ADR-023) ────────────────────────────
+#
+# El anti-replay del captcha era un `dict` del proceso: con `uvicorn --workers N`
+# un desafio resuelto servia una vez POR WORKER. Ahora se anota en la base de
+# `usuarios` (`libraauth_captcha_usados`, migracion `0003`), y lo que es de ESTE
+# producto es el cableado: que `create_app()` arme el `Captcha` con `UsadosEnBase`.
+
+
+def test_el_captcha_del_login_anota_los_desafios_usados_en_la_base(monkeypatch):
+    from altcha import Challenge, Payload, solve_challenge
+    from libraauth.captcha import UsadosEnBase
+    from sqlalchemy import text
+
+    monkeypatch.setattr("libraauth.session_auth._captcha_de", _CAPTCHA_DE_ORIGINAL)
+    # La app tal cual la arma `create_app()`: la fixture `client` de arriba le cambia el `Captcha` por uno en memoria.
+    app = create_app(fresh_database_url())
+    usados = app.state.captcha._usados
+    assert isinstance(usados, UsadosEnBase), "sin esto cada worker lleva su propia memoria de desafios usados"
+
+    # Mismo `usados` que el de `create_app()`, pero barato de resolver (el real cuesta ~1 s de CPU).
+    app.state.captcha = Captcha("clave-de-prueba", costo=1, contador_min=1, contador_rango=5, usados=usados)
+    with https_client(app) as client:
+        try:
+            desafio = Challenge.from_dict(client.get("/auth/captcha").json())
+            solucion = Payload(desafio, solve_challenge(desafio)).to_base64()
+            datos = {"username": ADMIN_USER, "password": ADMIN_PASS, "captcha": solucion}
+
+            assert client.post("/auth/login", json=datos).status_code == 200
+            # El mismo desafio otra vez (lo que haria otro worker): replay, rebota.
+            repetido = client.post("/auth/login", json=datos)
+            assert repetido.status_code == 400, repetido.text
+            assert repetido.json()["detail"] == CAPTCHA_INVALIDO
+            with app.state.auth_engine.connect() as c:
+                assert c.execute(text("SELECT count(*) FROM libraauth_captcha_usados")).scalar() == 1
+        finally:
+            app.state.auth_engine.dispose()
