@@ -281,4 +281,7 @@ def _captcha_aprobado(monkeypatch):
     `app.state.captcha` no alcanzaria a los tests que arman su propia app con
     `create_app(...)`.
     """
-    monkeypatch.setattr("libraauth.session_auth._captcha_de", lambda request: _CAPTCHA_DE_PRUEBA)
+    # Desde libraauth v0.50.0 el router la llama con `(request, captcha_usados)`.
+    monkeypatch.setattr(
+        "libraauth.session_auth._captcha_de", lambda request, usados=None: _CAPTCHA_DE_PRUEBA
+    )

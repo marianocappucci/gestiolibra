@@ -13,6 +13,7 @@ from libraauth.auditoria import (
 )
 from libraauth.auth_events import AuthEventRepository
 from libraauth.bootstrap import ensure_demo_user
+from libraauth.captcha import Captcha, UsadosEnBase
 from libraauth.demo_codigos import DemoCodigoRepository
 from libraauth.migrar import exigir_schema_al_dia
 from libraauth.models import Base as AuthBase
@@ -27,12 +28,14 @@ from libraauth.smtp_settings import SmtpSettingsRepository, resolver_smtp_config
 from libraauth.terminos import TerminosRepository, build_terminos_router
 from libracore import config_manager
 from libracore.arca_router import build_arca_router
+from libracore.candados import una_vez_al_arrancar
 from libracore.config_router import (
     build_backup_router,
     build_empresa_admin_router,
     build_empresa_router,
 )
 from libracore.db.url_de_instancia import url_de_instancia
+from libracore.errores import instalar_registro_de_errores
 from libracore.resguardo_enlace import build_resguardo_enlace_router
 from libracore.respaldo import Instancia
 from libracore.security_headers import CSP_SPA, SecurityHeadersMiddleware
@@ -181,7 +184,9 @@ def _instancia_a_respaldar(database_url: str, libracore_db_path: str,
 
 def create_app(database_url: str) -> FastAPI:
     """Build the vertical app after configuring LibraGenda's PostgreSQL port."""
-    configure(database_url)
+    # `pool_pre_ping` en el engine del dominio tambien (`libragenda.configure` se lo pasa a `create_engine`): mismo motivo
+    # que el de auth mas abajo.
+    configure(database_url, pool_pre_ping=True)
     Base.metadata.create_all(get_engine())  # demo only; deploy uses Alembic
 
     # `usuarios` (libraauth) vive en la base de LIBRACORE, no en la del dominio.
@@ -210,8 +215,10 @@ def create_app(database_url: str) -> FastAPI:
     # driver psycopg que es el de la familia, y `connect_args` es de SQLite.
     # Mismo arreglo que [[ventalibra]], que llego a esto primero.
     if libracore_db_path.startswith(("postgresql://", "postgresql+psycopg://")):
+        # `pool_pre_ping`: tras un restore en caliente con varios workers, el que no atendio el restore se recupera
+        # solo en vez de dar 500 hasta el reinicio (docs/varios-procesos.md de libracore).
         auth_engine = create_engine(
-            libracore_db_path.replace("postgresql://", "postgresql+psycopg://", 1)
+            libracore_db_path.replace("postgresql://", "postgresql+psycopg://", 1), pool_pre_ping=True
         )
     else:
         auth_engine = create_engine(
@@ -240,7 +247,8 @@ def create_app(database_url: str) -> FastAPI:
     # enganche es del producto, que es el unico que tiene los dos paquetes.
     secretos_repository = SecretosRepository(auth_sessions)
     config_manager.usar_almacen_de_secretos(secretos_repository)
-    migrar_secretos(secretos_repository)
+    with una_vez_al_arrancar("gestiolibra-arranque", destino=libracore_db_path):
+        migrar_secretos(secretos_repository)
 
     sessions = get_session_factory()
 
@@ -248,7 +256,9 @@ def create_app(database_url: str) -> FastAPI:
     # —el de LibraGenda— y no contra `auth_engine`: es donde ocurren las
     # escrituras que audita y donde vive su transacción. La tabla de accesos,
     # en cambio, sí va del lado de auth, que es donde LibraCore ya la creó.
-    AuditoriaBase.metadata.create_all(get_engine())
+    # DDL: con dos workers sobre una base nueva, dos `CREATE TABLE` a la vez se pisan (`pg_type_typname_nsp_index`).
+    with una_vez_al_arrancar("gestiolibra-arranque", destino=libracore_db_path):
+        AuditoriaBase.metadata.create_all(get_engine())
     configurar_auditoria(sessions, AUDITABLES)
 
     catalog = SqlAlchemyCatalogRepository(sessions)
@@ -261,18 +271,24 @@ def create_app(database_url: str) -> FastAPI:
     reminder_repository = SqlAlchemyReminderRepository(sessions)
     client_repository = ClientRepository(catalog, sessions)
     module_repository = ModuleRepository(sessions)
-    module_repository.ensure_seeded()
-    ensure_default_admin(user_repository)
-    # Crea al visitante de la demo, **solo si esta instancia es una demo**: se
-    # guia por `DEMO_MODE` + `DEMO_USERNAME`, las mismas dos variables que
-    # registran `POST /auth/demo`. En la instancia de un cliente devuelve None
-    # y no toca la base.
-    #
-    # 🔴 Sin esta llamada la ruta existe y no tiene a quien loguear: contesta
-    # `503 demo user not provisioned`. Cablear `incluir_demo=True` en el router
-    # no alcanza — la ruta y la siembra las conecta el producto, cada una por
-    # su lado.
-    ensure_demo_user(user_repository)
+    # 🔴 De a un proceso por vez (ADR-044 de libracore). `create_app()` ES el arranque y con `uvicorn --workers N` lo corre
+    # cada worker: un «si no existe, crear» (los modulos, el admin, el usuario de la demo) se contestaba «no existe» en
+    # todos antes de que ninguno creara. El candado hace que el segundo espere al primero y vea lo que dejo; cada paso
+    # sigue preguntando adentro, asi que sigue siendo idempotente. `destino` es la base de LibraCore: cualquiera sirve
+    # mientras sea la misma para todos los workers (el candado es de esa base, no de lo que se siembra).
+    with una_vez_al_arrancar("gestiolibra-arranque", destino=libracore_db_path):
+        module_repository.ensure_seeded()
+        ensure_default_admin(user_repository)
+        # Crea al visitante de la demo, **solo si esta instancia es una demo**: se
+        # guia por `DEMO_MODE` + `DEMO_USERNAME`, las mismas dos variables que
+        # registran `POST /auth/demo`. En la instancia de un cliente devuelve None
+        # y no toca la base.
+        #
+        # 🔴 Sin esta llamada la ruta existe y no tiene a quien loguear: contesta
+        # `503 demo user not provisioned`. Cablear `incluir_demo=True` en el router
+        # no alcanza — la ruta y la siembra las conecta el producto, cada una por
+        # su lado.
+        ensure_demo_user(user_repository)
 
     app = FastAPI(title="Gestiolibra")
 
@@ -300,6 +316,11 @@ def create_app(database_url: str) -> FastAPI:
     )
     app.state.users = user_repository
     app.state.session_auth = build_session_auth(user_repository)
+    # Los desafios del captcha ya resueltos se anotan en la base de `usuarios` (libraauth v0.50.0, ADR-023) y no en la
+    # memoria del proceso: con `uvicorn --workers N` un desafio resuelto servia una vez POR WORKER. Es el mismo `Captcha`
+    # que el router armaria solo (misma clave que la sesion), pero con `usados=`. La tabla la crea la revision `0003`
+    # de la cadena de `libraauth-migrar`.
+    app.state.captcha = Captcha(app.state.session_auth.secret_key, usados=UsadosEnBase(auth_sessions))
     # Recuperación de contraseña por correo (libraauth v0.5.0). Usa
     # `auth_sessions` —el mismo session_factory que el UserRepository— porque
     # la tabla de tokens tiene FK a `usuarios`, que vive en la base de
@@ -357,6 +378,10 @@ def create_app(database_url: str) -> FastAPI:
     # `CSP_SPA` y no la CSP por defecto: esa habilita `cdn.jsdelivr.net` para las
     # apps Jinja2, y este producto no carga nada externo. Ver libracore.
     app.add_middleware(SecurityHeadersMiddleware, csp=CSP_SPA)
+    # El registro de errores de la familia (ADR-045 de libracore): un 500 deja una linea en `DATA_DIR/errores/` con un
+    # `ref` que el usuario puede dictar, y monta `POST /api/errores-cliente` para los errores del navegador (publico a
+    # proposito).
+    instalar_registro_de_errores(app, "gestiolibra")
 
     app.include_router(health.router)
     app.include_router(auth_router.router)
