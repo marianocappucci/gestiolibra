@@ -34,6 +34,7 @@ from libracore.config_router import (
     build_empresa_admin_router,
     build_empresa_router,
 )
+from libracore.consultar_cuit_router import build_consultar_cuit_router
 from libracore.db.url_de_instancia import url_de_instancia
 from libracore.docs_api import cerrar_docs_de_la_api
 from libracore.errores import instalar_registro_de_errores
@@ -53,7 +54,7 @@ from sqlalchemy.orm import sessionmaker
 
 from . import mercadopago
 from .auditoria import AUDITABLES
-from .auth import build_session_auth, require_admin, require_admin_o_servicio, require_staff
+from .auth import build_session_auth, get_current_user, require_admin, require_admin_o_servicio, require_staff
 from .modules_gate import require_module
 from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
@@ -496,6 +497,18 @@ def create_app(database_url: str) -> FastAPI:
         # un script, el backoffice o un curl no tienen por que saberlo. Ver
         # LibraCore v1.63.0.
         build_arca_router(prefix="/config/arca", empresa_por_defecto=billing.EMPRESA),
+        dependencies=admin_only + [Depends(require_module("facturacion"))],
+    )
+    # Consulta de CUIT en el padrón de ARCA (`GET /api/consultar-cuit/{cuit}`): el router del motor, el que usan
+    # Contalibra, Restolibra y VentaLibra. Completa nombre y condición de IVA del alta de un cliente a partir del
+    # CUIT. Lee la fila activa de `arca_config` (la que escribe el router de arriba) y autentica contra
+    # `ws_sr_padron_a13` con el par de la facturación: sin certificados contesta 503, y si ARCA no delegó ese
+    # servicio al certificado, 403 con el paso a seguir.
+    #
+    # Mismo gate que el alta de un cliente (`routers/clients.py`: `require_admin`) y que la configuración de ARCA
+    # (módulo `facturacion`): sin ese módulo no hay dónde cargar los certificados, así que el módulo lo corta antes.
+    app.include_router(
+        build_consultar_cuit_router(usuario_actual=get_current_user),
         dependencies=admin_only + [Depends(require_module("facturacion"))],
     )
     # MercadoPago: las tres pantallas y el webhook, todas del motor. Lo unico
