@@ -7,6 +7,8 @@ import { api, ApiError, type Client } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ConsultarEnArca } from '@/components/ConsultarEnArca'
+import { CONDICIONES_IVA, condicionDeArca } from '@/lib/condiciones-iva'
 import { Input } from '@/components/ui/input'
 import { BadgeEstado } from 'libra-ui/badge-estado'
 import {
@@ -19,14 +21,6 @@ import { DataTable, sortableHeader } from '@/components/data-table'
 import { Pencil, Trash2 } from 'lucide-react'
 import { TituloPantalla } from 'libra-ui/titulo-pantalla'
 import { ICONOS } from 'libra-ui/iconos-identidad'
-
-const CONDICIONES_IVA = [
-  'Responsable Inscripto',
-  'Monotributista',
-  'IVA Exento',
-  'Consumidor Final',
-  'No Alcanzado',
-]
 
 const clientSchema = z.object({
   name: z.string().trim().min(1, 'El nombre es obligatorio'),
@@ -266,6 +260,24 @@ export function Clientes() {
                     </FormItem>
                   )}
                 />
+                {/* «Consultar en ARCA»: completa nombre y condición de IVA con el padrón, sin pisar lo ya escrito sin
+                    preguntar. Va en su propia línea: el mensaje y el aviso de «datos distintos» son más anchos que un campo. */}
+                <div className="basis-full">
+                  <ConsultarEnArca
+                    cuit={form.watch('cuit')}
+                    valores={form.watch()}
+                    destino={{
+                      nombre: { campo: 'name', etiqueta: 'Nombre' },
+                      iva: { campo: 'condicion_iva', etiqueta: 'Condición de IVA' },
+                    }}
+                    ivaDe={condicionDeArca}
+                    alAplicar={(cambios) => {
+                      for (const [campo, valor] of Object.entries(cambios)) {
+                        form.setValue(campo as keyof ClientFormValues, valor, { shouldDirty: true, shouldValidate: true })
+                      }
+                    }}
+                  />
+                </div>
                 <div className="flex gap-2 pt-6">
                   <Button type="submit" disabled={saving}>
                     {saving ? 'Guardando…' : editingId === 'new' ? 'Crear' : 'Guardar'}
