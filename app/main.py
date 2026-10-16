@@ -52,7 +52,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from . import mercadopago
+from . import empresa_demo, mercadopago
 from .auditoria import AUDITABLES
 from .auth import build_session_auth, get_current_user, require_admin, require_admin_o_servicio, require_staff
 from .modules_gate import require_module
@@ -249,6 +249,10 @@ def create_app(database_url: str) -> FastAPI:
     # enganche es del producto, que es el unico que tiene los dos paquetes.
     secretos_repository = SecretosRepository(auth_sessions)
     config_manager.usar_almacen_de_secretos(secretos_repository)
+    # La empresa ficticia de la demo (ADR-038 y ADR-061 de libracore): con `DEMO_MODE=1` el emisor de un comprobante es
+    # esta y no la de la base. Sin esta línea la demo dice «Empresa Demo SRL», la genérica del motor. Fuera de una demo
+    # no cambia nada.
+    empresa_demo.registrar()
     with una_vez_al_arrancar("gestiolibra-arranque", destino=libracore_db_path):
         migrar_secretos(secretos_repository)
 
