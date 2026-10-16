@@ -435,7 +435,10 @@ def create_app(database_url: str) -> FastAPI:
     # branches/resources/services/clients: lectura abierta a staff+admin
     # (necesaria para que el frontend arme selectores de turno sin ser
     # admin), escritura (create/update/delete) admin-only via dependencies
-    # puestas en cada endpoint mutante de esos routers.
+    # puestas en cada endpoint mutante de esos routers. **Excepción: el alta de un
+    # cliente (`POST /clients`) es de staff+admin** (ADR-033): quien atiende da de
+    # alta al cliente desde el selector de «Nuevo turno»; editarlo y borrarlo
+    # siguen siendo de admin.
     app.include_router(branches.router, dependencies=staff_or_admin_catalog)
     app.include_router(branch_hours.router, dependencies=admin_only)
     app.include_router(holidays.router, dependencies=admin_only)
@@ -509,8 +512,9 @@ def create_app(database_url: str) -> FastAPI:
     # `ws_sr_padron_a13` con el par de la facturación: sin certificados contesta 503, y si ARCA no delegó ese
     # servicio al certificado, 403 con el paso a seguir.
     #
-    # Mismo gate que el alta de un cliente (`routers/clients.py`: `require_admin`) y que la configuración de ARCA
-    # (módulo `facturacion`): sin ese módulo no hay dónde cargar los certificados, así que el módulo lo corta antes.
+    # Gate de admin, como la configuración de ARCA (módulo `facturacion`) y la edición de un cliente
+    # (`routers/clients.py`; el alta es de staff desde ADR-033, pero consultar el padrón no): sin ese módulo no hay
+    # dónde cargar los certificados, así que el módulo lo corta antes.
     app.include_router(
         build_consultar_cuit_router(usuario_actual=get_current_user),
         dependencies=admin_only + [Depends(require_module("facturacion"))],

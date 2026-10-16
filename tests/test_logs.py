@@ -137,8 +137,10 @@ def test_lo_que_escribe_el_staff_queda_a_su_nombre(admin_client, staff_client):
     """El usuario sale de la cookie de cada request: si quedara pegado del
     contexto anterior, el trabajo del empleado aparecería como del admin.
 
-    Se usa un turno y no un cliente porque el staff no puede dar de alta
-    clientes en este producto — el catálogo es admin-only.
+    Se usa un turno y no la edición de un cliente porque el resto del
+    catálogo (recursos, servicios, editar/borrar clientes) es admin-only;
+    el alta de un cliente sí es de staff (ADR-033), pero el turno es lo
+    propio de su trabajo.
     """
     admin_client.post("/resources", json={"id": "silla-1", "name": "Silla 1"})
     admin_client.post("/services", json={"id": "corte", "name": "Corte", "duration_minutes": 30})

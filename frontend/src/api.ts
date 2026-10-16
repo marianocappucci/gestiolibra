@@ -14,6 +14,8 @@
 export { api, ApiError, type User } from 'libra-ui/api-client'
 
 import type { OpcionSelect } from 'libra-ui/SelectBuscable'
+import type { ClienteNuevo } from 'libra-ui/SelectCliente'
+import { api } from 'libra-ui/api-client'
 
 export type Branch = {
   id: string
@@ -62,6 +64,41 @@ export type Client = {
   active: boolean
   cuit: string | null
   condicion_iva: string | null
+}
+
+/** Lo que pide `POST /clients` (`ClientCreate` del backend). */
+export type ClientePayload = {
+  name: string
+  phone: string | null
+  email: string | null
+  cuit: string | null
+  condicion_iva: string | null
+}
+
+/** El payload de un cliente, escrito una sola vez para toda pantalla que lo da de alta (la ficha de Clientes y el selector de cliente de
+ *  Nuevo turno, ADR-071 de libra-ui): lo vacio viaja como `null`, nunca como `''`, asi un cliente creado desde cualquier lado queda igual. */
+export function payloadDeCliente(
+  d: { name: string; phone?: string; email?: string; cuit?: string; condicion_iva?: string },
+): ClientePayload {
+  return {
+    name: d.name.trim(),
+    phone: d.phone?.trim() || null,
+    email: d.email?.trim() || null,
+    cuit: d.cuit?.trim() || null,
+    condicion_iva: d.condicion_iva || null,
+  }
+}
+
+/** El `crear` de `SelectCliente` (libra-ui/SelectCliente): da de alta con `POST /clients`, suma el cliente a la lista de la pantalla y devuelve
+ *  su opcion para que quede elegido. */
+export function crearClienteDesdeSelect(sumar: (c: Client) => void) {
+  return async (d: ClienteNuevo): Promise<OpcionSelect> => {
+    const creado = await api.post<Client>('/clients', payloadDeCliente({
+      name: d.nombre, phone: d.telefono, email: d.email, cuit: d.documento, condicion_iva: d.condicionIva,
+    }))
+    sumar(creado)
+    return opcionesCliente([creado])[0]
+  }
 }
 
 // --- opciones para los selects con busqueda (libra-ui/SelectBuscable) ------
