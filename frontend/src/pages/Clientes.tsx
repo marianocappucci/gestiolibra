@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import type { ColumnDef } from 'libra-ui/data-table'
-import { api, ApiError, type Client } from '../api'
+import { api, ApiError, payloadDeCliente, type Client } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -95,13 +95,7 @@ export function Clientes() {
   async function handleSubmit(values: ClientFormValues) {
     setSaving(true)
     setError(null)
-    const payload = {
-      name: values.name,
-      phone: values.phone || null,
-      email: values.email || null,
-      cuit: values.cuit || null,
-      condicion_iva: values.condicion_iva || null,
-    }
+    const payload = payloadDeCliente(values)
     try {
       if (editingId === 'new') {
         await api.post('/clients', payload)

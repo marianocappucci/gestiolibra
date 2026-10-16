@@ -1,3 +1,4 @@
+from conftest import https_client
 from fastapi.testclient import TestClient
 
 
@@ -87,11 +88,33 @@ def test_cannot_delete_a_client_with_an_appointment_pointing_at_it(admin_client:
     assert response.status_code == 409
 
 
-def test_staff_can_read_clients_but_not_write(admin_client: TestClient, staff_client: TestClient):
+def test_staff_can_read_and_create_clients_but_not_edit_or_delete(
+    admin_client: TestClient, staff_client: TestClient,
+):
     admin_client.post("/clients", json={"id": "client-1", "name": "Ana"})
 
     assert staff_client.get("/clients").status_code == 200
     assert staff_client.get("/clients/client-1").status_code == 200
-    assert staff_client.post("/clients", json={"id": "client-2", "name": "Otra"}).status_code == 403
+    # El alta es de staff (ADR-071 de libra-ui: el selector de cliente del
+    # turno da de alta ahi mismo); editar y borrar siguen siendo de admin.
     assert staff_client.put("/clients/client-1", json={"name": "Renombrada"}).status_code == 403
     assert staff_client.delete("/clients/client-1").status_code == 403
+
+
+def test_staff_can_create_a_client(admin_client: TestClient, staff_client: TestClient):
+    created = staff_client.post("/clients", json={
+        "name": "Dora", "phone": "11 5555 0000", "email": "dora@x.com",
+        "cuit": "20111222339", "condicion_iva": "Monotributista",
+    })
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["id"]
+    assert body["name"] == "Dora"
+    assert body["condicion_iva"] == "Monotributista"
+    # El admin lo ve en el listado: es el mismo catalogo.
+    assert [c["name"] for c in admin_client.get("/clients").json()] == ["Dora"]
+
+
+def test_anonymous_cannot_create_a_client(admin_client: TestClient):
+    with https_client(admin_client.app) as anonimo:
+        assert anonimo.post("/clients", json={"name": "Dora"}).status_code == 401
