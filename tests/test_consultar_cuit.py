@@ -113,11 +113,13 @@ def test_los_errores_del_padron_conservan_estado_y_mensaje(admin_client, arca_ca
     assert mensaje in r.json()["error"]
 
 
-def test_un_operador_no_puede_consultar_igual_que_no_puede_dar_de_alta(admin_client, staff_client, arca_cargada, monkeypatch):
+def test_un_operador_no_puede_consultar_igual_que_no_puede_editar_un_cliente(admin_client, staff_client, arca_cargada, monkeypatch):
     pedidos = []
     _padron(monkeypatch, persona=PERSONA, pedidos=pedidos)
-    # Control: el alta de un cliente también es de admin, así que el gate es el mismo.
-    assert staff_client.post("/clients", json={"id": "c-1", "name": "Ana"}).status_code == 403
+    # Control: editar un cliente es de admin, así que el gate es el mismo. (El ALTA es de staff desde el ADR-033: el selector de
+    # «Nuevo turno» la usa, pero consultar el padrón de ARCA con los certificados de la instancia no se abre con ella.)
+    assert admin_client.post("/clients", json={"id": "c-1", "name": "Ana"}).status_code == 201
+    assert staff_client.put("/clients/c-1", json={"name": "Ana B"}).status_code == 403
     assert staff_client.get(URL + "30711111114").status_code == 403
     assert pedidos == []
 

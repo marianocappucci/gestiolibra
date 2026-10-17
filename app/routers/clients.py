@@ -40,7 +40,11 @@ class ClientOut(BaseModel):
     condicion_iva: str | None
 
 
-@router.post("", status_code=201, response_model=ClientOut, dependencies=[Depends(require_admin)])
+# Alta abierta a staff: el router entero ya exige `require_staff` (staff **o**
+# admin, ver `main.py`), y quien atiende tiene que poder dar de alta al cliente
+# desde el selector del turno (ADR-071 de libra-ui). Editar y borrar siguen
+# siendo sólo de admin.
+@router.post("", status_code=201, response_model=ClientOut)
 def create_client(
     data: ClientCreate, clients: ClientRepository = Depends(get_client_repository),
 ):

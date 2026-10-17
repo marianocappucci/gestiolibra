@@ -46,6 +46,7 @@ import { TituloPantalla } from 'libra-ui/titulo-pantalla'
 import { ICONOS } from 'libra-ui/iconos-identidad'
 import { EncabezadoDePantalla } from 'libra-ui/acciones'
 import { SelectBuscable } from 'libra-ui/SelectBuscable'
+import { SelectCliente } from 'libra-ui/SelectCliente'
 import { BadgeEstado, type TonoEstado } from 'libra-ui/badge-estado'
 import {
   LABEL_VISTA, NavegadorCalendario, ReferenciaDeColores, VISTAS, VistaMes,
@@ -54,7 +55,7 @@ import {
 import { formatoMoneda } from 'libra-ui/formatos'
 import {
   api, ApiError, STATUS_LABELS, TIPO_COMPROBANTE_LABELS,
-  opcionesCliente, opcionesServicio,
+  crearClienteDesdeSelect, opcionesCliente, opcionesServicio,
   type AppointmentStatus, type Branch, type Client,
   type CompleteAppointmentResponse, type Factura, type MedioPago,
   type Resource, type Service,
@@ -457,10 +458,12 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
                   <FormItem>
                     <FormLabel>Cliente</FormLabel>
                     <FormControl>
-                      <SelectBuscable
+                      <SelectCliente
                         value={field.value}
                         onChange={field.onChange}
                         opciones={opcionesCliente(clients.filter((c) => c.active))}
+                        crear={crearClienteDesdeSelect((c) => setClients((prev) => [...prev, c]))}
+                        campos={['telefono', 'email']}
                         placeholder="Cliente…"
                         ariaLabel="Cliente"
                       />
