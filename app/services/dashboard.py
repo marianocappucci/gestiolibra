@@ -6,8 +6,9 @@ ni tabla propia de este módulo). Facturación/caja quedó afuera del primer
 corte (decisión explícita del usuario, ver DECISIONS.md ADR-012) y se
 sumó después, ver ADR-015.
 """
-from datetime import UTC, date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time
 
+from libracore import fechas
 from libracore.db import caja as db_caja
 from libracore.db import facturas as db_facturas
 from libragenda import AppointmentStatus, DepositStatus
@@ -15,9 +16,8 @@ from libragenda.repositories import AppointmentRepository, DepositRepository, Se
 
 from .clients import ClientRepository
 
-#: Zona del negocio. Argentina es UTC-3 fijo, sin horario de verano, así que el
-#: desfasaje es una constante y no hace falta una base de husos para resolverlo.
-_ZONA = timezone(timedelta(hours=-3))
+#: Zona del negocio: la de `libracore.fechas` (ADR-070), UTC-3 fijo sin horario de verano.
+_ZONA = fechas.ZONA_AR
 
 
 def _day_range_utc(date_from: date, date_to: date) -> tuple[datetime, datetime]:
@@ -26,7 +26,7 @@ def _day_range_utc(date_from: date, date_to: date) -> tuple[datetime, datetime]:
     🔴 Acá los días se armaban con `tzinfo=timezone.utc`, o sea que el rango
     significaba *"del 00:00 UTC al 23:59 UTC"*. Y en el mismo `summary()` la
     mitad de facturación compara ese rango contra fechas **locales** —las
-    facturas se estampan con `date.today()`—, así que **la misma función usaba
+    facturas se estampan con un `hoy` local —hoy `fechas.hoy()`, antes `date.today()`—, así que **la misma función usaba
     dos relojes**: entre las 21:00 y las 24:00 de Argentina, los turnos y los
     clientes se contaban de un día y las facturas de otro.
 
@@ -67,8 +67,12 @@ class DashboardService:
         por_estado = {status.value: 0 for status in AppointmentStatus}
         for item in in_range:
             por_estado[item.status.value] += 1
-        today = datetime.now(UTC).date()
-        turnos_hoy = sum(1 for item in all_appointments if item.starts_at.date() == today)
+        # «Hoy» es el día de Argentina, en el reloj del motor; y el día de cada turno,
+        # el de su instante en esa zona (en UTC, uno de las 21:00 caía en «mañana»).
+        today = fechas.hoy()
+        turnos_hoy = sum(
+            1 for item in all_appointments if item.starts_at.astimezone(_ZONA).date() == today
+        )
 
         desde, hasta = date_from.isoformat(), date_to.isoformat()
         facturas_en_periodo = db_facturas.get_facturas_filtradas(desde, hasta, limit=0)["total"]

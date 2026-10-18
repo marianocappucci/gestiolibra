@@ -14,10 +14,9 @@ uno con su propio medio de pago -- pero apuntando a la MISMA factura. La
 seña nunca genera su propia factura.
 """
 import os
-from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from libracore import arca_facturacion
+from libracore import arca_facturacion, fechas
 from libracore.db import arca_config as db_arca_config
 from libracore.db import caja as db_caja
 from libracore.db import core as libracore_core
@@ -148,10 +147,13 @@ async def invoice_appointment(
     punto_venta = arca_cfg["punto_venta"] if arca_cfg else 1
     tipo = _tipo_comprobante(client.get("condicion_iva"))
     subtotal, iva_amount = _split_iva(service_price)
+    # Un solo `hoy` para la factura y sus movimientos de caja: tres lecturas del
+    # reloj podrían partirse justo a la medianoche de Argentina.
+    hoy = fechas.hoy().isoformat()
 
     numero, ta, arca_used = await arca_facturacion.get_next_numero_with_arca(punto_venta, tipo)
     factura_id = db_facturas.create_factura(
-        tipo, punto_venta, numero, date.today().isoformat(),
+        tipo, punto_venta, numero, hoy,
         client.get("cuit") or "", client.get("name") or "",
         IVA_CODES.get(client.get("condicion_iva"), IVA_CODES["Consumidor Final"]),
         [], float(subtotal), float(iva_amount), float(service_price),
@@ -173,13 +175,13 @@ async def invoice_appointment(
 
     if deposit_amount > 0:
         db_caja.create_caja_movimiento(
-            date.today().isoformat(), "ingreso", f"Sena factura {numero}",
+            hoy, "ingreso", f"Sena factura {numero}",
             deposit_amount, referencia=f"{referencia}-sena",
             factura_id=factura_id, medio_pago=deposit_medio_pago or "",
         )
     if balance > 0:
         db_caja.create_caja_movimiento(
-            date.today().isoformat(), "ingreso", f"Saldo factura {numero}",
+            hoy, "ingreso", f"Saldo factura {numero}",
             balance, referencia=f"{referencia}-saldo",
             factura_id=factura_id, medio_pago=balance_medio_pago or "",
         )
