@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime, time, timedelta, timezone
 
 from fastapi.testclient import TestClient
+from libracore import fechas
 from libragenda import ReminderPolicy
 
 # 🔴 Los horarios de los turnos de este archivo NO salen del reloj.
@@ -29,10 +30,11 @@ HORA_DEL_TURNO_DE_HOY = time(12, 0)
 
 
 def _turno_de_hoy() -> datetime:
-    """Hoy al mediodia UTC. La FECHA sale del reloj -- no hay otra forma de
-    pedir "hoy" -- pero la HORA no, que es de donde venia el problema."""
+    """Hoy (el de Argentina, `fechas.hoy()`) al mediodia UTC. La FECHA sale del
+    reloj -- no hay otra forma de pedir "hoy" -- pero la HORA no, que es de donde
+    venia el problema. Mediodia UTC son las 09:00 de Argentina: el mismo dia."""
     return datetime.combine(
-        datetime.now(UTC).date(), HORA_DEL_TURNO_DE_HOY, tzinfo=UTC
+        fechas.hoy(), HORA_DEL_TURNO_DE_HOY, tzinfo=UTC
     )
 
 
@@ -124,7 +126,7 @@ def test_dashboard_counts_appointments_by_status_and_today(admin_client: TestCli
     assert body["turnos"]["total_en_periodo"] == 1
     assert body["turnos"]["por_estado"]["confirmed"] == 1
     assert body["turnos"]["por_estado"]["pending"] == 0
-    if starts_at_dt.date() == datetime.now(UTC).date():
+    if starts_at_dt.date() == fechas.hoy():
         assert body["turnos"]["hoy"] == 1
 
 
