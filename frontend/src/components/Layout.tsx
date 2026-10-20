@@ -49,5 +49,8 @@ export const Layout = createLayout({
   // `App.tsx` sigue mandando a `/agenda` y no acá.
   navSections: NAV_SECCIONES,
   // El nombre del negocio, debajo del nombre del producto (viene de Configuración > Datos de empresa, vía `/auth/me`).
+  // La barra de estado del pie (libra-ui ADR-083, libracore ADR-075): usuario, ARCA, respaldo y versión, de
+  // `GET /api/estado-del-sistema` al cargar y cada pocos minutos.
+  barraDeEstado: true,
   getUserSubtitle: (u) => (u as { empresa_nombre?: string }).empresa_nombre,
 })
