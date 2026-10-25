@@ -17,7 +17,7 @@ from motor_de_test import fresh_database_url, url_libracore
 from app.main import create_app
 
 RAIZ = Path(__file__).resolve().parent.parent
-COMANDO = "libraauth-migrar upgrade --prefijo gestiolibra --base core"
+COMANDO = "libraauth-migrar upgrade --prefijo gestiolibra --base dominio"
 
 
 def test_sin_la_cadena_la_app_no_arranca_y_dice_el_comando():

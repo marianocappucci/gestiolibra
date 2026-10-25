@@ -33,10 +33,10 @@ RAIZ = Path(__file__).resolve().parent.parent
 #: adopción de la cadena de auth). `libracore-migrar` entró el 2026-08-25 y su cadena no la
 #: corría nadie porque las migraciones del motor no viajaban en el wheel. Con una sola base
 #: (ADR-035) la resuelve por `GESTIOLIBRA_DATABASE_URL`, porque `gestiolibra` figura en
-#: `_UNA_SOLA_BASE` del motor; en la demo, que todavía tiene dos, por la variable del core.
+#: `_UNA_SOLA_BASE` del motor. `libraauth-migrar` va con `--base dominio` (ADR-037).
 ESPERADO = (
     ("libragenda-migrar", "upgrade"),
-    ("libraauth-migrar", "upgrade", "--prefijo", "gestiolibra", "--base", "core"),
+    ("libraauth-migrar", "upgrade", "--prefijo", "gestiolibra", "--base", "dominio"),
     ("libracore-migrar", "upgrade", "--prefijo", "gestiolibra"),
     ("alembic", "upgrade", "head"),
 )
@@ -207,38 +207,33 @@ def test_la_imagen_lleva_con_que_correrlas():
             assert prohibido not in lineas, f".dockerignore excluye {prohibido}"
 
 
-def test_libraauth_va_con_base_core_hasta_que_no_quede_una_instancia_de_dos_bases():
-    """🔴 `--base core`, y no `--base dominio`: medido el 2026-10-25 sobre una instancia de dos bases.
+@pytest.mark.parametrize("script", ["panel_admin", "nuevo_cliente"])
+def test_libraauth_va_con_base_dominio(script):
+    """`--base dominio` en los dos scripts y en el `command:` del compose (ADR-037).
 
-    Con `--base core` el comando usa la base del core si la instancia todavía tiene la variable (la demo, hasta que
-    se una) y, si no, cae a la del dominio (dev unida y todo alta nueva), porque `gestiolibra` figura en
-    `_UNA_SOLA_BASE` del motor desde libracore v1.194.0. Con `--base dominio` migraría SIEMPRE la del dominio: en la demo
-    crearía ahí las tablas de auth, vacías, al lado de las reales —sin fallar— y `libracore-unir-bases verificar`
-    cortaría después con `auth_en_los_dos`. En una base única los dos valores van al mismo lugar, así que cambiarlo a
-    `dominio` es un PR aparte, cuando no quede ninguna instancia de dos bases.
-    """
-    comando = next(c for c in _config_de("panel_admin") if c[0] == "libraauth-migrar")
+    Desde el 2026-10-25 dev y demo son de UNA sola base: no hay `GESTIOLIBRA_LIBRACORE_DATABASE_URL` en ninguna instancia
+    y `dominio` es la base donde vive todo. Hasta el ADR-035 iba `--base core` porque la demo tenía dos bases y
+    `--base dominio` habría creado ahí las tablas de auth vacías, al lado de las reales del core (la unión quedaba
+    imposible: `auth_en_los_dos`); ese escenario ya no existe. El valor tiene que ser el mismo en los tres lugares: el que
+    el deploy corre, el que el alta corre y el que el compose de dev corre."""
+    comando = next(c for c in _config_de(script) if c[0] == "libraauth-migrar")
     assert "--base" in comando, "sin --base, libraauth-migrar se niega a correr con --prefijo"
-    assert comando[comando.index("--base") + 1] == "core", (
-        f"mientras la demo tenga dos bases: --base core, no {comando[comando.index('--base') + 1]!r}")
+    assert comando[comando.index("--base") + 1] == "dominio", comando
+    compose = (RAIZ / "docker-compose.yml").read_text(encoding="utf-8")
+    assert "libraauth-migrar upgrade --prefijo gestiolibra --base dominio &&" in compose
+    assert "--base core" not in compose
 
 
-def test_a_donde_va_libraauth_con_una_base_y_con_dos():
-    """La resolución real de `libraauth-migrar` (`url_de_auth`), sin tocar ninguna base: el destino de cada `--base`."""
+def test_a_donde_va_libraauth_con_base_dominio():
+    """La resolución real de `libraauth-migrar` (`url_de_auth`), sin tocar ninguna base.
+
+    Con una sola base `dominio` sale de `GESTIOLIBRA_DATABASE_URL` y, como en el compose de dev (que sólo define
+    `DATABASE_URL`), de su nombre histórico."""
     from libraauth.migrar import url_de_auth
 
     dominio = "postgresql+psycopg://u:clave@servidor:5432/gestiolibra"
-    core = "postgresql+psycopg://u:clave@servidor:5432/gestiolibra_core"
-
-    # Una sola base (dev unida, alta nueva): sin variable del core, `core` y `dominio` son la misma.
-    una = {"GESTIOLIBRA_DATABASE_URL": dominio}
-    assert url_de_auth("gestiolibra", "core", entorno=una) == dominio
-    assert url_de_auth("gestiolibra", "dominio", entorno=una) == dominio
-
-    # Dos bases (la demo hasta que se una): `core` es la del core; `dominio` sería la equivocada.
-    dos = {**una, "GESTIOLIBRA_LIBRACORE_DATABASE_URL": core}
-    assert url_de_auth("gestiolibra", "core", entorno=dos) == core
-    assert url_de_auth("gestiolibra", "dominio", entorno=dos) == dominio  # el peligro: migraría la base equivocada
+    assert url_de_auth("gestiolibra", "dominio", entorno={"GESTIOLIBRA_DATABASE_URL": dominio}) == dominio
+    assert url_de_auth("gestiolibra", "dominio", entorno={"DATABASE_URL": dominio}) == dominio
 
 
 @pytest.mark.parametrize("script", ["panel_admin", "nuevo_cliente"])
@@ -289,26 +284,18 @@ def _base_temporal(etiqueta: str):
             c.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(nombre)))
 
 
-def _correr_cadena(dominio: str, core: str | None = None, *, solo: tuple[str, ...] | None = None,
-                   base_de_auth: str | None = None) -> None:
-    """Las cadenas que declara `panel_admin.py`, como subprocesos y en su orden, contra bases propias.
+def _correr_cadena(dominio: str, *, solo: tuple[str, ...] | None = None) -> None:
+    """Las cadenas que declara `panel_admin.py`, como subprocesos y en su orden, contra una base propia.
 
-    Sin `core`, **sin ninguna `GESTIOLIBRA_LIBRACORE_*` en el entorno** (el alta nueva y dev unida). Con `core`, la
-    variable del core apuntada a esa base (la demo, hasta que se una). `base_de_auth` cambia el `--base` de
-    `libraauth-migrar`; sin él, el del deploy."""
+    **Sin ninguna `GESTIOLIBRA_LIBRACORE_*` en el entorno** (la forma de toda instancia desde el 2026-10-25)."""
     import os
 
     entorno = {k: v for k, v in os.environ.items() if not k.startswith("GESTIOLIBRA_LIBRACORE_")}
     entorno.update(DATABASE_URL=dominio, GESTIOLIBRA_DATABASE_URL=dominio)
-    if core:
-        entorno["GESTIOLIBRA_LIBRACORE_DATABASE_URL"] = core
     bin_ = Path(sys.executable).parent
     for comando in _config_de("panel_admin"):
         if solo is not None and comando[0] not in solo:
             continue
-        comando = list(comando)
-        if base_de_auth and comando[0] == "libraauth-migrar":
-            comando[comando.index("--base") + 1] = base_de_auth
         r = subprocess.run([str(bin_ / comando[0]), *comando[1:]], env=entorno, cwd=str(RAIZ),
                            capture_output=True, text=True, timeout=300)
         assert r.returncode == 0, f"{' '.join(comando)}: {(r.stderr or r.stdout)[-2000:]}"
@@ -318,7 +305,7 @@ def test_las_cuatro_cadenas_del_deploy_migran_una_base_nueva_sin_variable_del_co
     """El alta nueva: las cuatro cadenas de `panel_admin.py`, como subprocesos y en su orden, contra UNA base vacía.
 
     Sin `GESTIOLIBRA_LIBRACORE_*` en el entorno. Es el comando del compose de dev con la variable ya retirada: si
-    `libracore-migrar` o `libraauth-migrar --base core` no cayeran a la base del dominio (o si alguna cadena chocara con
+    `libracore-migrar` o `libraauth-migrar --base dominio` no cayeran a la base del dominio (o si alguna cadena chocara con
     otra por un nombre de tabla repetido), el deploy de una instancia unida y todo alta nueva morirían acá."""
     import psycopg
 
@@ -338,36 +325,19 @@ def test_las_cuatro_cadenas_del_deploy_migran_una_base_nueva_sin_variable_del_co
         assert segunda is None, "el alta no debe crear `<base>_core`"
 
 
-def _unir_bases_verificar(dominio: str, core: str):
-    """`libracore-unir-bases verificar` sobre dos bases: (código de salida, texto)."""
-    r = subprocess.run(
-        [str(Path(sys.executable).parent / "libracore-unir-bases"), "--prefijo", "gestiolibra",
-         "--core", core, "--dominio", dominio, "verificar"],
-        capture_output=True, text=True, timeout=300)
-    return r.returncode, r.stdout + r.stderr
+def test_libraauth_con_base_dominio_deja_las_tablas_de_auth_en_la_unica_base():
+    """`--base dominio` sobre una base nueva: `usuarios` y la versión de auth quedan ahí, y no nace ninguna `<base>_core`.
 
-
-def test_libraauth_con_base_dominio_en_una_instancia_de_dos_bases_deja_la_union_imposible():
-    """🔴 Lo medido el 2026-10-25, de punta a punta: por qué el deploy sigue con `--base core`.
-
-    En una instancia que todavía tiene dos bases (la demo) `--base dominio` termina bien y crea en el dominio las
-    tablas de auth, vacías, al lado de las reales del core; desde ahí `libracore-unir-bases` corta con `auth_en_los_dos`
-    y la unión de esa demo no se puede hacer sin retirar a mano el juego de tablas sobrante."""
+    Es el control de lo que hace el `command:` del compose de dev y el alta de un cliente nuevo: el comando solo (la
+    cadena de LibraGenda no hace falta, auth no tiene FK contra ella) migra la base del dominio, y el destino sale de
+    `DATABASE_URL`/`GESTIOLIBRA_DATABASE_URL`, no de una variable del core."""
     import psycopg
 
-    def tiene_usuarios(url: str) -> bool:
+    with _base_temporal("auth") as (url, sqla):
+        _correr_cadena(sqla, solo=("libraauth-migrar",))
         with psycopg.connect(url) as c:
-            return c.execute("SELECT count(*) FROM information_schema.tables "
-                             "WHERE table_schema = 'public' AND table_name = 'usuarios'").fetchone()[0] == 1
-
-    with _base_temporal("dom") as (dominio, dominio_sqla), _base_temporal("core") as (core, core_sqla):
-        _correr_cadena(dominio_sqla, core_sqla)
-        assert tiene_usuarios(core) and not tiene_usuarios(dominio)  # los usuarios de la demo están en el core
-        antes, texto = _unir_bases_verificar(dominio_sqla, core_sqla)
-        assert antes == 0, texto  # control: con el deploy tal cual, se puede unir
-
-        _correr_cadena(dominio_sqla, core_sqla, solo=("libraauth-migrar",), base_de_auth="dominio")
-
-        assert tiene_usuarios(dominio)  # migró la base equivocada, sin fallar
-        despues, texto = _unir_bases_verificar(dominio_sqla, core_sqla)
-        assert despues != 0 and "auth_en_los_dos" in texto, texto
+            tablas = {f[0] for f in c.execute(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'").fetchall()}
+            segunda = c.execute("SELECT 1 FROM pg_database WHERE datname = current_database() || '_core'").fetchone()
+        assert {"usuarios", "auth_log", "alembic_version_libraauth"} <= tablas
+        assert segunda is None

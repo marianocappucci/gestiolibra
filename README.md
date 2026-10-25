@@ -65,9 +65,9 @@ amerite, sin cambios de código.
 Facturación/caja usa `libracore.db` — sqlite3 crudo con su propia
 conexión, configurada aparte del engine SQLAlchemy de LibraGenda/
 Gestiolibra. La base de LibraCore es **la misma del
-dominio** (una sola base, ADR-035; `app/config.py`, ADR-034), salvo en una instancia que
-todavía no se unió, que la declara en `GESTIOLIBRA_LIBRACORE_DATABASE_URL` (o la
-histórica `GESTIOLIBRA_LIBRACORE_DB_PATH`). Ver `DECISIONS.md` ADR-011.
+dominio** (una sola base, ADR-035 y ADR-037; `app/config.py`, ADR-034). Ninguna instancia
+declara ya `GESTIOLIBRA_LIBRACORE_DATABASE_URL` (ni la histórica `..._DB_PATH`); el código las
+tolera por si aparece. Ver `DECISIONS.md` ADR-011.
 
 ## Migraciones
 
