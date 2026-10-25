@@ -30,6 +30,19 @@ def estado_en_la_base(e, turno):
 # ── Sin conexión ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
+def test_la_conexion_del_nodo_la_lee_el_cartel_de_libra_ui_sin_pasar_por_la_cola(escenario):
+    """`GET /api/nodo/conexion` (libracore ADR-084): el nodo sin conexión se ve en la próxima consulta, sin traer pedidos."""
+    e = escenario
+    e.en_linea(False)
+    r = e.cliente.get("/api/nodo/conexion")
+    assert r.status_code == 200, r.text
+    cuerpo = r.json()
+    assert (cuerpo["es_nodo"], cuerpo["en_linea"], cuerpo["a_facturar"]) == (True, False, 0) and cuerpo["node_id"]
+    assert set(cuerpo) == {"es_nodo", "en_linea", "node_id", "a_facturar"}
+    e.en_linea(True)
+    assert e.cliente.get("/api/nodo/conexion").json()["en_linea"] is True
+
+
 def test_completar_sin_conexion_cobra_deja_la_factura_en_cola_y_atiende_el_turno(escenario):
     e = escenario
     turno = e.datos["turno"]
@@ -41,8 +54,10 @@ def test_completar_sin_conexion_cobra_deja_la_factura_en_cola_y_atiende_el_turno
     assert cuerpo["factura_en_cola"]["estado"] == "esperando"
     assert cuerpo["comprobante_no_fiscal"] == f"/appointments/{turno}/comprobante-no-fiscal"
     assert "cola" in cuerpo["mensaje"]
-    # La forma del 202 `en_cola` que reconoce el kit: la pantalla avisa «Se emite al volver la conexión».
+    # La forma única del «en cola» (libracore ADR-084) que reconoce el kit: la pantalla avisa «Se emite al volver la conexión».
+    # El código HTTP sigue siendo 200: el turno ya se atendió, y el kit decide por el cuerpo.
     assert cuerpo["en_cola"] is True and cuerpo["estado"] == "esperando" and cuerpo["pedido_id"] == cuerpo["factura_en_cola"]["id"]
+    assert cuerpo["codigo"] == "en_cola" and cuerpo["motivo"] == "" and "cola" in cuerpo["mensaje"]
 
     # El saldo (todo el precio: no había seña) quedó en la caja, SIN factura: se ata cuando salga.
     assert e.sql_nodo("SELECT tipo, monto, medio_pago, referencia, factura_id FROM caja_movimientos") == [

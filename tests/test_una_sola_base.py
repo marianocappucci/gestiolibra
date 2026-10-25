@@ -10,7 +10,7 @@ una base propia y descartable.
 Lo que se ata:
 
 1. `url_de_libracore` / `misma_base`: sin variable, o con la misma base (aunque cambie el driver o los parámetros), es la URL
-   del dominio TAL CUAL; con otra base, esa; las dos variables (la vigente y la histórica).
+   del dominio TAL CUAL; con otra base, esa (`GESTIOLIBRA_LIBRACORE_DATABASE_URL`).
 2. **La app arranca y anda con una sola base**: auth, LibraGenda y LibraCore en la misma base, y no vuelca la base dos veces
    al respaldar.
 3. **Con dos bases (tolerado, ya sin instancias así)** el respaldo lleva las dos y la app usa la del core para `usuarios`.
@@ -68,24 +68,11 @@ def test_con_otra_base_es_esa():
     assert url_de_libracore(DOMINIO, entorno={"GESTIOLIBRA_LIBRACORE_DATABASE_URL": core}) == core
 
 
-def test_el_nombre_historico_de_la_variable_sigue_valiendo():
-    """Dev y demo la llevan así en su compose (`GESTIOLIBRA_LIBRACORE_DB_PATH`, que guarda una URL)."""
-    core = "postgresql://u:clave@servidor:5432/gestiolibra_core"
-    assert url_de_libracore(DOMINIO, entorno={"GESTIOLIBRA_LIBRACORE_DB_PATH": core}) == core
-    assert url_de_libracore(DOMINIO, entorno={"GESTIOLIBRA_LIBRACORE_DB_PATH": DOMINIO}) == DOMINIO
-
-
-def test_el_nombre_vigente_le_gana_al_historico():
-    vigente = "postgresql://u:clave@servidor:5432/vigente"
-    entorno = {"GESTIOLIBRA_LIBRACORE_DATABASE_URL": vigente, "GESTIOLIBRA_LIBRACORE_DB_PATH": "postgresql://u:clave@servidor:5432/viejo"}
-    assert url_de_libracore(DOMINIO, entorno=entorno) == vigente
-
 
 # ── 2. La app anda con una sola base ─────────────────────────────────────────
 
 def _app_con_una_sola_base(monkeypatch):
     """La base de la suite (auth ya migrada, que deja la fixture autouse) y SIN variable del core: todo en la misma base."""
-    monkeypatch.delenv("GESTIOLIBRA_LIBRACORE_DB_PATH", raising=False)
     monkeypatch.delenv("GESTIOLIBRA_LIBRACORE_DATABASE_URL", raising=False)
     url = fresh_database_url()
     return url, create_app(url)

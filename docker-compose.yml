@@ -137,8 +137,7 @@ services:
       - GESTIOLIBRA_ADMIN_PASSWORD=${GESTIOLIBRA_ADMIN_PASSWORD:-}
       # 🔴 El corte a PostgreSQL, con UNA sola base (ADR-035): el dominio (LibraGenda), LibraAuth
       # y LibraCore viven todos en `gestiolibra`. **No hay variable del core**: sin
-      # `GESTIOLIBRA_LIBRACORE_DATABASE_URL` (ni su histórico `GESTIOLIBRA_LIBRACORE_DB_PATH`) el
-      # motor y `app/config.py` usan la base del dominio. Dev y demo se unieron el 2026-10-25 con
+      # `GESTIOLIBRA_LIBRACORE_DATABASE_URL` el motor y `app/config.py` usan la base del dominio. Dev y demo se unieron el 2026-10-25 con
       # `libracore-unir-bases` y no queda ninguna instancia de dos bases (el código la tolera, ADR-037).
       #
       # Volver esta línea a la ruta `.db` y reiniciar es el rollback completo: el archivo de

@@ -22,7 +22,7 @@ import { Clientes } from '../pages/Clientes'
 import { AuthProvider } from '../context/AuthContext'
 
 const LUNES = '2026-07-20'
-const RUTA_COLA = '/api/nodo/cola?limite=1'
+const RUTA_CONEXION = '/api/nodo/conexion'
 
 const SUCURSAL = {
   id: 'centro', name: 'Centro', active: true,
@@ -56,6 +56,11 @@ function servir(turnos: unknown[], extra: Record<string, unknown> = {}, cola: un
     for (const [fragmento, respuesta] of Object.entries(extra)) {
       if (u.includes(fragmento)) return Promise.resolve(json(respuesta))
     }
+    // La conexión (`GET /api/nodo/conexion`, libracore ADR-084) trae sólo cuatro datos; la cola, además, los pedidos.
+    if (u.includes(RUTA_CONEXION)) {
+      const { es_nodo, en_linea, node_id } = cola as Record<string, unknown>
+      return Promise.resolve(json({ es_nodo, en_linea, node_id, a_facturar: 0 }))
+    }
     if (u.includes('/api/nodo/cola')) return Promise.resolve(json(cola))
     if (u.includes('/auth/me')) {
       return Promise.resolve(json({
@@ -84,7 +89,7 @@ afterEach(() => _reiniciarConexionDelNodo())
 
 /** La agenda sola, con la conexión del nodo ya consultada (lo que en la app hace el cartel del layout). */
 async function montarAgenda(ruta = `/agenda?dia=${LUNES}`, { esAdmin = true } = {}) {
-  const parar = consultarConexionDelNodo({ ruta: RUTA_COLA })
+  const parar = consultarConexionDelNodo({ ruta: RUTA_CONEXION })
   render(
     <MemoryRouter initialEntries={[ruta]}>
       <Routes>
@@ -93,8 +98,8 @@ async function montarAgenda(ruta = `/agenda?dia=${LUNES}`, { esAdmin = true } = 
       </Routes>
     </MemoryRouter>,
   )
-  // Espera a que la consulta de la cola haya contestado: de ahí sale `esNodo`.
-  await waitFor(() => expect(pedidos.some((p) => p.url.includes('/api/nodo/cola'))).toBe(true))
+  // Espera a que la consulta de la conexión haya contestado: de ahí sale `esNodo`.
+  await waitFor(() => expect(pedidos.some((p) => p.url.includes(RUTA_CONEXION))).toBe(true))
   await new Promise((r) => setTimeout(r, 0))
   return parar
 }
@@ -120,6 +125,14 @@ describe('el layout de un nodo', () => {
     await waitFor(() => expect(itemsDelMenu()).toContain('Cola de comprobantes'))
   })
 
+  it('🔴 el cartel pregunta por la conexión del nodo y no trae la lista de la cola (libracore ADR-084)', async () => {
+    servir([])
+    montarApp('/agenda')
+    await screen.findByText(/Sin conexión: la agenda es de consulta/)
+    expect(pedidos.some((p) => p.url.endsWith(RUTA_CONEXION))).toBe(true)
+    expect(pedidos.some((p) => p.url.includes('/api/nodo/cola'))).toBe(false)
+  })
+
   it('🔴 el cartel no habla de cartas de porte ni de CPE: eso es de LibraCargo', async () => {
     servir([])
     montarApp('/agenda')
@@ -131,7 +144,7 @@ describe('el layout de un nodo', () => {
     servir([], {}, FUERA_DE_UN_NODO)
     montarApp('/agenda')
     await waitFor(() => expect(itemsDelMenu().length).toBeGreaterThan(0))
-    await waitFor(() => expect(pedidos.some((p) => p.url.includes('/api/nodo/cola'))).toBe(true))
+    await waitFor(() => expect(pedidos.some((p) => p.url.includes(RUTA_CONEXION))).toBe(true))
     expect(itemsDelMenu()).not.toContain('Cola de comprobantes')
     expect(screen.queryByText(/Sin conexión/)).not.toBeInTheDocument()
   })

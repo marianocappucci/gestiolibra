@@ -46,8 +46,8 @@ if DATA_DIR:
         "gestiolibra", default=f"sqlite:///{DATA_DIR}/gestiolibra.db"
     )
     # La base de LibraCore ya NO se puentea acá: `create_app()` la resuelve con
-    # `app.config.url_de_libracore` --la variable `GESTIOLIBRA_LIBRACORE_DATABASE_URL` (o su nombre
-    # histórico `..._DB_PATH`) si hay una OTRA base, y la del dominio si no (ADR-034)--. El default de
+    # `app.config.url_de_libracore` --la variable `GESTIOLIBRA_LIBRACORE_DATABASE_URL` si hay una OTRA
+    # base, y la del dominio si no (ADR-034)--. El default de
     # antes (`{DATA_DIR}/gestiolibra_libracore.db`) era una ruta SQLite, que
     # `services/billing.configure` rechaza desde el 2026-08-12.
     if os.environ.get("ADMIN_USER"):
