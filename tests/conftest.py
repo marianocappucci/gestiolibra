@@ -13,7 +13,7 @@ _time.tzset()
 import pytest
 from fastapi.testclient import TestClient
 from libraauth import session_auth as _session_auth
-from motor_de_test import destino_libracore, fresh_database_url, url_libracore
+from motor_de_test import TEST_DATABASE_URL, destino_libracore, fresh_database_url, url_libracore
 
 from app.main import create_app
 
@@ -46,6 +46,39 @@ def _sin_almacen_de_secretos_colgado():
     config_manager.usar_almacen_de_secretos(None)
 
 
+#: Las cuatro cadenas del deploy, en el orden de `scripts/panel_admin.py` (lo ata `test_migraciones_en_el_deploy.py`).
+_CADENAS_DEL_DEPLOY = (
+    ("libragenda-migrar", "upgrade"),
+    ("libraauth-migrar", "upgrade", "--prefijo", "gestiolibra", "--base", "core"),
+    ("libracore-migrar", "upgrade", "--prefijo", "gestiolibra"),
+    ("alembic", "upgrade", "head"),
+)
+
+
+def _migrar_como_el_deploy(url: str) -> None:
+    """Corre las cuatro cadenas del deploy sobre `url`, en subprocesos y sin variable del core.
+
+    La plantilla "armada" tiene que ser una instancia **migrada**, como la deja el deploy, y no solo lo que crea
+    `create_app()` (`create_all`, que no deja ninguna tabla de version). El restore de un backup
+    (`POST /api/config/restore`) vuelve a correr las cuatro cadenas contra el backup restaurado: sobre una base sin
+    versiones, `libragenda-migrar` muere con `relation "resources" already exists`. Hasta que la suite pasó a una
+    sola base eso no se veia: `libragenda-migrar` y `alembic` leen `DATABASE_URL`, que en el CI apunta a un SQLite
+    y en una corrida local a la base original, o sea que migraban *otra* base y solo `libracore-migrar` (por la
+    variable del core) tocaba la restaurada."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parent.parent
+    entorno = {k: v for k, v in os.environ.items() if not k.startswith("GESTIOLIBRA_LIBRACORE_")}
+    entorno.update(DATABASE_URL=url, GESTIOLIBRA_DATABASE_URL=url)
+    for comando in _CADENAS_DEL_DEPLOY:
+        r = subprocess.run([str(Path(sys.executable).parent / comando[0]), *comando[1:]], env=entorno, cwd=raiz,
+                           capture_output=True, text=True, timeout=300)
+        assert r.returncode == 0, f"{' '.join(comando)}: {(r.stderr or r.stdout)[-2000:]}"
+
+
 def _armar_app(url: str) -> None:
     """Deja la base como la deja `create_app()`: es lo que contiene la plantilla "armada".
 
@@ -70,6 +103,7 @@ def _armar_app(url: str) -> None:
             mp.delenv(nombre, raising=False)
         mp.setattr(config_manager, "CONFIG_PATH", f"{carpeta}/config.json")
         mp.setattr(config_manager, "LOGO_DIR", f"{carpeta}/logos")
+        _migrar_como_el_deploy(url)
         app = create_app(url)
         app.state.auth_engine.dispose()
     finally:
@@ -93,6 +127,13 @@ def _dev_env(request, monkeypatch, tmp_path):
     for nombre in _VARIABLES_DEL_CORE:
         monkeypatch.delenv(nombre, raising=False)
     destino_libracore(tmp_path / "gestiolibra_libracore.db", _armar_app if usa_admin_client else None)
+    # 🔴 Y `DATABASE_URL` apuntada a la base de este worker, como en una instancia real (donde ES la base del
+    # dominio). Con una sola base ya no hay variable del core, y el restore de un backup corre las cuatro cadenas en
+    # subprocesos con el entorno del proceso (`libracore.respaldo_postgres.correr_migraciones`): `libracore-migrar` y
+    # `libraauth-migrar` caen a la base del dominio, y `libragenda-migrar` y `alembic` la leen de `DATABASE_URL`. El job
+    # del CI define `DATABASE_URL=sqlite:///...ci.db`; sin esto el restore migraba ese archivo (`unable to open
+    # database file`) o, peor, migraba SQLite en vez de la base restaurada y el test pasaba sin probar nada.
+    monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
     # SessionAuth's SECRET_KEY resolution and the admin bootstrap both
     # fail closed unless ENV=development -- see app/auth.py and
     # app/services/users.py::ensure_default_admin.
