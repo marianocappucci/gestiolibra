@@ -3,7 +3,7 @@
 // wiki/analyses/auditoria-duplicacion-familia-libra.md).
 import { createLayout, type NavSection } from 'libra-ui/Layout'
 import { ICONOS } from 'libra-ui/iconos-identidad'
-import { RUTA_COLA_DEL_NODO, TITULO_COLA } from 'libra-ui/cola-del-nodo'
+import { TITULO_COLA } from 'libra-ui/cola-del-nodo'
 import { useConexionDelNodo } from 'libra-ui/nodo-offline'
 import { useAuth } from '@/context/AuthContext'
 import { WORDMARK } from '@/branding'
@@ -82,9 +82,9 @@ export const Layout = createLayout<Usuario>({
   barraDeEstado: true,
   getUserSubtitle: (u) => (u as { empresa_nombre?: string }).empresa_nombre,
   // El cartel «Sin conexión» arriba del contenido, sólo en un nodo y sólo sin conexión (libra-ui ADR-077/ADR-094).
-  // 🔑 `ruta` es la de la cola y no la `/api/nodo/conexion` de siempre: este producto no monta esa (es del punto de venta de
-  // ContaLibra y RestoLibra), y la cola contesta lo mismo que el cartel lee (`es_nodo`, `en_linea`, `node_id`). `limite=1` porque
-  // acá sólo importa la cabecera. Fuera de un nodo contesta `es_nodo: false`, el cartel deja de consultar y no se dibuja nada.
-  conexionDelNodo: { ruta: `${RUTA_COLA_DEL_NODO}?limite=1`, texto: TEXTO_CARTEL_SIN_CONEXION },
+  // La ruta es la del kit (`GET /api/nodo/conexion`), que este producto monta con `build_conexion_del_nodo_router` de libracore
+  // (ADR-084). Hasta entonces preguntaba a la cola (`/api/nodo/cola?limite=1`) y traía una lista de pedidos que no usaba. Fuera de
+  // un nodo contesta `es_nodo: false`, el cartel deja de consultar y no se dibuja nada.
+  conexionDelNodo: { texto: TEXTO_CARTEL_SIN_CONEXION },
   useAuth: useAuthConNodo,
 })

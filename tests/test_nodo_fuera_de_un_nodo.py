@@ -74,6 +74,7 @@ def test_el_catalogo_y_la_configuracion_se_escriben_en_la_web(admin_client):
     assert c.post("/branches", json={"id": "b1", "name": "Sucursal"}).status_code == 201
     assert c.put("/config/arca", json={"empresa": "negocio", "cuit": "20111222339", "punto_venta": 3}).status_code == 200
     assert c.get("/api/nodo/cola").json()["es_nodo"] is False
+    assert c.get("/api/nodo/conexion").json() == {"es_nodo": False, "en_linea": True, "node_id": None, "a_facturar": 0}
     assert c.get("/api/nodo/turnos-a-revisar").json() == []
 
 
