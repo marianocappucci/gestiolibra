@@ -158,7 +158,7 @@ def url_libracore() -> str:
     ubicacion de las tablas de auth (`usuarios`, `alembic_version_libraauth`), que desde el
     ADR-035 estan en la base del dominio. Devuelve la forma `postgresql://` de psycopg.
 
-    La forma de DOS bases (la demo, hasta que se una) la miden `tests/test_una_sola_base.py` con
+    La forma de DOS bases (ya no la tiene ninguna instancia desde el 2026-10-25; el código la tolera) la miden `tests/test_una_sola_base.py` con
     una base propia y descartable: no es la forma de la suite.
     """
     return _url_cruda(_PG.url)

@@ -19,8 +19,8 @@ from app.main import create_app
 
 #: Las dos formas del nombre de la variable que le diria a la app y al motor "LibraCore esta en OTRA
 #: base". La suite es de una sola base (ADR-035): ningun test arranca con ellas puestas, ni siquiera
-#: si quien corre la suite las tiene en su entorno. Los tests de la forma de dos bases (la demo,
-#: hasta que se una) las ponen ellos, a mano, con una base propia.
+#: si quien corre la suite las tiene en su entorno. Los tests de la forma de dos bases (tolerada,
+#: ya sin instancias así) las ponen ellos, a mano, con una base propia.
 _VARIABLES_DEL_CORE = ("GESTIOLIBRA_LIBRACORE_DATABASE_URL", "GESTIOLIBRA_LIBRACORE_DB_PATH")
 
 
@@ -49,7 +49,7 @@ def _sin_almacen_de_secretos_colgado():
 #: Las cuatro cadenas del deploy, en el orden de `scripts/panel_admin.py` (lo ata `test_migraciones_en_el_deploy.py`).
 _CADENAS_DEL_DEPLOY = (
     ("libragenda-migrar", "upgrade"),
-    ("libraauth-migrar", "upgrade", "--prefijo", "gestiolibra", "--base", "core"),
+    ("libraauth-migrar", "upgrade", "--prefijo", "gestiolibra", "--base", "dominio"),
     ("libracore-migrar", "upgrade", "--prefijo", "gestiolibra"),
     ("alembic", "upgrade", "head"),
 )
