@@ -3,9 +3,9 @@
 🔑 **Una sola base es el destino** (ADR-034, decisión del humano del 2026-10-21, igual que
 LibraClub ADR-020): `usuarios` y `auth_log` son las de `libraauth` y el motor las comparte, y
 para que la caja y la factura se escriban junto con el turno tienen que estar en la misma base.
-Hoy las dos instancias que existen (`gestiolibra-dev` y `gestiolibra-demo`) todavía llevan dos,
-`gestiolibra` y `gestiolibra_core`, y se unen con `libracore-unir-bases` en otro paso. Hasta
-entonces el código anda con las dos formas:
+`gestiolibra-dev` ya está unida (ADR-035) y todo alta nueva nace con una; `gestiolibra-demo` todavía lleva
+dos, `gestiolibra` y `gestiolibra_core`, y se une con `libracore-unir-bases` en otro paso. Hasta entonces el
+código anda con las dos formas:
 
 - **Sin `GESTIOLIBRA_LIBRACORE_DATABASE_URL`** (ni su nombre histórico
   `GESTIOLIBRA_LIBRACORE_DB_PATH`), o con la **misma base** que la del dominio: LibraCore vive

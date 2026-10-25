@@ -13,9 +13,15 @@ _time.tzset()
 import pytest
 from fastapi.testclient import TestClient
 from libraauth import session_auth as _session_auth
-from motor_de_test import destino_libracore, fresh_database_url, url_libracore
+from motor_de_test import TEST_DATABASE_URL, destino_libracore, fresh_database_url, url_libracore
 
 from app.main import create_app
+
+#: Las dos formas del nombre de la variable que le diria a la app y al motor "LibraCore esta en OTRA
+#: base". La suite es de una sola base (ADR-035): ningun test arranca con ellas puestas, ni siquiera
+#: si quien corre la suite las tiene en su entorno. Los tests de la forma de dos bases (la demo,
+#: hasta que se una) las ponen ellos, a mano, con una base propia.
+_VARIABLES_DEL_CORE = ("GESTIOLIBRA_LIBRACORE_DATABASE_URL", "GESTIOLIBRA_LIBRACORE_DB_PATH")
 
 
 @pytest.fixture(autouse=True)
@@ -40,14 +46,47 @@ def _sin_almacen_de_secretos_colgado():
     config_manager.usar_almacen_de_secretos(None)
 
 
-def _armar_app(url_dominio: str, url_core: str) -> None:
-    """Deja las dos bases como las deja `create_app()`: es lo que contienen las plantillas "armada".
+#: Las cuatro cadenas del deploy, en el orden de `scripts/panel_admin.py` (lo ata `test_migraciones_en_el_deploy.py`).
+_CADENAS_DEL_DEPLOY = (
+    ("libragenda-migrar", "upgrade"),
+    ("libraauth-migrar", "upgrade", "--prefijo", "gestiolibra", "--base", "core"),
+    ("libracore-migrar", "upgrade", "--prefijo", "gestiolibra"),
+    ("alembic", "upgrade", "head"),
+)
 
-    Se corre una vez por worker y por base (ver `motor_de_test.py`), con el mismo
-    entorno que `_dev_env` le pone a cada test, y no deja nada vivo: ni el pool del
-    engine de auth, ni el de LibraGenda, ni el almacen de secretos, ni la ruta de
-    `libracore.db.core` apuntando a una plantilla (una escritura posterior caeria
-    ahi y la copia dejaria de ser la que se restaura).
+
+def _migrar_como_el_deploy(url: str) -> None:
+    """Corre las cuatro cadenas del deploy sobre `url`, en subprocesos y sin variable del core.
+
+    La plantilla "armada" tiene que ser una instancia **migrada**, como la deja el deploy, y no solo lo que crea
+    `create_app()` (`create_all`, que no deja ninguna tabla de version). El restore de un backup
+    (`POST /api/config/restore`) vuelve a correr las cuatro cadenas contra el backup restaurado: sobre una base sin
+    versiones, `libragenda-migrar` muere con `relation "resources" already exists`. Hasta que la suite pasó a una
+    sola base eso no se veia: `libragenda-migrar` y `alembic` leen `DATABASE_URL`, que en el CI apunta a un SQLite
+    y en una corrida local a la base original, o sea que migraban *otra* base y solo `libracore-migrar` (por la
+    variable del core) tocaba la restaurada."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parent.parent
+    entorno = {k: v for k, v in os.environ.items() if not k.startswith("GESTIOLIBRA_LIBRACORE_")}
+    entorno.update(DATABASE_URL=url, GESTIOLIBRA_DATABASE_URL=url)
+    for comando in _CADENAS_DEL_DEPLOY:
+        r = subprocess.run([str(Path(sys.executable).parent / comando[0]), *comando[1:]], env=entorno, cwd=raiz,
+                           capture_output=True, text=True, timeout=300)
+        assert r.returncode == 0, f"{' '.join(comando)}: {(r.stderr or r.stdout)[-2000:]}"
+
+
+def _armar_app(url: str) -> None:
+    """Deja la base como la deja `create_app()`: es lo que contiene la plantilla "armada".
+
+    Se corre una vez por worker (ver `motor_de_test.py`), con el mismo entorno que `_dev_env`
+    le pone a cada test, sobre una base que ya tiene la cadena de auth, y no deja nada vivo: ni el
+    pool del engine de auth, ni el de LibraGenda, ni el almacen de secretos, ni la ruta de
+    `libracore.db.core` apuntando a una plantilla (una escritura posterior caeria ahi y la copia
+    dejaria de ser la que se restaura).
     """
     import shutil
     import tempfile
@@ -59,10 +98,13 @@ def _armar_app(url_dominio: str, url_core: str) -> None:
     mp = pytest.MonkeyPatch()
     try:
         mp.setenv("ENV", "development")
-        mp.setenv("GESTIOLIBRA_LIBRACORE_DB_PATH", url_core)
+        # Una sola base (ADR-035): ninguna variable del core, como en dev unida y en un alta nueva.
+        for nombre in _VARIABLES_DEL_CORE:
+            mp.delenv(nombre, raising=False)
         mp.setattr(config_manager, "CONFIG_PATH", f"{carpeta}/config.json")
         mp.setattr(config_manager, "LOGO_DIR", f"{carpeta}/logos")
-        app = create_app(url_dominio)
+        _migrar_como_el_deploy(url)
+        app = create_app(url)
         app.state.auth_engine.dispose()
     finally:
         mp.undo()
@@ -76,28 +118,26 @@ def _armar_app(url_dominio: str, url_core: str) -> None:
 
 @pytest.fixture(autouse=True)
 def _dev_env(request, monkeypatch, tmp_path):
-    # La base de LibraCore se restaura UNA VEZ POR TEST de una plantilla (ver
+    # La base (UNA sola, ADR-035) se restaura UNA VEZ POR TEST de una plantilla (ver
     # `motor_de_test.py`): la ARMADA para los tests que usan `admin_client`
     # (`staff_client` lo arrastra en `fixturenames`), la VACIA (solo auth) para el
     # resto, que arma su app o prueba el arranque y las migraciones desde cero.
     usa_admin_client = "admin_client" in request.fixturenames
-    base_de_libracore = destino_libracore(
-        tmp_path / "gestiolibra_libracore.db", _armar_app if usa_admin_client else None
-    )
+    # Sin variable del core: ni la vigente ni la historica, aunque este en el entorno de quien corre.
+    for nombre in _VARIABLES_DEL_CORE:
+        monkeypatch.delenv(nombre, raising=False)
+    destino_libracore(tmp_path / "gestiolibra_libracore.db", _armar_app if usa_admin_client else None)
+    # 🔴 Y `DATABASE_URL` apuntada a la base de este worker, como en una instancia real (donde ES la base del
+    # dominio). Con una sola base ya no hay variable del core, y el restore de un backup corre las cuatro cadenas en
+    # subprocesos con el entorno del proceso (`libracore.respaldo_postgres.correr_migraciones`): `libracore-migrar` y
+    # `libraauth-migrar` caen a la base del dominio, y `libragenda-migrar` y `alembic` la leen de `DATABASE_URL`. El job
+    # del CI define `DATABASE_URL=sqlite:///...ci.db`; sin esto el restore migraba ese archivo (`unable to open
+    # database file`) o, peor, migraba SQLite en vez de la base restaurada y el test pasaba sin probar nada.
+    monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
     # SessionAuth's SECRET_KEY resolution and the admin bootstrap both
     # fail closed unless ENV=development -- see app/auth.py and
     # app/services/users.py::ensure_default_admin.
     monkeypatch.setenv("ENV", "development")
-    # libracore.db is raw sqlite3 (a fresh connection per call, unlike
-    # SQLAlchemy's pooled engine) -- ":memory:" would give every call an
-    # empty, unrelated database. A real temp file per test is required.
-    #
-    # 🔴 Y contra PostgreSQL va al MISMO destino que el dominio. Hasta el
-    # 2026-08-10 esta linea daba un archivo SQLite temporal aunque el resto de
-    # la corrida fuera a PostgreSQL: la mitad cruda del producto -- las ~340
-    # consultas de LibraCore -- nunca se ejercitaba contra el motor nuevo, y el
-    # verde de la suite no decia nada sobre ella.
-    monkeypatch.setenv("GESTIOLIBRA_LIBRACORE_DB_PATH", base_de_libracore)
     # `libracore.config_manager` resuelve sus rutas AL IMPORTARSE, desde
     # DATA_DIR o -- si no esta -- el cwd, que corriendo pytest es la raiz del
     # repo. Setear la variable de entorno aca ya llega tarde, por eso se
@@ -159,7 +199,8 @@ def admin_client():
     confirmed and the real cause (WSL2 clock jumps) has nothing to do with
     threading or connection pooling.
     """
-    with https_client(create_app(fresh_database_url(_armar_app))) as client:
+    # La plantilla armada ya la restauro la fixture autouse (`_dev_env`): `fresh_database_url()` no la repite.
+    with https_client(create_app(fresh_database_url())) as client:
         response = client.post("/auth/login", json={"username": "admin", "password": "admin"})
         assert response.status_code == 200, response.text
         try:
