@@ -7,8 +7,7 @@ para que la caja y la factura se escriban junto con el turno tienen que estar en
 alta nueva nace con una: ya no queda ninguna instancia de dos bases (`gestiolibra` y `gestiolibra_core`). El código
 sigue tolerando las dos formas, pero el camino normal es una:
 
-- **Sin `GESTIOLIBRA_LIBRACORE_DATABASE_URL`** (ni su nombre histórico
-  `GESTIOLIBRA_LIBRACORE_DB_PATH`), o con la **misma base** que la del dominio: LibraCore vive
+- **Sin `GESTIOLIBRA_LIBRACORE_DATABASE_URL`**, o con la **misma base** que la del dominio: LibraCore vive
   en la base del dominio. Es la forma de una instancia unida y la de un alta nueva.
 - **Con otra base**: la de LibraCore es esa. Era la forma de dev y demo hasta que se unieron; ya no la tiene ninguna instancia.
 

@@ -42,6 +42,7 @@ from libracore.db.core import get_connection as lc_get_connection
 from libracore.docs_api import cerrar_docs_de_la_api
 from libracore.errores import instalar_registro_de_errores
 from libracore.estado_del_sistema import build_estado_del_sistema_router
+from libracore.nodo_conexion_router import build_conexion_del_nodo_router
 from libracore.nodo_offline import SinConexion, SoloEnElCentral
 from libracore.resguardo_enlace import build_resguardo_enlace_router
 from libracore.respaldo import Instancia
@@ -470,6 +471,12 @@ def create_app(database_url: str) -> FastAPI:
         # de un nodo contesta `es_nodo: false` y no hace nada.
         app.include_router(
             build_cola_del_nodo_router(cola=offline.cola(), usuario_actual=get_current_user, resolver_con=require_admin)
+        )
+        # `GET /api/nodo/conexion` (libracore ADR-084): lo que el cartel «Sin conexión» de libra-ui lee (`es_nodo`, `en_linea`,
+        # `node_id`). Este producto no tiene punto de venta, así que no monta el router de las ventas; cualquier usuario de la
+        # instancia, porque la pantalla lo pregunta al cargar la sesión. Antes preguntaba a la cola (`/api/nodo/cola?limite=1`).
+        app.include_router(
+            build_conexion_del_nodo_router(conexion=offline.CONEXION, usuario_actual=get_current_user)
         )
     # Los turnos que se atendieron sin conexión y en la web cambiaron (libra-ui ADR-095). Las dos puntas la leen.
     app.include_router(nodo_router.router, dependencies=[Depends(require_staff)])

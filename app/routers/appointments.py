@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from libracore.cola_arca_respuesta import cuerpo_en_cola
 from libracore.db import facturas as db_facturas
 from libragenda import (
     AppointmentConflict,
@@ -267,9 +268,10 @@ def _atender_en_el_nodo(sessions, appointment_id: str, estado: AppointmentStatus
     respuesta["factura_en_cola"] = pedido
     respuesta["mensaje"] = atencion_nodo.mensaje_del_pedido(pedido)
     respuesta["comprobante_no_fiscal"] = f"/appointments/{appointment_id}/comprobante-no-fiscal"
-    # La forma del 202 `en_cola` que reconoce el kit (`esRespuestaEnCola`, libra-ui ADR-094): la pantalla muestra el aviso «Se
-    # emite al volver la conexión» en vez de dar la factura por emitida.
-    respuesta.update(en_cola=True, estado=pedido["estado"], pedido_id=pedido["id"], motivo=pedido.get("ultimo_error") or "")
+    # La forma única del «en cola» (libracore ADR-084), la que reconoce el kit (`esRespuestaEnCola`, libra-ui ADR-094): la
+    # pantalla muestra el aviso «Se emite al volver la conexión» en vez de dar la factura por emitida. El turno ya se atendió:
+    # se contesta 200 y el pedido en cola es una parte de la respuesta (el kit decide por el cuerpo, no por el código).
+    respuesta.update(cuerpo_en_cola(pedido, mensaje=respuesta["mensaje"]))
     return respuesta
 
 

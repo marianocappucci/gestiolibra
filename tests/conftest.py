@@ -17,11 +17,11 @@ from motor_de_test import TEST_DATABASE_URL, destino_libracore, fresh_database_u
 
 from app.main import create_app
 
-#: Las dos formas del nombre de la variable que le diria a la app y al motor "LibraCore esta en OTRA
-#: base". La suite es de una sola base (ADR-035): ningun test arranca con ellas puestas, ni siquiera
-#: si quien corre la suite las tiene en su entorno. Los tests de la forma de dos bases (tolerada,
-#: ya sin instancias así) las ponen ellos, a mano, con una base propia.
-_VARIABLES_DEL_CORE = ("GESTIOLIBRA_LIBRACORE_DATABASE_URL", "GESTIOLIBRA_LIBRACORE_DB_PATH")
+#: La variable que le diria a la app y al motor "LibraCore esta en OTRA base". La suite es de una sola
+#: base (ADR-035): ningun test arranca con ella puesta, ni siquiera si quien corre la suite la tiene en
+#: su entorno. Los tests de la forma de dos bases (tolerada, ya sin instancias así) la ponen ellos, a
+#: mano, con una base propia.
+_VARIABLES_DEL_CORE = ("GESTIOLIBRA_LIBRACORE_DATABASE_URL",)
 
 
 @pytest.fixture(autouse=True)
@@ -123,7 +123,7 @@ def _dev_env(request, monkeypatch, tmp_path):
     # (`staff_client` lo arrastra en `fixturenames`), la VACIA (solo auth) para el
     # resto, que arma su app o prueba el arranque y las migraciones desde cero.
     usa_admin_client = "admin_client" in request.fixturenames
-    # Sin variable del core: ni la vigente ni la historica, aunque este en el entorno de quien corre.
+    # Sin variable del core, aunque este en el entorno de quien corre.
     for nombre in _VARIABLES_DEL_CORE:
         monkeypatch.delenv(nombre, raising=False)
     destino_libracore(tmp_path / "gestiolibra_libracore.db", _armar_app if usa_admin_client else None)
