@@ -88,9 +88,14 @@ log "seed listo desde origin/develop ($(wc -l < "$SEED_LOCAL") lineas)"
 # esa, una vez.
 URL_DOMINIO=$(docker exec "$CONTENEDOR" printenv DATABASE_URL 2>/dev/null || true)
 # 🔑 La base de LibraCore: la variable del core (el nombre vigente o el historico) si hay una OTRA base y,
-# si no, la del dominio (ADR-034: una sola base). `Config` de la app hace lo mismo (`app/config.py`). A esta
-# altura el contenedor ya contesto `printenv DATABASE_URL`, asi que una variable ausente es "no esta
+# si no, la del dominio (ADR-034 y ADR-035: una sola base). `Config` de la app hace lo mismo (`app/config.py`). A
+# esta altura el contenedor ya contesto `printenv DATABASE_URL`, asi que una variable ausente es "no esta
 # definida" y no "no pude entrar".
+#
+# 🔴 Esto LEE el entorno del contenedor, no lo define, y se queda a proposito: la demo todavia tiene dos bases
+# (hasta que se una con `libracore-unir-bases`) y sin esta lectura el reset recrearia el dominio y dejaria el core
+# (usuarios, codigos de acceso, caja) con los datos de ayer, sin avisar. Con una sola base la variable no existe y
+# `URL_CORE` es `URL_DOMINIO`. Se simplifica cuando no quede ninguna instancia de dos bases.
 URL_CORE=$(docker exec "$CONTENEDOR" printenv GESTIOLIBRA_LIBRACORE_DATABASE_URL 2>/dev/null || true)
 [ -n "$URL_CORE" ] || URL_CORE=$(docker exec "$CONTENEDOR" printenv GESTIOLIBRA_LIBRACORE_DB_PATH 2>/dev/null || true)
 [ -n "$URL_CORE" ] || URL_CORE=$URL_DOMINIO

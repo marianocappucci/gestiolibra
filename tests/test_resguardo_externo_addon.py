@@ -161,8 +161,8 @@ def test_el_backoffice_prende_el_addon_y_la_app_lo_ve(admin_client):
         "import json; from app.database import get_modulos; print(json.dumps(get_modulos()))"
     ))
     assert leido[ADDON] is True
-    # Control: el shim leyó la tabla del DOMINIO. La de `gestiolibra_core`
-    # existe pero está vacía, así que ahí no habría ningún módulo de plan.
+    # Control: el shim leyó `gestiolibra_modulos`, la tabla del producto. La `modulos` del motor
+    # (misma base, ADR-035) existe pero está vacía, así que ahí no habría ningún módulo de plan.
     assert leido["facturacion"] is True
 
     _como_el_backoffice(f"from app.database import set_addon; set_addon({ADDON!r}, False)")
@@ -170,7 +170,7 @@ def test_el_backoffice_prende_el_addon_y_la_app_lo_ve(admin_client):
 
 
 def test_dentro_de_la_app_el_shim_lee_los_modulos_del_dominio_y_no_toca_libracore(admin_client, monkeypatch):
-    """Con la app armada, `libracore.db.core` apunta a la base de LibraCore (`gestiolibra_core`, otra base).
+    """Con la app armada, `libracore.db.core` apunta a la base de LibraCore (la misma que la del dominio, ADR-035).
 
     Desde ADR-034 el shim no usa `libracore.db.core` --abre su propio engine contra la base del
     dominio--, asi que ya no hace falta negarse en un proceso donde el core lo configuro otro: lee

@@ -7,9 +7,10 @@ era exclusivamente por CLI.
 El mecanismo es de `libracore` y tiene sus propios tests ahí. Lo que se prueba
 acá es lo que sólo este producto puede verificar:
 
-1. 🔴 Que el backup traiga **las dos bases**. `usuarios` vive en la de
-   LibraCore, separada de la del dominio: un backup de una sola no se puede
-   restaurar, y **no falla** — da un ZIP que se descarga y pesa poco.
+1. 🔴 Que el backup traiga **la base**, una sola desde el ADR-035: `usuarios`, LibraCore
+   y el dominio viven juntos. (Con dos bases, la forma de la demo hasta que se una, un
+   backup de una sola no se puede restaurar, y **no falla** — da un ZIP que se descarga y
+   pesa poco; esa forma la mide `tests/test_una_sola_base.py`.) Y que no la lleve dos veces.
 2. Que después de restaurar la app sirva los datos nuevos.
 3. Que todo sea admin-only.
 """
@@ -82,9 +83,13 @@ def _cliente(client, nombre="Ana Pérez"):
     return r.json()
 
 
-# ── 🔴 Las dos bases ──────────────────────────────────────────────────────
+# ── 🔴 La base (una sola, ADR-035) ───────────────────────────────────────
 
-def test_el_backup_trae_las_dos_bases(admin_client):
+def test_el_backup_trae_la_base_una_sola_vez(admin_client):
+    """Una sola base (el dominio, auth y LibraCore juntos): el ZIP lleva UN dump, con usuarios y facturación adentro.
+
+    Con la forma de dos bases (la demo, hasta que se una) lleva dos: lo mide `tests/test_una_sola_base.py`
+    (`_instancia_a_respaldar`). Volcar la misma base dos veces es el error que esto vigila."""
     _cliente(admin_client)
 
     r = admin_client.get("/api/config/backup-ahora")
@@ -93,12 +98,8 @@ def test_el_backup_trae_las_dos_bases(admin_client):
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         bases = sorted(n for n in z.namelist() if n.startswith("bases/"))
 
-    assert len(bases) == 2, f"esperaba dos bases, vinieron {bases}"
-    # "core" y no "libracore" porque el nombre depende del motor: en SQLite es
-    # el archivo `gestiolibra_libracore.db` y en PostgreSQL el dump de la base
-    # `gestiolibra_core`. Lo que se prueba es que la mitad de usuarios y
-    # facturación esté, no cómo se llama el archivo.
-    assert any("core" in b for b in bases), f"falta la base de usuarios: {bases}"
+    assert len(bases) == 1, f"esperaba una sola base, vinieron {bases}"
+    assert not any("core" in b for b in bases), f"no hay base de LibraCore aparte: {bases}"
 
 
 def test_el_backup_trae_el_logo(admin_client):

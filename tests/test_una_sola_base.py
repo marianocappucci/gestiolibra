@@ -1,10 +1,11 @@
-"""La base de LibraCore: la propia o, si no hay, la del dominio (ADR-034).
+"""La base de LibraCore: la propia o, si no hay, la del dominio (ADR-034 y ADR-035).
 
 GestioLibra llevaba dos bases (`gestiolibra` y `gestiolibra_core`) porque LibraCore y LibraGenda declaraban las dos una
 tabla `clients` con `id` de tipos incompatibles. Con LibraGenda v0.14.0 la suya es `agenda_clients` y la `modulos` de este
 producto es `gestiolibra_modulos`: ya no hay nombre repetido y el código anda con **una base o con dos** (igual que
-LibraClub, ADR-020). Dev y demo siguen con dos hasta que `libracore-unir-bases` las una; después, sin la variable del
-core, la app queda en una.
+LibraClub, ADR-020). **Una sola es la forma de la suite y de todo alta nueva** (ADR-035); dev ya está unida. La demo sigue
+con dos hasta que `libracore-unir-bases` la una, así que la forma de dos bases se sigue midiendo, con una base propia y
+descartable.
 
 Lo que se ata:
 
@@ -12,9 +13,13 @@ Lo que se ata:
    del dominio TAL CUAL; con otra base, esa; las dos variables (la vigente y la histórica).
 2. **La app arranca y anda con una sola base**: auth, LibraGenda y LibraCore en la misma base, y no vuelca la base dos veces
    al respaldar.
-3. Con dos bases (la forma de hoy) el respaldo lleva las dos y la app usa la del core para `usuarios`.
+3. **Con dos bases (la demo hoy)** el respaldo lleva las dos y la app usa la del core para `usuarios`.
+4. **Una base nueva sin `GESTIOLIBRA_LIBRACORE_*`** migra con las cuatro cadenas del deploy, en su orden, y las tablas de
+   auth quedan en la del dominio (`tests/test_cadena_de_una_sola_base.py` mide la cadena entera).
 """
 from __future__ import annotations
+
+import contextlib
 
 import psycopg
 from libracore.db import caja as db_caja
@@ -79,13 +84,10 @@ def test_el_nombre_vigente_le_gana_al_historico():
 # ── 2. La app anda con una sola base ─────────────────────────────────────────
 
 def _app_con_una_sola_base(monkeypatch):
-    """El dominio con la cadena de auth puesta y SIN variable del core: todo en la misma base."""
-    from libraauth.testing import crear_schema_de_auth
-
+    """La base de la suite (auth ya migrada, que deja la fixture autouse) y SIN variable del core: todo en la misma base."""
     monkeypatch.delenv("GESTIOLIBRA_LIBRACORE_DB_PATH", raising=False)
     monkeypatch.delenv("GESTIOLIBRA_LIBRACORE_DATABASE_URL", raising=False)
     url = fresh_database_url()
-    crear_schema_de_auth(_cruda(url))
     return url, create_app(url)
 
 
@@ -128,18 +130,66 @@ def test_con_una_sola_base_el_respaldo_no_vuelca_la_misma_base_dos_veces(monkeyp
         app.state.auth_engine.dispose()
 
 
-# ── 3. Con dos bases (la forma de dev y demo hoy) ────────────────────────────
+# ── 3. Con dos bases (la forma de la demo hasta que se una) ─────────────────
 
-def test_con_dos_bases_el_respaldo_lleva_las_dos():
-    dominio, core = fresh_database_url(), url_libracore()
-    assert not misma_base(dominio, core)
-    instancia = _instancia_a_respaldar(dominio, core, directorios=[])
-    assert instancia.postgres_url == dominio
-    assert instancia.postgres_extra == [core]
+@contextlib.contextmanager
+def _core_aparte(monkeypatch):
+    """Una base de LibraCore PROPIA y descartable, con la cadena de auth, y la variable del core apuntada a ella.
+
+    La suite es de una sola base (ADR-035); esta es la forma de la demo, que todavía tiene dos. Se crea en el mismo
+    servidor, con un nombre único por proceso, y se borra al salir (`FORCE`: la app deja su pool vivo)."""
+    import uuid
+    from urllib.parse import urlsplit, urlunsplit
+
+    from libraauth.testing import crear_schema_de_auth
+    from psycopg import sql
+
+    dominio = _cruda(fresh_database_url())
+    nombre = f"gestiolibra_core_{uuid.uuid4().hex[:10]}"
+    with psycopg.connect(dominio, autocommit=True) as c:
+        c.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(nombre)))
+    partes = urlsplit(dominio)
+    core = urlunsplit(partes._replace(path=f"/{nombre}"))
+    try:
+        crear_schema_de_auth(core)
+        monkeypatch.setenv("GESTIOLIBRA_LIBRACORE_DATABASE_URL", core)
+        yield core
+    finally:
+        monkeypatch.delenv("GESTIOLIBRA_LIBRACORE_DATABASE_URL", raising=False)
+        from libracore.db import core as libracore_core
+
+        libracore_core.configure(url_libracore())
+        with psycopg.connect(dominio, autocommit=True) as c:
+            c.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(nombre)))
 
 
-def test_con_dos_bases_la_app_pone_auth_y_libracore_en_la_del_core(admin_client):
-    """La forma de hoy no cambió: `usuarios` está en `gestiolibra_core`, no en el dominio."""
-    dominio = admin_client.app.state.auth_engine.url.render_as_string(hide_password=False)
-    assert misma_base(dominio, url_libracore())
-    assert not misma_base(dominio, fresh_database_url())
+def test_con_dos_bases_el_respaldo_lleva_las_dos(monkeypatch):
+    dominio = fresh_database_url()
+    with _core_aparte(monkeypatch) as core:
+        assert not misma_base(dominio, core)
+        instancia = _instancia_a_respaldar(dominio, core, directorios=[])
+        assert instancia.postgres_url == dominio
+        assert instancia.postgres_extra == [core]
+
+
+def test_con_dos_bases_la_app_pone_auth_y_libracore_en_la_del_core(monkeypatch):
+    """La forma de la demo no cambió: `usuarios` está en la base del core, no en la del dominio."""
+    from conftest import https_client
+
+    with _core_aparte(monkeypatch) as core:
+        url = fresh_database_url()
+        app = create_app(url)
+        try:
+            with https_client(app) as client:
+                r = client.post("/auth/login", json={"username": "admin", "password": "admin"})
+                assert r.status_code == 200, r.text
+            dominio_del_motor = app.state.auth_engine.url.render_as_string(hide_password=False)
+            assert misma_base(dominio_del_motor, core)
+            assert not misma_base(dominio_del_motor, url)
+            with psycopg.connect(core) as c:
+                assert c.execute("SELECT count(*) FROM usuarios WHERE role = 'admin'").fetchone()[0] == 1
+                assert c.execute("SELECT count(*) FROM cajas").fetchone()[0] >= 1  # LibraCore armó su schema acá
+            with psycopg.connect(_cruda(url)) as c:
+                assert c.execute("SELECT count(*) FROM gestiolibra_modulos").fetchone()[0] > 0  # el dominio, el suyo
+        finally:
+            app.state.auth_engine.dispose()

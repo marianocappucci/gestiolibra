@@ -46,7 +46,14 @@ configure(
     # bajar y restaurar solo. Sin el flag, el `tar.gz` empaqueta `data/` mientras
     # el dump de PostgreSQL queda **afuera**.
     backup_zip=True,
-    base_core_separada=True,
+    # 🔑 UNA sola base (ADR-035, sobre el ADR-034 y el ADR-083 de libracore): ya no se pasa
+    # `base_core_separada=True` --el motor lo ignora para los productos de `_UNA_SOLA_BASE`, entre
+    # ellos este-- y el alta nace con `gestiolibra` y nada más, sin `gestiolibra_core`. Lo único que
+    # el motor no puede adivinar es cómo se llama la tabla de módulos de este producto en esa base:
+    # la `modulos` a secas es la del motor (ADR-034, punto 3), la de acá es `gestiolibra_modulos`.
+    # Va en `nuevo_cliente.py` Y en `panel_admin.py`: `configure()` pisa una configuración global
+    # y el que corre último gana. Cuando este producto lea la `modulos` del motor, se saca.
+    tabla_modulos="gestiolibra_modulos",
     product_name="GESTIOLIBRA",
     image_name="gestiolibra:latest",
     container_prefix="gestiolibra",
@@ -81,15 +88,17 @@ configure(
     # LibraCore crea SU `clients` (id entero): al reves, las dos pisarian el nombre. Despues
     # va libraauth, despues libracore y la propia al final (sus FK apuntan a `agenda_clients`
     # y a `branches`). Lo ata `tests/test_migraciones_en_el_deploy.py`.
-    # 🔴 **TRES cadenas, y el orden no es decorativo.**
+    # 🔴 **CUATRO cadenas, y el orden no es decorativo.**
     #
     # 1. `libragenda-migrar` — va primero porque las revisiones propias de este
     #    producto tienen FK contra tablas de LibraGenda.
-    # 2. `libracore-migrar` — el esquema de LibraCore vive en `gestiolibra_core`,
-    #    una base **aparte**: el comando la resuelve por `GESTIOLIBRA_LIBRACORE_DB_PATH` y **no**
-    #    por `DATABASE_URL`, que apunta al dominio. Ver
+    # 2. `libraauth-migrar` — las seis tablas de auth. `--base core`, **a propósito, y no
+    #    `--base dominio`** (ver abajo).
+    # 3. `libracore-migrar` — el esquema de LibraCore. Con una sola base (ADR-035) no hay
+    #    `GESTIOLIBRA_LIBRACORE_DATABASE_URL` y el comando cae a la base del dominio, porque
+    #    `gestiolibra` figura en `_UNA_SOLA_BASE` desde libracore v1.194.0 (ADR-083). Ver
     #    `libracore.migrar.url_de_core`.
-    # 3. `alembic` — la cadena propia.
+    # 4. `alembic` — la cadena propia.
     #
     # La del motor no la corría nadie hasta el 2026-08-25: sus migraciones no
     # viajaban en el wheel. Medido, `gestiolibra_core` de la demo no tiene
@@ -97,7 +106,12 @@ configure(
     # `0002` le agrega a `clients`.
     migraciones=(
         ("libragenda-migrar", "upgrade"),
-        # libraauth: sus seis tablas viven en la base de LibraCore (medido 2026-09-16), por eso --base core.
+        # 🔴 `--base core` y NO `--base dominio`, medido el 2026-10-25. Con `--base core` el comando usa la base
+        # del core si la instancia todavía tiene la variable (la demo, hasta que se una) y, si no, cae a la del
+        # dominio (dev unida y todo alta nueva). Con `--base dominio` migraría SIEMPRE la del dominio: en una
+        # instancia que aún tiene dos bases crea ahí las ocho tablas de auth, vacías, al lado de las reales, y
+        # `libracore-unir-bases verificar` corta después con `auth_en_los_dos`. Es el mismo destino en una base
+        # única; cambiarlo a `dominio` es un PR aparte, cuando no quede ninguna instancia de dos bases.
         ("libraauth-migrar", "upgrade", "--prefijo", "gestiolibra", "--base", "core"),
         ("libracore-migrar", "upgrade", "--prefijo", "gestiolibra"),
         ("alembic", "upgrade", "head"),
