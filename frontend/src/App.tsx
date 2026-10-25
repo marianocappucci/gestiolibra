@@ -11,6 +11,7 @@ import { Usuarios } from './pages/Usuarios'
 import { Logs } from './pages/Logs'
 import { Configuracion } from './pages/Configuracion'
 import { Senas } from './pages/Senas'
+import { Cola } from './pages/Cola'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -51,6 +52,15 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Senas />
+          </ProtectedRoute>
+        }
+      />
+      {/* La cola de ARCA del nodo (libra-ui ADR-094). El menú la ofrece sólo en un nodo; fuera de uno la pantalla lo dice. */}
+      <Route
+        path="/cola"
+        element={
+          <ProtectedRoute>
+            <Cola />
           </ProtectedRoute>
         }
       />
