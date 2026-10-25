@@ -164,9 +164,7 @@ def test_la_agenda_del_nodo_muestra_la_atencion_encima_del_espejo(escenario):
 
 def test_el_comprobante_no_fiscal_lleva_la_leyenda_y_lo_que_se_cobro(escenario, monkeypatch):
     e = escenario
-    from libracore import ticket_generator
-
-    from libracore import config_manager
+    from libracore import config_manager, ticket_generator
 
     # En la PC, los datos de empresa del encabezado los escribe el instalador en el `config.json` del nodo (la carga
     # de `libraedge-central nodo registrar`, `CLAVES_DEL_EMISOR`, ADR-017 de LibraEdge): acá se siembran igual.
