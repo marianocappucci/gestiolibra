@@ -38,7 +38,7 @@ def test_la_lista_trae_las_atenciones_que_chocaron_con_la_web(admin_client):
     # Los nombres de `AtencionAplicada` de LibraGenda, que es lo que espera `TurnosARevisar` del kit.
     assert fila["appointment_id"] == turno and fila["estado"] == "completed" and fila["actor"] == "Ana"
     assert fila["motivo"] == "cancelado" and fila["resultado"] == "a_revisar" and fila["estado_despues"] == "cancelled"
-    assert fila["revisada_at"] is None and fila["at"].startswith("2026-10-25T10:40")
+    assert fila["revisada_at"] is None and datetime.fromisoformat(fila["at"]) == datetime(2026, 10, 25, 10, 40, tzinfo=UTC)
     # Y de qué turno se trata, para que la tarjeta no diga un uuid.
     assert (fila["cliente"], fila["servicio"]) == ("Ana", "Corte") and fila["starts_at"].startswith("2099-01-01")
 
@@ -69,7 +69,7 @@ def test_ya_lo_revise_saca_el_turno_de_la_lista_y_no_cambia_el_turno(admin_clien
     assert agenda[0]["status"] == "cancelled" and agenda[0]["a_revisar"] is False
     # Marcar de nuevo no pisa quién lo revisó la primera vez.
     otra = c.post("/api/nodo/turnos-a-revisar/revisar", json={"atenciones": ["a" * 36]})
-    assert otra.status_code == 200 and otra.json()[0]["revisada_at"] == r.json()[0]["revisada_at"]
+    assert otra.status_code == 200 and datetime.fromisoformat(otra.json()[0]["revisada_at"]) == datetime.fromisoformat(r.json()[0]["revisada_at"])
 
 
 def test_un_turno_que_ya_no_existe_sale_en_la_lista_sin_nombres(admin_client):
