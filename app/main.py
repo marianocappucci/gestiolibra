@@ -172,7 +172,7 @@ def _instancia_a_respaldar(database_url: str, libracore_db_path: str,
     """Que se lleva el backup, segun el motor de cada mitad.
 
     Con **una sola base** (ADR-034: `libracore_db_path` ES `database_url`) se lleva esa, una vez.
-    Lo que sigue vale para la forma de dos bases, que es la de dev y demo hasta que se unan.
+    Lo que sigue vale para la forma de dos bases, que ya no tiene ninguna instancia (dev y demo se unieron el 2026-10-25) pero el código tolera.
 
     🔴 **Las dos mitades o ninguna.** El dominio y LibraCore son dos bases
     separadas -- dos archivos en SQLite, dos bases PostgreSQL despues del corte,
@@ -266,12 +266,17 @@ def create_app(database_url: str) -> FastAPI:
             f"sqlite:///{libracore_db_path}", connect_args={"check_same_thread": False}
         )
     # 🔴 Las tablas de auth las crea la cadena de LibraAuth (`libraauth-migrar
-    # upgrade --prefijo gestiolibra --base core`, declarada en `scripts/panel_admin.py`),
+    # upgrade --prefijo gestiolibra --base dominio`, declarada en `scripts/panel_admin.py`),
     # no el arranque. Desde libraauth v0.45.0 (2026-09-17) el arranque la EXIGE: si
     # no corrió, la app no levanta y el error dice el comando. Hasta ese día acá
     # había un `AuthBase.metadata.create_all(auth_engine)` que tapaba cualquier
     # camino que se olvidara de migrar.
-    exigir_schema_al_dia(auth_engine, prefijo="gestiolibra", base="core")
+    # `--base` del comando que dice el error: `dominio` con una sola base (la forma de todo el mundo desde el
+    # 2026-10-25, ADR-037) y `core` sólo si alguien todavía declara la variable del core con OTRA base.
+    exigir_schema_al_dia(
+        auth_engine, prefijo="gestiolibra",
+        base="dominio" if misma_base(database_url, str(libracore_db_path)) else "core",
+    )
     auth_sessions = sessionmaker(bind=auth_engine)
 
     # 🔴 Los secretos de terceros de `config.json` -- el access token y la
@@ -345,7 +350,7 @@ def create_app(database_url: str) -> FastAPI:
     # Atender un turno en un nodo (`turno.atendido`, ADR-036) se enchufa al outbox. Fuera de un nodo no hace nada.
     offline.configurar_atenciones()
     # Un nodo es de UNA sola base (ADR-035): el dominio y LibraCore son la misma, y es donde LibraEdge crea sus tablas
-    # (`node_identity`, `sync_outbox`...). La demo, hasta que se una, lleva dos y no monta nada de lo del nodo.
+    # (`node_identity`, `sync_outbox`...). Con dos bases (ya no hay ninguna instancia así) no se monta nada de lo del nodo.
     una_base = misma_base(database_url, str(libracore_db_path))
 
     # 🔴 Colgado de la app para poder SOLTARLO. En produccion la app es una y

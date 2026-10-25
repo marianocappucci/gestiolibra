@@ -8,7 +8,7 @@ El mecanismo es de `libracore` y tiene sus propios tests ahí. Lo que se prueba
 acá es lo que sólo este producto puede verificar:
 
 1. 🔴 Que el backup traiga **la base**, una sola desde el ADR-035: `usuarios`, LibraCore
-   y el dominio viven juntos. (Con dos bases, la forma de la demo hasta que se una, un
+   y el dominio viven juntos. (Con dos bases, la forma que ya no tiene ninguna instancia pero el código tolera, un
    backup de una sola no se puede restaurar, y **no falla** — da un ZIP que se descarga y
    pesa poco; esa forma la mide `tests/test_una_sola_base.py`.) Y que no la lleve dos veces.
 2. Que después de restaurar la app sirva los datos nuevos.
@@ -88,7 +88,7 @@ def _cliente(client, nombre="Ana Pérez"):
 def test_el_backup_trae_la_base_una_sola_vez(admin_client):
     """Una sola base (el dominio, auth y LibraCore juntos): el ZIP lleva UN dump, con usuarios y facturación adentro.
 
-    Con la forma de dos bases (la demo, hasta que se una) lleva dos: lo mide `tests/test_una_sola_base.py`
+    Con la forma de dos bases (tolerada, ya sin instancias así) lleva dos: lo mide `tests/test_una_sola_base.py`
     (`_instancia_a_respaldar`). Volcar la misma base dos veces es el error que esto vigila."""
     _cliente(admin_client)
 

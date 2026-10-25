@@ -3,14 +3,14 @@
 🔑 **Una sola base es el destino** (ADR-034, decisión del humano del 2026-10-21, igual que
 LibraClub ADR-020): `usuarios` y `auth_log` son las de `libraauth` y el motor las comparte, y
 para que la caja y la factura se escriban junto con el turno tienen que estar en la misma base.
-`gestiolibra-dev` ya está unida (ADR-035) y todo alta nueva nace con una; `gestiolibra-demo` todavía lleva
-dos, `gestiolibra` y `gestiolibra_core`, y se une con `libracore-unir-bases` en otro paso. Hasta entonces el
-código anda con las dos formas:
+`gestiolibra-dev` y `gestiolibra-demo` se unieron el 2026-10-25 con `libracore-unir-bases` (ADR-035 y ADR-037) y todo
+alta nueva nace con una: ya no queda ninguna instancia de dos bases (`gestiolibra` y `gestiolibra_core`). El código
+sigue tolerando las dos formas, pero el camino normal es una:
 
 - **Sin `GESTIOLIBRA_LIBRACORE_DATABASE_URL`** (ni su nombre histórico
   `GESTIOLIBRA_LIBRACORE_DB_PATH`), o con la **misma base** que la del dominio: LibraCore vive
   en la base del dominio. Es la forma de una instancia unida y la de un alta nueva.
-- **Con otra base**: la de LibraCore es esa. Es la forma de dev y demo hasta que se unan.
+- **Con otra base**: la de LibraCore es esa. Era la forma de dev y demo hasta que se unieron; ya no la tiene ninguna instancia.
 
 Se resuelve en un solo lugar y devuelve **un solo valor**: si es la misma base, la URL del
 dominio tal cual. Quien necesita saber si son dos (el respaldo, que no puede volcar la misma base

@@ -3,9 +3,9 @@
 GestioLibra llevaba dos bases (`gestiolibra` y `gestiolibra_core`) porque LibraCore y LibraGenda declaraban las dos una
 tabla `clients` con `id` de tipos incompatibles. Con LibraGenda v0.14.0 la suya es `agenda_clients` y la `modulos` de este
 producto es `gestiolibra_modulos`: ya no hay nombre repetido y el código anda con **una base o con dos** (igual que
-LibraClub, ADR-020). **Una sola es la forma de la suite y de todo alta nueva** (ADR-035); dev ya está unida. La demo sigue
-con dos hasta que `libracore-unir-bases` la una, así que la forma de dos bases se sigue midiendo, con una base propia y
-descartable.
+LibraClub, ADR-020). **Una sola es la forma de la suite y de todo alta nueva** (ADR-035); dev y demo se unieron el
+2026-10-25 (ADR-037) y ya no queda ninguna instancia de dos bases, pero el código las tolera y esa forma se sigue midiendo, con
+una base propia y descartable.
 
 Lo que se ata:
 
@@ -13,7 +13,7 @@ Lo que se ata:
    del dominio TAL CUAL; con otra base, esa; las dos variables (la vigente y la histórica).
 2. **La app arranca y anda con una sola base**: auth, LibraGenda y LibraCore en la misma base, y no vuelca la base dos veces
    al respaldar.
-3. **Con dos bases (la demo hoy)** el respaldo lleva las dos y la app usa la del core para `usuarios`.
+3. **Con dos bases (tolerado, ya sin instancias así)** el respaldo lleva las dos y la app usa la del core para `usuarios`.
 4. **Una base nueva sin `GESTIOLIBRA_LIBRACORE_*`** migra con las cuatro cadenas del deploy, en su orden, y las tablas de
    auth quedan en la del dominio (`tests/test_cadena_de_una_sola_base.py` mide la cadena entera).
 """
@@ -130,14 +130,14 @@ def test_con_una_sola_base_el_respaldo_no_vuelca_la_misma_base_dos_veces(monkeyp
         app.state.auth_engine.dispose()
 
 
-# ── 3. Con dos bases (la forma de la demo hasta que se una) ─────────────────
+# ── 3. Con dos bases (tolerado: ya no lo tiene ninguna instancia) ─────────────────
 
 @contextlib.contextmanager
 def _core_aparte(monkeypatch):
     """Una base de LibraCore PROPIA y descartable, con la cadena de auth, y la variable del core apuntada a ella.
 
-    La suite es de una sola base (ADR-035); esta es la forma de la demo, que todavía tiene dos. Se crea en el mismo
-    servidor, con un nombre único por proceso, y se borra al salir (`FORCE`: la app deja su pool vivo)."""
+    La suite es de una sola base (ADR-035); esta es la forma que tenía la demo hasta el 2026-10-25 y que el código
+    sigue tolerando. Se crea en el mismo servidor, con un nombre único por proceso, y se borra al salir (`FORCE`: la app deja su pool vivo)."""
     import uuid
     from urllib.parse import urlsplit, urlunsplit
 
@@ -173,7 +173,7 @@ def test_con_dos_bases_el_respaldo_lleva_las_dos(monkeypatch):
 
 
 def test_con_dos_bases_la_app_pone_auth_y_libracore_en_la_del_core(monkeypatch):
-    """La forma de la demo no cambió: `usuarios` está en la base del core, no en la del dominio."""
+    """La forma de dos bases (la que tenía la demo) sigue andando: `usuarios` está en la base del core, no en la del dominio."""
     from conftest import https_client
 
     with _core_aparte(monkeypatch) as core:
