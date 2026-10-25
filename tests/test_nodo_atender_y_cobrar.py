@@ -166,6 +166,17 @@ def test_el_comprobante_no_fiscal_lleva_la_leyenda_y_lo_que_se_cobro(escenario, 
     e = escenario
     from libracore import ticket_generator
 
+    from libracore import config_manager
+
+    # En la PC, los datos de empresa del encabezado los escribe el instalador en el `config.json` del nodo (la carga
+    # de `libraedge-central nodo registrar`, `CLAVES_DEL_EMISOR`, ADR-017 de LibraEdge): acá se siembran igual.
+    config_manager.save({**config_manager.load(), "empresa_nombre": "Peluquería Ejemplo SRL",
+                         "empresa_cuit": "30999999006", "empresa_iva_condition": "Responsable Inscripto",
+                         "empresa_direccion": "Calle Falsa 123"})
+    encabezados = []
+    real_encabezado = ticket_generator._empresa_header
+    monkeypatch.setattr(ticket_generator, "_empresa_header",
+                        lambda pdf, cfg, logo: (encabezados.append(cfg), real_encabezado(pdf, cfg, logo))[1])
     visto = []
     real = ticket_generator.generar_ticket_venta
     monkeypatch.setattr(ticket_generator, "generar_ticket_venta", lambda venta: (visto.append(venta), real(venta))[1])
@@ -181,6 +192,9 @@ def test_el_comprobante_no_fiscal_lleva_la_leyenda_y_lo_que_se_cobro(escenario, 
     assert venta["total"] == 1000.0 and venta["cliente_nombre"] == "Ana Gómez" and venta["cliente_cuit"] == "27111111113"
     assert venta["items"] == [{"nombre": "Corte", "cantidad": 1, "precio_unitario": 1000.0}]
     assert {p["medio"]: p["monto"] for p in venta["pagos"]} == {"transferencia": 400.0, "efectivo": 600.0}
+    # El encabezado sale con la empresa del `config.json` de la PC, no vacío.
+    assert encabezados and encabezados[0]["empresa_nombre"] == "Peluquería Ejemplo SRL"
+    assert encabezados[0]["empresa_cuit"] == "30999999006"
     # Reimprimirlo da el mismo comprobante: sale de la foto del pedido, no de lo que valga hoy.
     assert e.cliente.get(f"/appointments/{turno}/comprobante-no-fiscal").status_code == 200
 
