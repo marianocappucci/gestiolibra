@@ -12,7 +12,8 @@ license = { text = "Proprietary" }
 dependencies = [
     # v0.11.0 -> v0.12.0 (2026-10-17): `crear_esquema` serializa el DDL de LibraGenda entre procesos (ADR-015 de libragenda), para `uvicorn --workers N`. Sin migracion.
     # v0.12.0 -> v0.13.0 (2026-10-18): `AppointmentConflict.resource_ids`, `reschedule(secondary_resource_ids=)` y candados en orden de id (ADR-016 de libragenda). Aditivo; este producto no usa recursos secundarios. Sin migracion.
-    "libragenda @ git+https://github.com/marianocappucci/libragenda.git@v0.13.0",
+    # v0.13.0 -> v0.14.0 (2026-10-25): `clients` pasa a `agenda_clients` y la tabla de versión es `alembic_version_libragenda` (ADR-017 y ADR-018 de libragenda). **Migración**: correr `libragenda-migrar upgrade` ANTES de arrancar la app con este pin (ADR-034 de este producto).
+    "libragenda @ git+https://github.com/marianocappucci/libragenda.git@v0.14.0",
     # libracore sigue proveyendo facturacion/caja/ARCA. El auth SALIO de aca el
     # 2026-07-30 y ahora lo da libraauth (ver app/auth.py y app/services/users.py).
     #

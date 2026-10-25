@@ -31,7 +31,7 @@ def test_aplicar_plan_en_db_basico(tmp_path):
     db_path = str(tmp_path / "test.db")
     con = sqlite3.connect(db_path)
     con.execute("""
-        CREATE TABLE modulos (
+        CREATE TABLE gestiolibra_modulos (
             modulo TEXT PRIMARY KEY, habilitado INTEGER NOT NULL, plan TEXT NOT NULL
         )
     """)
@@ -41,7 +41,7 @@ def test_aplicar_plan_en_db_basico(tmp_path):
     plans.aplicar_plan_en_db(db_path, "basico")
 
     con = sqlite3.connect(db_path)
-    rows = dict(con.execute("SELECT modulo, habilitado FROM modulos").fetchall())
+    rows = dict(con.execute("SELECT modulo, habilitado FROM gestiolibra_modulos").fetchall())
     con.close()
     assert rows == {"recordatorios": 0, "senas": 0, "facturacion": 0, "dashboard": 0}
 
@@ -50,7 +50,7 @@ def test_aplicar_plan_en_db_estandar(tmp_path):
     db_path = str(tmp_path / "test.db")
     con = sqlite3.connect(db_path)
     con.execute("""
-        CREATE TABLE modulos (
+        CREATE TABLE gestiolibra_modulos (
             modulo TEXT PRIMARY KEY, habilitado INTEGER NOT NULL, plan TEXT NOT NULL
         )
     """)
@@ -60,7 +60,7 @@ def test_aplicar_plan_en_db_estandar(tmp_path):
     plans.aplicar_plan_en_db(db_path, "estandar")
 
     con = sqlite3.connect(db_path)
-    rows = dict(con.execute("SELECT modulo, habilitado FROM modulos").fetchall())
+    rows = dict(con.execute("SELECT modulo, habilitado FROM gestiolibra_modulos").fetchall())
     con.close()
     assert rows == {"recordatorios": 1, "senas": 1, "facturacion": 0, "dashboard": 0}
 
@@ -69,7 +69,7 @@ def test_aplicar_plan_en_db_is_idempotent(tmp_path):
     db_path = str(tmp_path / "test.db")
     con = sqlite3.connect(db_path)
     con.execute("""
-        CREATE TABLE modulos (
+        CREATE TABLE gestiolibra_modulos (
             modulo TEXT PRIMARY KEY, habilitado INTEGER NOT NULL, plan TEXT NOT NULL
         )
     """)
@@ -80,7 +80,7 @@ def test_aplicar_plan_en_db_is_idempotent(tmp_path):
     plans.aplicar_plan_en_db(db_path, "basico")  # downgrade, sobre las mismas filas
 
     con = sqlite3.connect(db_path)
-    rows = dict(con.execute("SELECT modulo, habilitado FROM modulos").fetchall())
+    rows = dict(con.execute("SELECT modulo, habilitado FROM gestiolibra_modulos").fetchall())
     con.close()
     assert rows == {"recordatorios": 0, "senas": 0, "facturacion": 0, "dashboard": 0}
 
@@ -89,7 +89,7 @@ def test_aplicar_plan_en_db_rejects_unknown_plan(tmp_path):
     db_path = str(tmp_path / "test.db")
     con = sqlite3.connect(db_path)
     con.execute("""
-        CREATE TABLE modulos (
+        CREATE TABLE gestiolibra_modulos (
             modulo TEXT PRIMARY KEY, habilitado INTEGER NOT NULL, plan TEXT NOT NULL
         )
     """)

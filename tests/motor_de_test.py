@@ -201,6 +201,13 @@ def url_libracore() -> str:
 
     Dos bases en el mismo servidor es la traduccion fiel de los dos archivos, y
     es la topologia que va a necesitar tambien la instancia de produccion.
+
+    ⚠️ **Desde LibraGenda v0.14.0 (ADR-034) esto ya no es forzoso**: la tabla de
+    LibraGenda es `agenda_clients` y la `modulos` del producto es
+    `gestiolibra_modulos`, asi que no queda ningun nombre repetido y la app anda con
+    UNA base (`tests/test_una_sola_base.py` la arranca entera asi). La suite sigue
+    con dos porque es la forma de dev y demo hoy; se retira cuando se unan, como hizo
+    LibraClub.
     """
     return _url_cruda(_PG_CORE.url)
 

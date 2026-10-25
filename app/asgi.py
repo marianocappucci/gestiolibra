@@ -45,15 +45,11 @@ if DATA_DIR:
     database_url = url_de_instancia(
         "gestiolibra", default=f"sqlite:///{DATA_DIR}/gestiolibra.db"
     )
-    # Puente al nombre NORMALIZADO. Se resuelve primero -- asi un compose
-    # que todavia trae `GESTIOLIBRA_LIBRACORE_DB_PATH` gana sobre el default,
-    # que es de SQLite: al reves, la instancia migrada se conectaria a un
-    # archivo que no existe.
-    os.environ.setdefault(
-        "GESTIOLIBRA_LIBRACORE_DATABASE_URL",
-        url_de_instancia("gestiolibra", core=True,
-                         default=f"{DATA_DIR}/gestiolibra_libracore.db"),
-    )
+    # La base de LibraCore ya NO se puentea acá: `create_app()` la resuelve con
+    # `app.config.url_de_libracore` --la variable `GESTIOLIBRA_LIBRACORE_DATABASE_URL` (o su nombre
+    # histórico `..._DB_PATH`) si hay una OTRA base, y la del dominio si no (ADR-034)--. El default de
+    # antes (`{DATA_DIR}/gestiolibra_libracore.db`) era una ruta SQLite, que
+    # `services/billing.configure` rechaza desde el 2026-08-12.
     if os.environ.get("ADMIN_USER"):
         os.environ.setdefault("GESTIOLIBRA_ADMIN_USERNAME", os.environ["ADMIN_USER"])
     if os.environ.get("ADMIN_PASSWORD"):

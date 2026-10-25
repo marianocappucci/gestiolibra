@@ -8,68 +8,49 @@ contrato que Gestiolibra tiene que cumplir desde que declaró
 existía: sin él el `docker exec` muere con `ImportError`, y la lectura del
 backoffice lo muestra como "no se pudo leer".
 
-Delegan en `libracore.db.modulos`, que es donde vive la implementación única
-de la familia. Acá no se copia lógica: se cumple el contrato. Mismo patrón que
-`libradesk/app/database.py`, **con una diferencia que no es de estilo** — ver
-`_asegurar_core_configurado`.
+🔑 **Desde ADR-034 ya no delegan en `libracore.db.modulos`.** Hasta entonces la tabla del
+producto se llamaba `modulos`, igual que la del motor, y el shim la leía por esa coincidencia
+de nombre. Ahora la del producto es `gestiolibra_modulos` (la `modulos` es la de LibraCore:
+con una sola base por producto no pueden llamarse igual) y lo que decide el 403 de
+`require_module` es lo que lee `ModuleRepository`. Así que el contrato se cumple por el mismo
+repositorio que lee la app: un solo camino, y el add-on que prende el backoffice es el que la
+app ve. Cuando las filas pasen a la `modulos` del motor (ADR-034, punto 3) esto vuelve a
+delegar en `libracore.db.modulos`.
+
+No toca el estado global de `libracore.db.core`: antes lo apuntaba a la base del dominio y
+tenía que rechazar el proceso donde el core ya lo había configurado la app (que en este
+producto era OTRA base). Acá se abre un engine propio contra la base del dominio y se suelta.
 """
-
-#: Si fue ESTE módulo el que apuntó `libracore.db.core` a la base del dominio.
-#: Hace falta para distinguir "lo configuré yo en una llamada anterior" de "lo
-#: configuró otro", que en este producto significa otra base.
-_apuntado_por_este_modulo = False
+from contextlib import contextmanager
 
 
-def _asegurar_core_configurado() -> None:
-    """Apunta `libracore.db.core` a la base del DOMINIO de esta instancia.
+@contextmanager
+def _repositorio():
+    """Un `ModuleRepository` contra la base del DOMINIO de esta instancia; el engine se suelta al salir.
 
-    La tabla `modulos` que lee `ModuleRepository` —y por lo tanto la que
-    decide el 403 de `require_module`— vive en la base del dominio
-    (`url_de_instancia("gestiolibra")`, la base `gestiolibra`).
-
-    🔴 **Acá no alcanza con "si nadie lo configuró, lo configuro".** En
-    LibraDesk sí, porque la app configura el core contra su única base. En
-    Gestiolibra la app lo configura en `billing.configure(libracore_db_path)`
-    contra la base **de LibraCore** (`gestiolibra_core`), que es otra: tiene su
-    propia tabla `modulos`, vacía, que nadie consulta. Un shim que aceptara ese
-    core ya configurado leería `{}` y escribiría el add-on donde la app no lo
-    ve — el backoffice mostraría "prendido" y la pantalla seguiría en 403.
-
-    Así que hay dos casos, y el tercero se rechaza en voz alta:
-
-    - Bajo `docker exec python3 -c "from app.database import get_modulos"` no
-      corrió ningún arranque: el core está sin configurar y se apunta al
-      dominio. Es el caso del backoffice.
-    - Una segunda llamada en ese mismo proceso: ya lo apuntó este módulo.
-    - Un proceso donde el core lo configuró otro (la app viva, la suite): ahí
-      apunta a la base de LibraCore, y en vez de leer la tabla equivocada en
-      silencio se levanta `RuntimeError`. Pisar la configuración tampoco es
-      opción: le cambiaría la base a la facturación de una app viva.
+    Bajo `docker exec python3 -c "from app.database import get_modulos"` no corrió ningún
+    arranque, así que la URL sale del entorno (`url_de_instancia`), igual que en `asgi.py`.
     """
-    global _apuntado_por_este_modulo
-    from libracore.db import core as libracore_core
     from libracore.db.url_de_instancia import url_de_instancia
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
 
-    if _apuntado_por_este_modulo:
-        return
-    if libracore_core.esta_configurado():
-        raise RuntimeError(
-            "app.database de Gestiolibra se usa en un proceso nuevo (el `docker exec` "
-            "del backoffice): acá libracore.db.core ya está configurado, y en este "
-            "producto eso es la base de LibraCore, no la del dominio donde vive la "
-            "tabla `modulos` que decide los add-ons. Dentro de la app se usa "
-            "`app.state.modules`."
-        )
-    libracore_core.configure(url_de_instancia("gestiolibra", requerida=True))
-    _apuntado_por_este_modulo = True
+    from .services.modules import ModuleRepository
+
+    url = url_de_instancia("gestiolibra", requerida=True)
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    engine = create_engine(url)
+    try:
+        yield ModuleRepository(sessionmaker(bind=engine))
+    finally:
+        engine.dispose()
 
 
 def get_modulos() -> dict[str, bool]:
-    """`{modulo: habilitado}` de esta instancia. Ver `_asegurar_core_configurado`."""
-    _asegurar_core_configurado()
-    from libracore.db.modulos import get_modulos as _get_modulos
-
-    return _get_modulos()
+    """`{modulo: habilitado}` de esta instancia."""
+    with _repositorio() as modulos:
+        return modulos.get_all()
 
 
 def set_addon(nombre: str, habilitado: bool) -> None:
@@ -78,7 +59,5 @@ def set_addon(nombre: str, habilitado: bool) -> None:
     Efecto inmediato: `ModuleRepository.is_enabled` relee la fila en cada
     request. No valida que `nombre` sea un add-on: eso lo hace el backoffice
     contra `plans.ADDONS` antes de llamar."""
-    _asegurar_core_configurado()
-    from libracore.db.modulos import set_addon as _set_addon
-
-    _set_addon(nombre, habilitado)
+    with _repositorio() as modulos:
+        modulos.set_addon(nombre, habilitado)

@@ -169,11 +169,27 @@ def test_el_backoffice_prende_el_addon_y_la_app_lo_ve(admin_client):
     assert admin_client.get(RUTA).status_code == 403
 
 
-def test_dentro_de_la_app_el_shim_no_lee_la_base_de_libracore(admin_client):
-    """Con la app armada, `libracore.db.core` apunta a `gestiolibra_core`, no a
-    la base del dominio. El shim tiene que negarse en vez de leer esa tabla
-    `modulos` —vacía— y contestar `{}` como si fuera la verdad."""
-    from app.database import get_modulos
+def test_dentro_de_la_app_el_shim_lee_los_modulos_del_dominio_y_no_toca_libracore(admin_client, monkeypatch):
+    """Con la app armada, `libracore.db.core` apunta a la base de LibraCore (`gestiolibra_core`, otra base).
 
-    with pytest.raises(RuntimeError, match="base de LibraCore"):
-        get_modulos()
+    Desde ADR-034 el shim no usa `libracore.db.core` --abre su propio engine contra la base del
+    dominio--, asi que ya no hace falta negarse en un proceso donde el core lo configuro otro: lee
+    `gestiolibra_modulos` donde la app la lee, y deja el core como lo encontro. Antes lanzaba
+    `RuntimeError` para no contestar `{}` con la `modulos` vacia del core; ahora esa tabla ni se
+    consulta."""
+    from libracore.db import core as libracore_core
+
+    from app.database import get_modulos, set_addon
+
+    monkeypatch.setenv("GESTIOLIBRA_DATABASE_URL", TEST_DATABASE_URL)
+    core_antes = libracore_core._database_url
+
+    leido = get_modulos()
+    # Control: son las filas de la app (sembradas en el dominio), no las de la tabla vacia del core.
+    assert leido == admin_client.app.state.modules.get_all()
+    assert leido["facturacion"] is True
+
+    set_addon(ADDON, True)
+    assert admin_client.app.state.modules.is_enabled(ADDON) is True
+    assert admin_client.get(RUTA).status_code == 200
+    assert libracore_core._database_url == core_antes
