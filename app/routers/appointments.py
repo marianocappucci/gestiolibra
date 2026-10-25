@@ -1,10 +1,13 @@
 import asyncio
 from datetime import datetime
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from libracore.db import facturas as db_facturas
 from libragenda import (
     AppointmentConflict,
     AppointmentNotFound,
+    AppointmentStatus,
     AppointmentUnavailable,
     DepositStatus,
     InvalidTransition,
@@ -12,17 +15,23 @@ from libragenda import (
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.repositories import DepositRepository
 from pydantic import BaseModel
+from sqlalchemy.orm import Session, sessionmaker
 
 from .. import mensajes_agenda as mensajes
+from .. import offline
+from ..auth import get_current_user
 from ..dependencies import (
     get_appointment_service,
     get_catalog_repository,
     get_client_repository,
     get_deposit_repository,
     get_service_price_repository,
+    get_sessions,
 )
 from ..modules_gate import get_module_repository
+from ..services import atencion_nodo
 from ..services.appointments import AppointmentService, OutsideBusinessHours, ServiceNotFound
+from ..services.atencion_nodo import CobroDelTurno
 from ..services.billing import invoice_appointment
 from ..services.clients import ClientRepository
 from ..services.modules import ModuleRepository
@@ -51,7 +60,7 @@ class RescheduleRequest(BaseModel):
     reason: str | None = None
 
 
-@router.post("/appointments", status_code=201)
+@router.post("/appointments", status_code=201, dependencies=[Depends(offline.solo_en_el_central)])
 def create_appointment(
     data: AppointmentRequest,
     service: AppointmentService = Depends(get_appointment_service),
@@ -71,7 +80,7 @@ def create_appointment(
     return {"id": appointment.id, "status": appointment.status.value, "ends_at": appointment.ends_at}
 
 
-@router.post("/appointments/{appointment_id}/confirm")
+@router.post("/appointments/{appointment_id}/confirm", dependencies=[Depends(offline.solo_en_el_central)])
 def confirm_appointment(
     appointment_id: str,
     service: AppointmentService = Depends(get_appointment_service),
@@ -85,7 +94,7 @@ def confirm_appointment(
     return {"id": appointment.id, "status": appointment.status.value}
 
 
-@router.post("/appointments/{appointment_id}/cancel")
+@router.post("/appointments/{appointment_id}/cancel", dependencies=[Depends(offline.solo_en_el_central)])
 def cancel_appointment(
     appointment_id: str,
     data: CancelRequest = CancelRequest(),
@@ -100,7 +109,7 @@ def cancel_appointment(
     return {"id": appointment.id, "status": appointment.status.value, "reason": appointment.reason}
 
 
-@router.post("/appointments/{appointment_id}/reschedule")
+@router.post("/appointments/{appointment_id}/reschedule", dependencies=[Depends(offline.solo_en_el_central)])
 def reschedule_appointment(
     appointment_id: str,
     data: RescheduleRequest,
@@ -134,6 +143,8 @@ def complete_appointment(
     deposits: DepositRepository = Depends(get_deposit_repository),
     catalog: SqlAlchemyCatalogRepository = Depends(get_catalog_repository),
     modules: ModuleRepository = Depends(get_module_repository),
+    sessions: sessionmaker[Session] = Depends(get_sessions),
+    user: dict = Depends(get_current_user),
 ):
     """Completa el turno y, si hay un precio configurado para el servicio
     en la sucursal Y el plan incluye el módulo "facturacion", factura el
@@ -182,6 +193,14 @@ def complete_appointment(
         if balance > 0 and not data.medio_pago:
             raise HTTPException(422, f"medio_pago requerido para saldo de {balance}")
 
+    if offline.nodo() is not None:
+        cobro = None
+        if price_row is not None:
+            cobro = _cobro_del_turno(
+                catalog, current, price_row["price"], client, deposit, data.medio_pago)
+        return _atender_en_el_nodo(
+            sessions, appointment_id, AppointmentStatus.COMPLETED, user, cobro=cobro)
+
     try:
         appointment = service.complete(appointment_id)
     except AppointmentNotFound:
@@ -202,3 +221,89 @@ def complete_appointment(
         ))
 
     return {"id": appointment.id, "status": appointment.status.value, "factura": factura}
+
+
+# ── En un nodo: atender y cobrar sin conexión (ADR-036) ────────────────────────────────────────────────────────────────
+
+
+def _cobro_del_turno(catalog, turno, precio, cliente: dict, deposit, medio_pago: str | None) -> CobroDelTurno:
+    """Lo que se cobra: la misma cuenta de `billing.invoice_appointment` (el saldo es el precio menos la seña **pagada**),
+    con el cliente y el servicio tal como están hoy: la cola guarda esta foto."""
+    pagada = deposit is not None and deposit.status is DepositStatus.PAID
+    sena = Decimal(deposit.amount) if pagada else Decimal(0)
+    servicio = catalog.get_service(turno.service_id)
+    return CobroDelTurno(
+        precio=Decimal(precio), sena=sena, sena_medio_pago=deposit.medio_pago if pagada else None,
+        saldo=Decimal(precio) - sena, saldo_medio_pago=medio_pago,
+        cliente={**cliente, "id": turno.client_id}, servicio=servicio.name if servicio else turno.service_id,
+    )
+
+
+def _atender_en_el_nodo(sessions, appointment_id: str, estado: AppointmentStatus, user: dict, *,
+                        cobro: CobroDelTurno | None = None) -> dict:
+    """Lo que contesta el nodo al atender un turno: el nuevo estado y, si se cobró, cómo quedó la factura.
+
+    - Con conexión, la factura se intenta en el acto (`factura`): el cliente se lleva la de siempre.
+    - Sin conexión, o si se corta, queda en la cola (`factura_en_cola`) y sale sola al volver; el cliente se lleva el
+      **comprobante no fiscal** (`comprobante_no_fiscal`: la ruta del PDF).
+    """
+    actor = user.get("name") or user.get("username")
+    try:
+        pedido = atencion_nodo.atender(sessions, appointment_id, estado, actor=actor, cobro=cobro)
+    except AppointmentNotFound:
+        raise HTTPException(404, mensajes.POR_NOMBRE["AppointmentNotFound"][1])
+    except InvalidTransition as exc:
+        raise HTTPException(*mensajes.describir(exc))
+    respuesta: dict = {
+        "id": appointment_id, "status": estado.value, "factura": None, "atendido_sin_conexion": True,
+        "factura_en_cola": None, "comprobante_no_fiscal": None, "mensaje": None,
+    }
+    if pedido is None:
+        return respuesta
+    pedido = atencion_nodo.emitir_si_hay_conexion(pedido, usuario_id=user.get("id"))
+    if pedido["estado"] == "emitido":
+        respuesta["factura"] = db_facturas.get_factura(int(pedido["resultado"]["factura_id"]))
+        return respuesta
+    respuesta["factura_en_cola"] = pedido
+    respuesta["mensaje"] = atencion_nodo.mensaje_del_pedido(pedido)
+    respuesta["comprobante_no_fiscal"] = f"/appointments/{appointment_id}/comprobante-no-fiscal"
+    # La forma del 202 `en_cola` que reconoce el kit (`esRespuestaEnCola`, libra-ui ADR-094): la pantalla muestra el aviso «Se
+    # emite al volver la conexión» en vez de dar la factura por emitida.
+    respuesta.update(en_cola=True, estado=pedido["estado"], pedido_id=pedido["id"], motivo=pedido.get("ultimo_error") or "")
+    return respuesta
+
+
+@router.post("/appointments/{appointment_id}/start")
+def start_appointment(
+    appointment_id: str, sessions: sessionmaker[Session] = Depends(get_sessions),
+    user: dict = Depends(get_current_user),
+):
+    """Marca el turno «en curso». **Sólo en un nodo** (ADR-036): en la web el turno se completa directamente. Es la
+    atención del mostrador sin conexión, que sube sola al volver (`turno.atendido`)."""
+    offline.exigir_nodo(offline.MENSAJE_SOLO_EN_EL_NODO_START)
+    return _atender_en_el_nodo(sessions, appointment_id, AppointmentStatus.IN_PROGRESS, user)
+
+
+@router.post("/appointments/{appointment_id}/no-show")
+def no_show_appointment(
+    appointment_id: str, sessions: sessionmaker[Session] = Depends(get_sessions),
+    user: dict = Depends(get_current_user),
+):
+    """Marca que el cliente «no vino». **Sólo en un nodo** (ADR-036), por lo mismo que `start`."""
+    offline.exigir_nodo(offline.MENSAJE_SOLO_EN_EL_NODO_NO_SHOW)
+    return _atender_en_el_nodo(sessions, appointment_id, AppointmentStatus.NO_SHOW, user)
+
+
+@router.get("/appointments/{appointment_id}/comprobante-no-fiscal")
+def comprobante_no_fiscal(appointment_id: str):
+    """El comprobante que se lleva el cliente cuando se cobró sin conexión y la factura todavía no salió: un PDF «no válido
+    como factura» con la leyenda «La factura se emite al volver la conexión». Se puede reimprimir. 404 si el turno no se
+    cobró en este equipo, 409 si la factura ya salió."""
+    try:
+        pdf = atencion_nodo.comprobante_no_fiscal(appointment_id)
+    except atencion_nodo.SinComprobanteNoFiscal as exc:
+        raise HTTPException(404, str(exc))
+    except atencion_nodo.YaFacturado as exc:
+        raise HTTPException(409, {"codigo": "ya_facturado", "mensaje": str(exc)})
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="comprobante-no-fiscal-{appointment_id[:8]}.pdf"'})

@@ -19,6 +19,11 @@
  *  `components/agenda/sena-del-turno.tsx`; la lista de todas las señas es la
  *  pantalla `/senas`.
  *
+ *  **En el equipo del local sin conexión (un nodo de LibraEdge, ADR-036)** la agenda es de sólo consulta: no hay «Nuevo turno», ni
+ *  confirmar, reprogramar o cancelar; sí «En curso», «No vino» y «Completar» (que cobra y deja la factura en cola, y le da al
+ *  cliente un comprobante no fiscal). Los turnos atendidos así llevan su etiqueta («Atendido sin conexión», «A revisar») y la lista
+ *  «Turnos a revisar» (libra-ui ADR-095) aparece arriba cuando hay alguno. En la web nada de esto cambia.
+ *
  *  `esAdmin` llega por prop desde `App.tsx` y no con `useAuth()` acá adentro:
  *  el hook de libra-ui tira fuera del `AuthProvider`, y los tests de la agenda
  *  la montan sola. Sólo decide qué botones se muestran — el permiso real lo
@@ -41,13 +46,19 @@ import { useSearchParams } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { Plus } from 'lucide-react'
+import { ExternalLink, Plus } from 'lucide-react'
 import { TituloPantalla } from 'libra-ui/titulo-pantalla'
 import { ICONOS } from 'libra-ui/iconos-identidad'
 import { EncabezadoDePantalla } from 'libra-ui/acciones'
 import { SelectBuscable } from 'libra-ui/SelectBuscable'
 import { SelectCliente } from 'libra-ui/SelectCliente'
 import { BadgeEstado, type TonoEstado } from 'libra-ui/badge-estado'
+import { AvisoEnCola } from 'libra-ui/AvisosDeLaCola'
+import { useAvisoDeEnCola } from 'libra-ui/cola-del-nodo'
+import { EtiquetasDeTurnoDelNodo } from 'libra-ui/EtiquetasDeTurno'
+import { useConexionDelNodo } from 'libra-ui/nodo-offline'
+import { TurnosARevisar } from 'libra-ui/TurnosARevisar'
+import type { AtencionARevisar, TurnoARevisar } from 'libra-ui/turnos-del-nodo'
 import {
   LABEL_VISTA, NavegadorCalendario, ReferenciaDeColores, VISTAS, VistaMes,
   VistaSemana, clasePunto, diaDeLaUrl, hoyLocal, rangoDeVista, vistaDeLaUrl,
@@ -113,6 +124,13 @@ function horaDePared(local: string): string {
   return `${local.slice(8, 10)}-${local.slice(5, 7)} ${local.slice(11, 16)}`
 }
 
+/** Una fila de `GET /api/nodo/turnos-a-revisar`: lo que espera el kit, más de qué turno se trata (`app/routers/nodo.py`). */
+type AtencionConTurno = AtencionARevisar & {
+  cliente?: string | null
+  servicio?: string | null
+  starts_at?: string | null
+}
+
 const turnoSchema = z.object({
   resource_id: z.string().min(1, 'Elegí un recurso'),
   service_id: z.string().min(1, 'Elegí un servicio'),
@@ -145,6 +163,12 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
   const [completando, setCompletando] = useState(false)
   const [factura, setFactura] = useState<Factura | null>(null)
   const [reprogramando, setReprogramando] = useState<TurnoConRecurso | null>(null)
+  // En un nodo (lo sabe el cartel del layout, que consulta; acá sólo se lee): la agenda es de consulta y se atiende sin conexión.
+  const { esNodo } = useConexionDelNodo()
+  // La factura que quedó en la cola al cobrar sin conexión, y el comprobante no fiscal que se lleva el cliente mientras tanto.
+  const { aviso, registrar, cerrar: cerrarAviso } = useAvisoDeEnCola()
+  const [comprobante, setComprobante] = useState<string | null>(null)
+  const [porRevisar, setPorRevisar] = useState<AtencionConTurno[]>([])
 
   const vista = vistaDeLaUrl(params.get('vista'))
   // `hoyLocal()` en cada render y no en un `useState`: si alguien deja la
@@ -173,6 +197,17 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
     }).catch((err) => setErrorCatalogo(describirError(err)))
       .finally(() => setCatalogoCargado(true))
   }, [])
+
+  // La lista «Turnos a revisar»: la atención sin conexión que en la web chocó con un cambio. Un fallo no tumba la agenda.
+  const cargarPorRevisar = useCallback(async () => {
+    try {
+      const filas = await api.get<AtencionConTurno[]>('/api/nodo/turnos-a-revisar')
+      setPorRevisar(Array.isArray(filas) ? filas : [])
+    } catch {
+      setPorRevisar([])
+    }
+  }, [])
+  useEffect(() => { void cargarPorRevisar() }, [cargarPorRevisar])
 
   // Sólo los activos: un recurso dado de baja no se agenda, y sus turnos viejos
   // en la grilla serían ruido permanente.
@@ -262,6 +297,9 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
       setPidiendoMedioPago(null)
       setMedioPago('')
       if (respuesta.factura) setFactura(respuesta.factura)
+      // Sin conexión la factura queda en la cola (202 `en_cola`): se avisa «Se emite al volver la conexión» y se ofrece el
+      // comprobante no fiscal, que es lo que el cliente se lleva. No se da por emitida una factura que no existe.
+      else if (registrar(respuesta)) setComprobante(respuesta.comprobante_no_fiscal ?? null)
       await recargar()
       cerrarTurno()
     } catch (err) {
@@ -277,6 +315,24 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
     } finally {
       setCompletando(false)
     }
+  }
+
+  /** «En curso» y «No vino»: atención del mostrador sin conexión, sin cobro (`POST /appointments/{id}/start` y `/no-show`). */
+  const atender = (t: TurnoConRecurso, que: 'start' | 'no-show') =>
+    accion(() => api.post(`/appointments/${t.id}/${que}`))
+
+  /** La tarjeta de la lista «a revisar» dice «Ana Gómez · Corte» y la fecha, no un uuid. */
+  const describirTurnoARevisar = useCallback((t: TurnoARevisar) => {
+    const ultima = t.ultima as AtencionConTurno
+    const quien = [ultima.cliente, ultima.servicio].filter(Boolean).join(' · ')
+    const cuando = ultima.starts_at ? ` — ${ultima.starts_at.slice(8, 10)}-${ultima.starts_at.slice(5, 7)}-${ultima.starts_at.slice(0, 4)}` : ''
+    return quien ? `${quien}${cuando}` : `Turno ${t.turnoId.slice(0, 8)}`
+  }, [])
+
+  async function marcarRevisado(t: TurnoARevisar) {
+    await api.post('/api/nodo/turnos-a-revisar/revisar', { atenciones: t.atenciones.map((a) => a.atencion_id) })
+    await cargarPorRevisar()
+    await recargar()
   }
 
   async function crear(values: TurnoFormValues) {
@@ -326,8 +382,9 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
           <div>
             <TituloPantalla icono={ICONOS.agenda}>Agenda</TituloPantalla>
             <p className="text-sm text-muted-foreground">
-              Qué tiene cada recurso y dónde queda lugar. Entrá a un turno para
-              confirmarlo, reprogramarlo, cancelarlo, completarlo o pedirle una seña.
+              {esNodo
+                ? 'Qué tiene cada recurso. Sin conexión la agenda es de consulta: entrá a un turno para atenderlo y cobrarlo.'
+                : 'Qué tiene cada recurso y dónde queda lugar. Entrá a un turno para confirmarlo, reprogramarlo, cancelarlo, completarlo o pedirle una seña.'}
             </p>
           </div>
         }
@@ -346,11 +403,25 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
               placeholder="Buscar recurso…"
             />
           </div>
-          <Button onClick={abrirAlta} disabled={activos.length === 0}>
-            <Plus />Nuevo turno
-          </Button>
+          {!esNodo && (
+            <Button onClick={abrirAlta} disabled={activos.length === 0}>
+              <Plus />Nuevo turno
+            </Button>
+          )}
         </div>
       </EncabezadoDePantalla>
+
+      {/* ── Turnos a revisar ───────────────────────────────────────────── */}
+      {porRevisar.length > 0 && (
+        <Card><CardContent className="py-4">
+          <TurnosARevisar
+            atenciones={porRevisar}
+            describirTurno={describirTurnoARevisar}
+            // «Ya lo revisé» es del central: en la PC del local la lista se ve y la revisión es de la web.
+            onMarcarRevisado={esNodo ? undefined : marcarRevisado}
+          />
+        </CardContent></Card>
+      )}
 
       <NavegadorCalendario vista={vista} dia={dia} hoy={hoy} href={href}>
         {/* Las pestañas de shadcn, como en Configuración: la vista la manda la
@@ -519,16 +590,24 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
               ))}
               <div className="flex items-center justify-between gap-4">
                 <span className="text-muted-foreground">Estado</span>
-                <BadgeEstado tono={STATUS_TONO[turno.status]}>
-                  {STATUS_LABELS[turno.status]}
-                </BadgeEstado>
+                <span className="flex flex-wrap items-center justify-end gap-1.5">
+                  <BadgeEstado tono={STATUS_TONO[turno.status]}>
+                    {STATUS_LABELS[turno.status]}
+                  </BadgeEstado>
+                  <EtiquetasDeTurnoDelNodo
+                    atendidoSinConexion={turno.atendido_sin_conexion}
+                    aRevisar={turno.a_revisar}
+                    motivo={turno.motivo}
+                  />
+                </span>
               </div>
-              <SenaDelTurno turno={turno} esAdmin={esAdmin} medios={mediosPago} />
+              <SenaDelTurno turno={turno} esAdmin={esAdmin} medios={mediosPago} soloLectura={esNodo} />
               {errorAccion && <p className="text-sm text-destructive">{errorAccion}</p>}
             </div>
           )}
           <DialogFooter>
-            {turno?.status === 'pending' && (
+            {/* Sin conexión la agenda es de consulta: confirmar, reprogramar y cancelar son de la web (409 `solo_en_el_central`). */}
+            {!esNodo && turno?.status === 'pending' && (
               <Button
                 variant="outline"
                 onClick={() => accion(() => api.post(`/appointments/${turno.id}/confirm`))}
@@ -538,12 +617,12 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
             )}
             {/* Los mismos dos estados que admite el motor: un turno cancelado o
                 ya atendido no se mueve (`cannot reschedule ...` → 409). */}
-            {turno && (turno.status === 'pending' || turno.status === 'confirmed') && (
+            {!esNodo && turno && (turno.status === 'pending' || turno.status === 'confirmed') && (
               <Button variant="outline" onClick={() => setReprogramando(turno)}>
                 Reprogramar
               </Button>
             )}
-            {turno && (turno.status === 'pending' || turno.status === 'confirmed') && (
+            {!esNodo && turno && (turno.status === 'pending' || turno.status === 'confirmed') && (
               <Button
                 variant="outline"
                 className="text-destructive hover:text-destructive"
@@ -552,7 +631,14 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
                 Cancelar turno
               </Button>
             )}
-            {turno?.status === 'confirmed' && (
+            {/* Atender sin conexión (ADR-036): «En curso» y «No vino» sólo existen en el equipo del local. */}
+            {esNodo && turno?.status === 'confirmed' && (
+              <Button variant="outline" onClick={() => atender(turno, 'start')}>En curso</Button>
+            )}
+            {esNodo && turno?.status === 'confirmed' && (
+              <Button variant="outline" onClick={() => atender(turno, 'no-show')}>No vino</Button>
+            )}
+            {(turno?.status === 'confirmed' || (esNodo && turno?.status === 'in_progress')) && (
               <Button onClick={() => completar(turno)}>Completar</Button>
             )}
           </DialogFooter>
@@ -604,6 +690,32 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
             >
               {completando ? 'Completando…' : 'Completar'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Cobrado sin conexión: la factura queda en la cola ───────────── */}
+      <Dialog open={aviso !== null} onOpenChange={(abierto) => { if (!abierto) { cerrarAviso(); setComprobante(null) } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Turno cobrado sin conexión</DialogTitle>
+            <DialogDescription>
+              El cobro y la atención quedaron registrados en este equipo y suben solos cuando vuelva la conexión.
+            </DialogDescription>
+          </DialogHeader>
+          <AvisoEnCola aviso={aviso} />
+          <p className="text-sm text-muted-foreground">
+            La factura no se puede numerar sin ARCA: darle al cliente el comprobante no fiscal, que dice que la factura se emite al volver la conexión.
+          </p>
+          <DialogFooter>
+            {comprobante && (
+              <Button variant="outline" asChild>
+                <a href={comprobante} target="_blank" rel="noreferrer">
+                  <ExternalLink />Comprobante no fiscal
+                </a>
+              </Button>
+            )}
+            <Button onClick={() => { cerrarAviso(); setComprobante(null) }}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

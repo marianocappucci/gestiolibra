@@ -168,7 +168,8 @@ def test_una_instancia_de_antes_se_renombra_sin_perder_filas(base_limpia):
     assert "gestiolibra_modulos" not in _tablas()
     assert _clave_primaria("modulos") == "modulos_pkey"
 
-    command.upgrade(base_limpia, "head")
+    # Hasta la revisión que se mide (no `head`: las que vinieron después, como la `0010_libraedge`, no son de este ADR).
+    command.upgrade(base_limpia, NUEVA)
 
     tablas = _tablas()
     assert "modulos" not in tablas and "gestiolibra_modulos" in tablas
@@ -261,7 +262,7 @@ def test_el_downgrade_de_la_0005_borra_la_del_producto_y_nunca_la_del_motor(base
 
 
 def test_en_una_base_unida_el_downgrade_aborta_y_no_toca_la_modulos_del_motor(base_limpia):
-    _cadena_del_deploy(base_limpia)
+    _cadena_del_deploy(base_limpia, NUEVA)
     _sql("INSERT INTO modulos (modulo, habilitado, plan) VALUES ('del_motor', 1, 'estandar')")
 
     with pytest.raises(RuntimeError, match="ya existe una `modulos`"):

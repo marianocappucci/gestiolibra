@@ -3,9 +3,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
 
+from .. import offline
 from ..auth import require_admin
-from ..dependencies import get_client_repository
+from ..dependencies import get_client_repository, get_sessions
+from ..services import clientes_nodo
 from ..services.clients import ClientRepository
 
 router = APIRouter(prefix="/clients", tags=["clients"])
@@ -47,13 +50,26 @@ class ClientOut(BaseModel):
 @router.post("", status_code=201, response_model=ClientOut)
 def create_client(
     data: ClientCreate, clients: ClientRepository = Depends(get_client_repository),
+    sessions: sessionmaker[Session] = Depends(get_sessions),
 ):
     """`id` es opcional: a diferencia de sucursales/recursos/servicios
     (catálogo que arma un admin una vez, con slugs pensados a mano),
     clientes se dan de alta todo el tiempo durante la operación diaria
     -- pedirle a quien atiende que invente un id único para cada
     cliente nuevo es friccion real sin ningún beneficio. Sigue
-    aceptándose explícito para uso scripteado que ya lo pase."""
+    aceptándose explícito para uso scripteado que ya lo pase.
+
+    🔑 **En un nodo de LibraEdge el cliente nace con un id provisorio** (`"-N"`, ADR-036): el que pase `id` se ignora. El
+    central le asigna el definitivo al recibirlo (y si ya existía con ese CUIT, lo une a su ficha). Fuera de un nodo no
+    cambia nada."""
+    if offline.nodo() is not None:
+        try:
+            return clientes_nodo.alta_en_el_nodo(
+                sessions, nombre=data.name, telefono=data.phone, email=data.email, cuit=data.cuit,
+                condicion_iva=data.condicion_iva,
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
     client_id = data.id or str(uuid4())
     try:
         return clients.create(
@@ -84,6 +100,7 @@ def update_client(
     client_id: str, data: ClientUpdate,
     clients: ClientRepository = Depends(get_client_repository),
 ):
+    clientes_nodo.exigir_cliente_modificable(client_id)
     try:
         return clients.update(
             client_id, data.name, data.phone, data.email, data.active,
@@ -97,6 +114,7 @@ def update_client(
 
 @router.delete("/{client_id}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_client(client_id: str, clients: ClientRepository = Depends(get_client_repository)):
+    clientes_nodo.exigir_cliente_modificable(client_id)
     try:
         clients.delete(client_id)
     except KeyError:
