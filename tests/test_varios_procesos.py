@@ -1,11 +1,11 @@
 """El arranque con DOS workers de uvicorn de verdad (libracore ADR-044).
 
 Todo el producto sigue corriendo con **un** proceso (`WEB_CONCURRENCY` por defecto, 1), pero el codigo ya esta listo para
-mas. Lo unico que un `TestClient` no puede ver es lo que pasa cuando dos procesos arrancan JUNTOS contra las mismas
-bases: `create_app()` ES el arranque, y sus «si no existe, crear» (los modulos, el admin) se contestan «no existe» en los
+mas. Lo unico que un `TestClient` no puede ver es lo que pasa cuando dos procesos arrancan JUNTOS contra la misma
+base: `create_app()` ES el arranque, y sus «si no existe, crear» (los modulos, el admin) se contestan «no existe» en los
 dos workers antes de que ninguno cree, salvo que los serialice `una_vez_al_arrancar`.
 
-Este test deja las dos bases como las deja un deploy (migradas, sin sembrar: la plantilla «armada» de la suite sin las
+Este test deja la base (una sola, ADR-035) como la deja un deploy (migradas, sin sembrar: la plantilla «armada» de la suite sin las
 filas de `modulos` ni de `usuarios`), levanta `uvicorn app_dos_workers:app --workers 2` (`app.asgi` con la ventana de la carrera ensanchada, ver `tests/app_dos_workers.py`) como subproceso, y mira que:
 
 - los dos workers arrancan, sin ningun traceback en el log (los dos loguean «Application startup complete»; uvicorn reinicia a
@@ -24,7 +24,7 @@ import psycopg
 import pytest
 from conftest import _armar_app
 from libracore.testing.varios_procesos import pedir, puerto_libre
-from motor_de_test import destino_libracore, fresh_database_url, url_libracore
+from motor_de_test import fresh_database_url, url_libracore
 
 from plans import TODOS_LOS_MODULOS
 
@@ -57,12 +57,11 @@ def _esperar(proceso, log, base, *, arranque=90.0):
 
 
 def test_dos_workers_arrancan_y_el_seed_queda_una_sola_vez(tmp_path):
-    # Las dos bases «armadas» (todas las tablas) y sin sembrar: lo que deja un deploy antes del primer arranque.
-    destino_libracore(tmp_path / "x.db", _armar_app)
+    # La base «armada» (todas las tablas) y sin sembrar: lo que deja un deploy antes del primer arranque.
+    # Una sola (ADR-035): el dominio y LibraCore/LibraAuth comparten la misma.
     dominio = fresh_database_url(_armar_app)
     with psycopg.connect(_cruda(dominio), autocommit=True) as c:
-        c.execute("DELETE FROM modulos")
-    with psycopg.connect(_cruda(url_libracore()), autocommit=True) as c:
+        c.execute("DELETE FROM gestiolibra_modulos")
         c.execute("DELETE FROM usuarios")
 
     puerto = puerto_libre()
@@ -91,6 +90,6 @@ def test_dos_workers_arrancan_y_el_seed_queda_una_sola_vez(tmp_path):
     with psycopg.connect(_cruda(url_libracore())) as c:
         admins = c.execute("SELECT count(*) FROM usuarios WHERE role = 'admin'").fetchone()[0]
     with psycopg.connect(_cruda(dominio)) as c:
-        modulos = c.execute("SELECT count(*), count(DISTINCT modulo) FROM modulos").fetchone()
+        modulos = c.execute("SELECT count(*), count(DISTINCT modulo) FROM gestiolibra_modulos").fetchone()
     assert admins == 1, f"{admins} admins: el hook de arranque corrio sin candado en los dos workers"
     assert modulos == (len(TODOS_LOS_MODULOS), len(TODOS_LOS_MODULOS))

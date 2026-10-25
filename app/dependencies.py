@@ -7,6 +7,7 @@ from libragenda import DepositManager, ReminderDispatcher
 from libragenda.availability_repository import SqlAlchemyAvailabilityRepository
 from libragenda.catalog_repository import SqlAlchemyCatalogRepository
 from libragenda.repositories import DepositRepository
+from sqlalchemy.orm import Session, sessionmaker
 
 from .services.appointments import AppointmentService
 from .services.branch_hours import BranchHoursRepository
@@ -72,6 +73,12 @@ def get_deposit_manager(request: Request) -> DepositManager:
 
 def get_deposit_repository(request: Request) -> DepositRepository:
     return request.app.state.deposits
+
+
+def get_sessions(request: Request) -> sessionmaker[Session]:
+    """La fábrica de sesiones del dominio (la de LibraGenda): la usa lo que escribe varias tablas en una transacción
+    —atender y cobrar un turno en un nodo, el alta provisoria de un cliente—."""
+    return request.app.state.sessions
 
 
 def get_dashboard_service(request: Request) -> DashboardService:

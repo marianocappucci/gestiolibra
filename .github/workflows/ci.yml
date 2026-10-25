@@ -181,9 +181,10 @@ jobs:
       # `tests/motor_de_test.py` ahora hace imposible la primera.
       #
       # xdist (reglas/ci.md del wiki): 4 workers, las vCPU del runner. Cada uno
-      # trabaja en SUS dos bases (`gestiolibra_gw0` y `gestiolibra_core_gw0`, ...;
-      # ver `tests/motor_de_test.py`), porque la limpieza entre tests borra la base
-      # entera. La cobertura sigue siendo una sola: pytest-cov junta la de los
+      # trabaja en SU base (`gestiolibra_gw0`, `gestiolibra_gw1`, ...; ver
+      # `tests/motor_de_test.py`), porque la limpieza entre tests borra la base
+      # entera. Una sola base por worker desde el ADR-035: el dominio, LibraAuth y
+      # LibraCore comparten la misma, sin variable del core. La cobertura sigue siendo una sola: pytest-cov junta la de los
       # workers y el piso (`fail_under`) aplica igual.
       - name: Run tests
         if: steps.cambios.outputs.backend == 'true'
@@ -204,12 +205,12 @@ jobs:
       # resto fuera a PostgreSQL, asi que el verde de este job no decia nada
       # sobre las ~340 consultas crudas del core.
       #
-      # LibraCore va a `gestiolibra_core`, otra base en el mismo servidor, que
-      # el arnes crea si no esta (ver `motor_de_test.url_libracore`). No puede
-      # compartir schema con el dominio: LibraCore y LibraGenda declaran las dos
-      # una tabla `clients` con formas incompatibles -- `id` INTEGER contra
-      # VARCHAR(100) -- y en SQLite eso no chocaba porque eran dos archivos.
-
+      # LibraCore va a la MISMA base que el dominio (ADR-035): no hay `gestiolibra_core` ni
+      # variable del core. Hasta el 2026-10-25 la suite llevaba dos bases porque LibraCore y
+      # LibraGenda declaraban las dos una tabla `clients` con formas incompatibles -- `id`
+      # INTEGER contra VARCHAR(100) --; desde LibraGenda v0.14.0 la suya es `agenda_clients` y
+      # el choque ya no existe. `tests/test_una_sola_base.py` mide ademas la forma de dos
+      # bases (la demo, hasta que se una).
 
       # Smoke check for the two independent Alembic chains this repo
       # depends on: LibraGenda's own (engine schema) applied first, then

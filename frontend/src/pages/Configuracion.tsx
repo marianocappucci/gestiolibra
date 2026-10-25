@@ -36,6 +36,7 @@
  *  diferencia de la agenda y los clientes, que se usan todos los días.
  */
 import { createConfiguracion } from 'libra-ui/Configuracion'
+import { seccionSucursalSinInternet } from 'libra-ui/SucursalSinInternet'
 import { CalendarClock, MapPin, Scissors } from 'lucide-react'
 import { SucursalesCard } from './configuracion/sucursales'
 import { ServiciosCard } from './configuracion/servicios'
@@ -61,5 +62,8 @@ export const Configuracion = createConfiguracion({
     { clave: 'sucursales', label: 'Sucursales', icono: MapPin, contenido: <SucursalesCard /> },
     { clave: 'servicios', label: 'Servicios', icono: Scissors, contenido: <ServiciosCard /> },
     { clave: 'recursos', label: 'Recursos', icono: CalendarClock, contenido: <RecursosCard /> },
+    // «Sucursal sin internet» (libra-ui ADR-080, ADR-036 de este producto): el administrador da de alta el nodo del local y se lleva el
+    // instalador y el código de vinculación. Sólo para el administrador; lo arma el router de LibraEdge (`/api/nodos-offline`).
+    seccionSucursalSinInternet(),
   ],
 })

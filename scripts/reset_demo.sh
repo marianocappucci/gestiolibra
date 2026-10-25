@@ -82,11 +82,23 @@ log "seed listo desde origin/develop ($(wc -l < "$SEED_LOCAL") lineas)"
 # sin resetear nada. Por eso el motor se DETECTA, y si no se puede detectar se
 # aborta en vez de suponer SQLite.
 #
-# 🔴 Y son DOS bases: el dominio y LibraCore no pueden compartir schema en este
-# producto -- los dos declaran una tabla `clients` con `id` de tipos
-# incompatibles. Resetear una sola deja la demo a medias.
+# 🔴 Y mientras la demo tenga DOS bases (el dominio y LibraCore no podian compartir schema: los
+# dos declaraban una tabla `clients` con `id` de tipos incompatibles; LibraGenda v0.14.0 renombro la
+# suya a `agenda_clients`, ADR-034), resetear una sola la deja a medias. Con una sola base se resetea
+# esa, una vez.
 URL_DOMINIO=$(docker exec "$CONTENEDOR" printenv DATABASE_URL 2>/dev/null || true)
-URL_CORE=$(docker exec "$CONTENEDOR" printenv GESTIOLIBRA_LIBRACORE_DB_PATH 2>/dev/null || true)
+# 🔑 La base de LibraCore: la variable del core (el nombre vigente o el historico) si hay una OTRA base y,
+# si no, la del dominio (ADR-034 y ADR-035: una sola base). `Config` de la app hace lo mismo (`app/config.py`). A
+# esta altura el contenedor ya contesto `printenv DATABASE_URL`, asi que una variable ausente es "no esta
+# definida" y no "no pude entrar".
+#
+# 🔴 Esto LEE el entorno del contenedor, no lo define, y se queda a proposito: la demo todavia tiene dos bases
+# (hasta que se una con `libracore-unir-bases`) y sin esta lectura el reset recrearia el dominio y dejaria el core
+# (usuarios, codigos de acceso, caja) con los datos de ayer, sin avisar. Con una sola base la variable no existe y
+# `URL_CORE` es `URL_DOMINIO`. Se simplifica cuando no quede ninguna instancia de dos bases.
+URL_CORE=$(docker exec "$CONTENEDOR" printenv GESTIOLIBRA_LIBRACORE_DATABASE_URL 2>/dev/null || true)
+[ -n "$URL_CORE" ] || URL_CORE=$(docker exec "$CONTENEDOR" printenv GESTIOLIBRA_LIBRACORE_DB_PATH 2>/dev/null || true)
+[ -n "$URL_CORE" ] || URL_CORE=$URL_DOMINIO
 
 es_postgres() {
   case "$1" in postgres://*|postgresql://*|postgresql+*://*) return 0 ;; *) return 1 ;; esac
@@ -111,7 +123,7 @@ filas_del_dominio() {
     docker exec "$(sidecar_de "$URL_DOMINIO")" sh -c '
       psql -tA -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
         SELECT COALESCE((SELECT COUNT(*) FROM appointments), 0)
-             + COALESCE((SELECT COUNT(*) FROM clients), 0)
+             + COALESCE((SELECT COUNT(*) FROM agenda_clients), 0)
              + COALESCE((SELECT COUNT(*) FROM services), 0)"
     ' 2>/dev/null || echo "?"
   else
@@ -120,7 +132,7 @@ import sqlite3
 try:
     c = sqlite3.connect('/app/data/gestiolibra.db')
     print(sum(c.execute('SELECT COUNT(*) FROM ' + t).fetchone()[0]
-              for t in ('appointments', 'clients', 'services')))
+              for t in ('appointments', 'agenda_clients', 'services')))
 except Exception:
     print('?')
 " 2>/dev/null || echo "?"
@@ -165,8 +177,12 @@ if es_postgres "$URL_DOMINIO"; then
   docker stop "$CONTENEDOR" >/dev/null
   log "app parada para soltar las conexiones"
 
+  BASES_VISTAS=""
   for base in "$(base_de "$URL_DOMINIO")" "$(base_de "$URL_CORE")"; do
     [ -z "$base" ] && continue
+    # Una sola base (ADR-034): no se recrea dos veces el mismo schema.
+    case " $BASES_VISTAS " in *" $base "*) continue ;; esac
+    BASES_VISTAS="$BASES_VISTAS $base"
     # `psql` corre DENTRO del sidecar y con las variables de su propio entorno:
     # asi la contrasena no pasa por la linea de comandos del host, donde
     # quedaria en el `ps` y en el log del cron.

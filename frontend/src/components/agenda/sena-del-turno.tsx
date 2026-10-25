@@ -52,11 +52,13 @@ type PedidoValues = z.infer<typeof pedidoSchema>
 const ADMITE_SENA = new Set(['pending', 'confirmed'])
 
 export function SenaDelTurno({
-  turno, esAdmin, medios,
+  turno, esAdmin, medios, soloLectura = false,
 }: {
   turno: TurnoConRecurso
   esAdmin: boolean
   medios: MedioPago[]
+  /** En el equipo del local sin conexión (ADR-036) la seña se ve pero no se pide ni se cobra: eso es de la web. */
+  soloLectura?: boolean
 }) {
   const [estado, setEstado] = useState<Estado>({ tipo: 'cargando' })
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
@@ -136,7 +138,7 @@ export function SenaDelTurno({
       )}
       {estado.tipo === 'error' && <p className="text-sm text-destructive">{estado.mensaje}</p>}
 
-      {estado.tipo === 'sin' && ADMITE_SENA.has(turno.status) && (
+      {estado.tipo === 'sin' && ADMITE_SENA.has(turno.status) && !soloLectura && (
         <Form {...form}>
           <form className="flex items-end gap-2" onSubmit={form.handleSubmit(pedir)}>
             <FormField
@@ -159,7 +161,7 @@ export function SenaDelTurno({
         </Form>
       )}
 
-      {estado.tipo === 'sena' && esAdmin && (
+      {estado.tipo === 'sena' && esAdmin && !soloLectura && (
         <div className="flex flex-wrap justify-end gap-2">
           {estado.sena.status === 'pending' && (
             <>
@@ -176,7 +178,12 @@ export function SenaDelTurno({
           )}
         </div>
       )}
-      {estado.tipo === 'sena' && !esAdmin && estado.sena.status === 'pending' && (
+      {soloLectura && (
+        <p className="text-xs text-muted-foreground">
+          La seña se pide y se cobra desde la web.
+        </p>
+      )}
+      {estado.tipo === 'sena' && !esAdmin && !soloLectura && estado.sena.status === 'pending' && (
         <p className="text-xs text-muted-foreground">
           El cobro de la seña lo registra un administrador.
         </p>

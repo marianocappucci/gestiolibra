@@ -21,6 +21,8 @@ import { DataTable, sortableHeader } from '@/components/data-table'
 import { Pencil, Trash2 } from 'lucide-react'
 import { TituloPantalla } from 'libra-ui/titulo-pantalla'
 import { ICONOS } from 'libra-ui/iconos-identidad'
+import { EtiquetaDePersonaDelNodo } from 'libra-ui/EtiquetaProvisorio'
+import { useConexionDelNodo } from 'libra-ui/nodo-offline'
 
 const clientSchema = z.object({
   name: z.string().trim().min(1, 'El nombre es obligatorio'),
@@ -37,6 +39,9 @@ const EMPTY_VALUES: ClientFormValues = { name: '', phone: '', email: '', cuit: '
 export function Clientes() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
+  // En el equipo del local sin conexión (ADR-036) los clientes se dan de alta —con un número provisorio— y no se editan ni se borran:
+  // eso es de la web (409 del backend). Lo sabe el cartel del layout; acá sólo se lee.
+  const { esNodo } = useConexionDelNodo()
 
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,7 +132,13 @@ export function Clientes() {
   // la mide `libra-ui` sola (ver wiki/entities/libra-ui.md v0.4.0).
   const columns = useMemo<ColumnDef<Client>[]>(() => {
     const base: ColumnDef<Client>[] = [
-      { accessorKey: 'name', header: sortableHeader('Nombre'), size: 200, minSize: 120, meta: { stretch: true }, cell: ({ row }) => <span className="block truncate font-medium" title={row.original.name}>{row.original.name}</span> },
+      { accessorKey: 'name', header: sortableHeader('Nombre'), size: 200, minSize: 120, meta: { stretch: true }, cell: ({ row }) => (
+        <span className="flex items-center gap-2">
+          <span className="block truncate font-medium" title={row.original.name}>{row.original.name}</span>
+          {/* «Provisorio»: se dio de alta sin conexión y todavía no tiene su número definitivo (libra-ui ADR-095). */}
+          <EtiquetaDePersonaDelNodo id={row.original.id} persona="cliente" />
+        </span>
+      ) },
       { accessorKey: 'phone', header: 'Teléfono', size: 130, minSize: 100, cell: ({ row }) => row.original.phone ?? '—' },
       { accessorKey: 'email', header: 'Email', size: 200, minSize: 140, cell: ({ row }) => <span className="block truncate" title={row.original.email ?? undefined}>{row.original.email ?? '—'}</span> },
       { accessorKey: 'cuit', header: 'CUIT', size: 130, minSize: 110, cell: ({ row }) => row.original.cuit ?? '—' },
@@ -144,7 +155,7 @@ export function Clientes() {
         ),
       },
     ]
-    if (isAdmin) {
+    if (isAdmin && !esNodo) {
       base.push({
         id: 'actions',
         header: () => <div className="text-right">Acciones</div>,
@@ -158,7 +169,7 @@ export function Clientes() {
     }
     return base
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin])
+  }, [isAdmin, esNodo])
 
   return (
     <div className="grid gap-4">

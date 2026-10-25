@@ -149,6 +149,13 @@ export type Appointment = {
   starts_at: string
   ends_at: string
   status: AppointmentStatus
+  /** Lo que la agenda cuenta de un turno atendido en un nodo sin conexión (ADR-036, libra-ui ADR-095). Faltan o son neutros fuera de un
+   *  nodo y en un turno que no se atendió así. `status` ya viene con el estado de esa atención. */
+  atendido_sin_conexion?: boolean
+  /** La atención subió y en la web el turno cambió: está en la lista «Turnos a revisar». */
+  a_revisar?: boolean
+  /** Por qué (`cancelado`, `movido`, `ya_atendido`...). */
+  motivo?: string | null
 }
 
 // --- señas ------------------------------------------------------------------
@@ -283,6 +290,16 @@ export type CompleteAppointmentResponse = {
   id: string
   status: AppointmentStatus
   factura: Factura | null
+  /** Sólo en un nodo (ADR-036): la atención quedó en esta PC y sube sola al volver la conexión. */
+  atendido_sin_conexion?: boolean
+  /** Sólo en un nodo: la factura quedó en la cola de ARCA (`esRespuestaEnCola` del kit reconoce `en_cola`). */
+  en_cola?: boolean
+  estado?: string
+  pedido_id?: number
+  mensaje?: string | null
+  motivo?: string
+  /** La ruta del PDF «no válido como factura» que se le da al cliente mientras la factura no salga. */
+  comprobante_no_fiscal?: string | null
 }
 
 export type DashboardSummary = {

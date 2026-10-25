@@ -16,7 +16,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 class ClientBillingRow(Base):
     __tablename__ = "client_billing"
 
-    id: Mapped[str] = mapped_column(ForeignKey("clients.id"), primary_key=True)
+    id: Mapped[str] = mapped_column(ForeignKey("agenda_clients.id"), primary_key=True)
     cuit: Mapped[str | None] = mapped_column(String(20), nullable=True)
     condicion_iva: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -93,7 +93,7 @@ class ClientRepository:
 
     def delete(self, client_id: str) -> None:
         # Borrar primero la extension (ClientBillingRow.id tiene FK a
-        # clients.id): borrar el Client antes violaria esa FK en Postgres
+        # agenda_clients.id): borrar el Client antes violaria esa FK en Postgres
         # real -- mismo bug ya encontrado y corregido en PatientRepository/
         # BranchRepository de esta familia.
         with self.session_factory.begin() as session:

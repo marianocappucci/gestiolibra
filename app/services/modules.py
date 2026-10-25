@@ -12,6 +12,12 @@ cliente real con un plan elegido) achica el acceso según corresponda.
 🔴 **Los add-ons (`plans.ADDONS`) son la excepción, y al revés: arrancan
 APAGADOS.** No pertenecen a ningún plan, así que no se siembran ni los toca
 un plan; se prenden por instancia desde el backoffice. Ver `is_enabled`.
+
+🔑 **La tabla es `gestiolibra_modulos`** (ADR-034), no `modulos`: `modulos` es la de LibraCore
+(`libracore.db.modulos`, con `id` y `habilitado` entero) y con una sola base por producto
+las dos no pueden llamarse igual. Mientras las filas no pasen a la del motor (ADR-034,
+punto 3) todo lo que lee o escribe módulos en este producto va por acá: el repositorio, el
+contrato del backoffice (`app.database`) y `plans.aplicar_plan_en_db`.
 """
 from libragenda.sqlalchemy_repository import Base
 from sqlalchemy import select
@@ -21,7 +27,7 @@ from plans import ADDONS, TODOS_LOS_MODULOS
 
 
 class ModuleRow(Base):
-    __tablename__ = "modulos"
+    __tablename__ = "gestiolibra_modulos"
 
     modulo: Mapped[str] = mapped_column(primary_key=True)
     habilitado: Mapped[bool] = mapped_column(default=True)
@@ -74,6 +80,31 @@ class ModuleRepository:
         with self.session_factory() as session:
             rows = session.scalars(select(ModuleRow)).all()
             return {row.modulo: bool(row.habilitado) for row in rows}
+
+    def set_addon(self, modulo: str, habilitado: bool) -> None:
+        """Prende o apaga un add-on. Crea la fila si falta, con `plan="addon"`, y **sólo cambia
+        `habilitado`** en una que ya existe (igual que `libracore.db.modulos.set_addon`, que este
+        método reemplaza mientras la tabla sea la del producto)."""
+        with self.session_factory.begin() as session:
+            row = session.get(ModuleRow, modulo)
+            if row is None:
+                session.add(ModuleRow(modulo=modulo, habilitado=habilitado, plan="addon"))
+            else:
+                row.habilitado = habilitado
+
+    def aplicar_plan(self, plan: str, activos: set[str], todos: set[str]) -> None:
+        """Escribe `habilitado` y `plan` de cada módulo de `todos` según `activos`. Idempotente.
+
+        Es el cuerpo de `libracore.provisioning.apply_plan_modules`, que escribe en una tabla
+        llamada `modulos` y por eso ya no llega a esta. Quien llama resta los add-ons de `todos`:
+        un plan nunca los toca."""
+        with self.session_factory.begin() as session:
+            for modulo in sorted(todos):
+                row = session.get(ModuleRow, modulo)
+                if row is None:
+                    session.add(ModuleRow(modulo=modulo, habilitado=modulo in activos, plan=plan))
+                else:
+                    row.habilitado, row.plan = modulo in activos, plan
 
     def set_enabled(self, modulo: str, habilitado: bool) -> None:
         """Prende/apaga un módulo puntual, sin pasar por un plan completo
