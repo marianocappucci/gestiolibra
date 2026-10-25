@@ -103,6 +103,26 @@ SQLAlchemy), así que apuntar el autogenerate ahí vería también las tablas
 de LibraGenda como propias de esta cadena. Las migraciones de Gestiolibra
 se escriben a mano, mismo criterio que ya usa LibraGenda para las suyas.
 
+## Modo sin conexión (escritorio)
+
+El local puede seguir **atendiendo y cobrando sin internet** con la versión de escritorio de la suite (LibraEdge, ADR-036): una copia de
+Gestiolibra corre en la PC del local (el *nodo*) y sincroniza con la web (el *central*). Con el nodo sin conexión la agenda es de
+**sólo consulta** —no se dan, mueven ni cancelan turnos—, pero un turno ya dado se marca en curso, atendido o «no vino» y se cobra: la
+seña y el saldo suben a la caja, la factura queda en la cola de ARCA y sale sola al volver la conexión, y el cliente se lleva un
+comprobante no fiscal. Si en la web el turno cambió mientras tanto (se canceló, se movió), la atención y lo cobrado valen y el turno
+queda «a revisar». La web sigue operando como siempre.
+
+```bash
+# En el central, una vez por sucursal (el nodo se da de alta desde Configuración > Sucursal sin internet, o por línea de comandos):
+LIBRAEDGE_APROVISIONAMIENTO=app.offline:aprovisionamiento libraedge-central nodo publicar
+LIBRAEDGE_APROVISIONAMIENTO=app.offline:aprovisionamiento libraedge-central nodo registrar <node_id> --sucursal <id o nombre>
+# Lo que el central no pudo aplicar (por ejemplo, un cobro repetido) queda en revisión manual:
+LIBRAEDGE_DESPACHADOR=app.routers.sincronizacion_offline:despachador libraedge-central revision listar
+```
+
+Variables del nodo: `LIBRAEDGE_NODE_ID` (la identidad, que escribe el instalador; fuera de un nodo no está) y `LIBRAEDGE_ESTADO` (el archivo
+de estado del proceso del nodo). Todo lo del nodo (`app/offline.py`) es de **una sola base** (ADR-035) y sin identidad de nodo no cambia nada.
+
 ## CI
 
 `.github/workflows/ci.yml`: en cada push/PR a `main` — instala el paquete,

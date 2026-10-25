@@ -326,3 +326,59 @@ def _captcha_aprobado(monkeypatch):
     monkeypatch.setattr(
         "libraauth.session_auth._captcha_de", lambda request, usados=None: _CAPTCHA_DE_PRUEBA
     )
+
+
+# ── Un nodo y su central (ADR-036) ──────────────────────────────────────────
+
+#: Lo que la referencia del escenario deja cargado, para que los tests no repitan los ids.
+CUIT_EMISOR = "20111222339"
+
+
+@pytest.fixture
+def escenario(admin_client, monkeypatch, tmp_path):
+    """Un nodo y su central, con dos bases (ver `tests/nodo_apoyo.py`).
+
+    La referencia (la sucursal, el recurso, el servicio con su precio, un cliente, dos turnos confirmados y la configuración
+    de ARCA) se carga **antes** de copiar la base al central: es lo que el espejo de LibraEdge deja en el nodo. Después la
+    instancia pasa a ser el nodo del local, **sin conexión**, y el central tiene registrado ese nodo. `escenario.datos` trae
+    los ids de la referencia."""
+    from nodo_apoyo import Escenario
+
+    c = admin_client
+    assert c.post("/branches", json={"id": "sucursal-1", "name": "Sucursal Centro"}).status_code == 201
+    assert c.post("/resources", json={"id": "box-1", "name": "Box 1", "branch_id": "sucursal-1"}).status_code == 201
+    assert c.post("/services", json={"id": "corte", "name": "Corte", "duration_minutes": 30}).status_code == 201
+    for dia in range(7):
+        r = c.post("/resources/box-1/availability", json={"weekday": dia, "starts_at": "00:00:00", "ends_at": "23:59:00"})
+        assert r.status_code == 201, r.text
+    assert c.put("/services/corte/prices", json={"branch_id": "sucursal-1", "price": "1000.00"}).status_code == 200
+    r = c.post("/clients", json={"id": "ana", "name": "Ana Gómez", "cuit": "27111111113",
+                                 "condicion_iva": "Consumidor Final"})
+    assert r.status_code == 201, r.text
+    turnos = []
+    for hora in ("10:00", "11:00", "12:00"):
+        r = c.post("/appointments", json={"resource_id": "box-1", "service_id": "corte", "client_id": "ana",
+                                          "starts_at": f"2099-01-01T{hora}:00"})
+        assert r.status_code == 201, r.text
+        turno = r.json()["id"]
+        assert c.post(f"/appointments/{turno}/confirm").status_code == 200
+        turnos.append(turno)
+    # El tercer turno tiene una seña de 400 ya cobrada por transferencia: el saldo es de 600.
+    sena = c.post(f"/appointments/{turnos[2]}/deposit", json={"amount": "400.00"})
+    assert sena.status_code == 201, sena.text
+    r = c.post(f"/deposits/{sena.json()['id']}/mark-paid", json={"medio_pago": "transferencia"})
+    assert r.status_code == 200, r.text
+    r = c.put("/config/arca", json={"empresa": "negocio", "cuit": CUIT_EMISOR, "punto_venta": 3,
+                                    "ambiente": "produccion"})
+    assert r.status_code == 200, r.text
+
+    e = Escenario(c, monkeypatch, tmp_path)
+    e.datos = {"sucursal": "sucursal-1", "recurso": "box-1", "servicio": "corte", "cliente": "ana",
+               "turno": turnos[0], "otro_turno": turnos[1], "turno_con_sena": turnos[2], "precio": "1000.00"}
+    e.clonar_el_central()
+    e.registrar_el_nodo()
+    e.ser_nodo()
+    try:
+        yield e
+    finally:
+        e.soltar()
