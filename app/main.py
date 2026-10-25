@@ -35,7 +35,6 @@ from libracore.config_router import (
     build_empresa_router,
 )
 from libracore.consultar_cuit_router import build_consultar_cuit_router
-from libracore.db.url_de_instancia import url_de_instancia
 from libracore.docs_api import cerrar_docs_de_la_api
 from libracore.errores import instalar_registro_de_errores
 from libracore.estado_del_sistema import build_estado_del_sistema_router
@@ -62,6 +61,7 @@ from sqlalchemy.orm import sessionmaker
 from . import empresa_demo, mercadopago
 from .auditoria import AUDITABLES
 from .auth import build_session_auth, get_current_user, require_admin, require_admin_o_servicio, require_staff
+from .config import misma_base, url_de_libracore
 from .modules_gate import require_module
 from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
 from .payments import ManualPaymentPort
@@ -161,6 +161,9 @@ def _instancia_a_respaldar(database_url: str, libracore_db_path: str,
                            directorios: list) -> Instancia:
     """Que se lleva el backup, segun el motor de cada mitad.
 
+    Con **una sola base** (ADR-034: `libracore_db_path` ES `database_url`) se lleva esa, una vez.
+    Lo que sigue vale para la forma de dos bases, que es la de dev y demo hasta que se unan.
+
     🔴 **Las dos mitades o ninguna.** El dominio y LibraCore son dos bases
     separadas -- dos archivos en SQLite, dos bases PostgreSQL despues del corte,
     porque no pueden compartir schema: las dos declaran una tabla `clients` con
@@ -176,7 +179,10 @@ def _instancia_a_respaldar(database_url: str, libracore_db_path: str,
     dominio = make_url(database_url)
     if dominio.drivername.startswith("postgresql"):
         extra = []
-        if str(libracore_db_path).startswith(("postgresql://", "postgresql+psycopg://")):
+        # Una sola base (ADR-034): la de LibraCore ES la del dominio, y el dump de la misma base dos veces
+        # no se puede restaurar (el segundo `pg_restore` pisaria al primero).
+        if (str(libracore_db_path).startswith(("postgresql://", "postgresql+psycopg://"))
+                and not misma_base(database_url, str(libracore_db_path))):
             extra.append(str(libracore_db_path))
         return Instancia(
             nombre="gestiolibra",
@@ -215,9 +221,11 @@ def create_app(database_url: str) -> FastAPI:
     #
     # libraauth lee sin problema la tabla que escribio el sqlite3 crudo de
     # libracore (mismo schema, mismo hashing) y `create_all` no la altera.
-    libracore_db_path = url_de_instancia(
-        "gestiolibra", core=True, default="./data/gestiolibra_libracore.db"
-    )
+    #
+    # **Esa "base de LibraCore" puede ser la del dominio** (ADR-034): sin la variable del core, o con la
+    # misma base, `usuarios` y todo LibraCore viven junto a las tablas de LibraGenda. Dos formas, un solo
+    # valor (`app.config.url_de_libracore`). Con dos bases sigue valiendo todo lo de arriba.
+    libracore_db_path = url_de_libracore(database_url)
     billing.configure(libracore_db_path)
     # La URL de SQLAlchemy salia siempre como `sqlite:///...`, aunque el destino
     # fuera una URL PostgreSQL: la interpolacion la convertia en una ruta

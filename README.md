@@ -64,16 +64,16 @@ amerite, sin cambios de código.
 
 Facturación/caja usa `libracore.db` — sqlite3 crudo con su propia
 conexión, configurada aparte del engine SQLAlchemy de LibraGenda/
-Gestiolibra vía `GESTIOLIBRA_LIBRACORE_DB_PATH` (default
-`./data/gestiolibra_libracore.db`, mismo criterio de volumen persistente
-que el resto de los paths de datos). Ver `DECISIONS.md` ADR-011.
+Gestiolibra. La base de LibraCore es la de `GESTIOLIBRA_LIBRACORE_DATABASE_URL` (o la
+histórica `GESTIOLIBRA_LIBRACORE_DB_PATH`) si es otra base y, si no, **la misma del
+dominio** (`app/config.py`, ADR-034). Ver `DECISIONS.md` ADR-011.
 
 ## Migraciones
 
 Dos cadenas de Alembic independientes corren contra la **misma** base
 `gestiolibra`, cada una con su propia tabla de versión (para no
-pisarse: `alembic_version` es de LibraGenda, `alembic_version_gestiolibra`
-es de Gestiolibra). El deploy corre ambas, en este orden, antes de levantar
+pisarse: `alembic_version_libragenda` es de LibraGenda desde su v0.14.0 -antes era
+`alembic_version`, que es la de LibraCore-, `alembic_version_gestiolibra` es de Gestiolibra). El deploy corre ambas, en este orden, antes de levantar
 la API:
 
 **1. Migraciones de LibraGenda** (schema del motor: sucursales, recursos,

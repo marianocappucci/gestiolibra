@@ -71,8 +71,16 @@ configure(
     # primero. Al reves, la primera revision que las toque muere con
     # `relation "branches" does not exist`.
     #
-    # Son dos tablas de version distintas en la misma base: `alembic_version`
-    # para LibraGenda y `alembic_version_gestiolibra` para esta cadena.
+    # Son tablas de version distintas: `alembic_version_libragenda` para LibraGenda
+    # (desde su v0.14.0, ADR-017 de libragenda; antes `alembic_version`, que es la de
+    # LibraCore y la que `libragenda-migrar` renombra solo), `alembic_version_gestiolibra`
+    # para esta cadena y `alembic_version` para la de `libracore-migrar`.
+    #
+    # 🔑 ORDEN (ADR-034): LibraGenda va SIEMPRE primero. Su `0010_agenda_clients` renombra
+    # `clients` -> `agenda_clients`, y en una base nueva de una sola base la `0002` de
+    # LibraCore crea SU `clients` (id entero): al reves, las dos pisarian el nombre. Despues
+    # va libraauth, despues libracore y la propia al final (sus FK apuntan a `agenda_clients`
+    # y a `branches`). Lo ata `tests/test_migraciones_en_el_deploy.py`.
     # 🔴 **TRES cadenas, y el orden no es decorativo.**
     #
     # 1. `libragenda-migrar` — va primero porque las revisiones propias de este

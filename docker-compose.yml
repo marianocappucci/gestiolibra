@@ -133,10 +133,15 @@ services:
       - TZ=America/Argentina/Buenos_Aires
       - GESTIOLIBRA_ADMIN_USERNAME=${GESTIOLIBRA_ADMIN_USERNAME:-admin}
       - GESTIOLIBRA_ADMIN_PASSWORD=${GESTIOLIBRA_ADMIN_PASSWORD:-}
-      # 🔴 El corte a PostgreSQL. Son DOS bases y no dos schemas de la misma:
-      # el dominio (LibraGenda) y LibraCore declaran los dos una tabla
+      # 🔴 El corte a PostgreSQL. Hoy son DOS bases y no dos schemas de la misma:
+      # el dominio (LibraGenda) y LibraCore declaraban los dos una tabla
       # `clients` con `id` de tipos incompatibles — ver
-      # `docker/postgres-init/10-base-de-libracore.sql`.
+      # `docker/postgres-init/10-base-de-libracore.sql`. Con LibraGenda v0.14.0 la
+      # suya es `agenda_clients` y la de `modulos` de este producto es
+      # `gestiolibra_modulos` (ADR-034): ya no hay nombre repetido, y la app anda
+      # con UNA base (sin `GESTIOLIBRA_LIBRACORE_DB_PATH`, `app/config.py`). Unir
+      # dev y demo es un paso aparte (`libracore-unir-bases`, con respaldo y OK);
+      # mientras no se una, estas dos líneas siguen.
       #
       # Volver estas dos líneas a las rutas `.db` y reiniciar es el rollback
       # completo: los archivos de `dev-data/` siguen ahí y sin tocar —

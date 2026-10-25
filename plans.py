@@ -75,25 +75,39 @@ ADDONS = {"resguardo_externo"}
 
 
 def aplicar_plan_en_db(db_path: str, plan: str) -> None:
-    """Aplica un plan escribiendo el estado de módulos directo en la DB
-    SQLite de un cliente (`clientes/<slug>/data/gestiolibra.db`). Lo usa
+    """Aplica un plan escribiendo el estado de módulos directo en la base de una
+    instancia (una URL de PostgreSQL, o la ruta de un archivo SQLite). Lo usa
     el provisioning para asignar el plan de una instancia sin depender
     del contenedor.
 
-    Shim sobre libracore.provisioning.apply_plan_modules (extraído
-    2026-07-26: el cuerpo era idéntico en Gestiolibra/MedLibra/VentaLibra
-    salvo el nombre de la variable, ver
-    wiki/analyses/auditoria-duplicacion-familia-libra.md). Requiere que la
-    tabla `modulos` ya exista (la crea la migración propia de Gestiolibra,
-    `0005_modulos`).
+    🔑 **Ya no es un shim sobre `libracore.provisioning.apply_plan_modules`** (ADR-034). Esa
+    función escribe en una tabla llamada `modulos`, que en este producto pasó a llamarse
+    `gestiolibra_modulos` porque `modulos` es la de LibraCore. El cuerpo es el mismo (por cada
+    módulo del plan: crear la fila si falta y fijar `habilitado` y `plan`) pero por
+    `ModuleRepository`, que sabe cuál es la tabla. Requiere que la tabla ya exista (la crea
+    la migración propia de Gestiolibra, `0005_modulos`, y `0009` la renombra).
 
-    `- ADDONS`: aplicar un plan nunca toca un add-on (`resguardo_externo`).
-    Hoy es equivalente a `TODOS_LOS_MODULOS` (los add-ons ya están afuera),
-    pero deja la invariante escrita."""
+    `- ADDONS` y `- modulos_de_adicionales`: aplicar un plan nunca toca un add-on
+    (`resguardo_externo`) ni el módulo de un adicional (ADR-048 de libracore). Hoy
+    `TODOS_LOS_MODULOS` ya los deja afuera, pero la invariante queda escrita."""
     if plan not in PLAN_MODULOS:
         raise ValueError(f"Plan desconocido: {plan!r}")
-    from libracore.provisioning import apply_plan_modules
-    apply_plan_modules(
-        db_path, active_modules=modulos_de_plan(plan),
-        all_modules=TODOS_LOS_MODULOS - ADDONS, plan=plan,
-    )
+    import sys
+
+    from libracore.adicionales import modulos_de_adicionales
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services.modules import ModuleRepository
+
+    url = str(db_path)
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    elif "://" not in url:
+        url = f"sqlite:///{url}"
+    todos = TODOS_LOS_MODULOS - ADDONS - modulos_de_adicionales(sys.modules[__name__])
+    engine = create_engine(url)
+    try:
+        ModuleRepository(sessionmaker(bind=engine)).aplicar_plan(plan, modulos_de_plan(plan), todos)
+    finally:
+        engine.dispose()

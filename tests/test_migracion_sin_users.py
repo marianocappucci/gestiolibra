@@ -110,7 +110,7 @@ def test_mundo_1_la_borra_cuando_existe(base_limpia):
     assert _hay_users(), "el control: `0001` tiene que haberla creado"
     command.stamp(base_limpia, PREVIA)
 
-    command.upgrade(base_limpia, "head")
+    command.upgrade(base_limpia, NUEVA)
 
     assert not _hay_users()
     assert _revision() == NUEVA
@@ -125,7 +125,7 @@ def test_mundo_2_no_falla_cuando_no_existe(base_limpia):
     command.stamp(base_limpia, PREVIA)
     assert not _hay_users(), "el control: la instancia viva no la tiene"
 
-    command.upgrade(base_limpia, "head")
+    command.upgrade(base_limpia, NUEVA)
 
     assert not _hay_users()
     assert _revision() == NUEVA
@@ -136,7 +136,7 @@ def test_el_downgrade_la_devuelve(base_limpia):
     estaba en `0001`. Queda vacía — no hay de dónde recuperar filas que este
     producto dejó de escribir hace un mes."""
     command.stamp(base_limpia, PREVIA)
-    command.upgrade(base_limpia, "head")
+    command.upgrade(base_limpia, NUEVA)
     assert not _hay_users()
 
     command.downgrade(base_limpia, PREVIA)
