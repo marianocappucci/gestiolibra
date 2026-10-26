@@ -78,6 +78,7 @@ CUERPOS = {
         "aggregate_type": "turno", "aggregate_id": "x:turno:1", "occurred_at": "2026-10-24T00:00:00+00:00",
         "schema_version": 1, "payload": {}},
     ("POST", "/sync/v1/ticket-arca"): {"node_id": "x", "emisor_id": None, "servicio": "wsfe"},
+    ("POST", "/sync/v1/estado-operaciones"): {"node_id": "x", "operation_ids": ["x:1"]},
     ("POST", "/api/nodo/turnos-a-revisar/revisar"): {"atenciones": ["no-existe"]},
 }
 
