@@ -23,6 +23,10 @@ ESCRITURAS_DEL_CENTRAL = [
     ("POST", "/appointments/{turno}/reschedule", {"starts_at": "2099-01-03T10:00:00"}),
     ("POST", "/appointments/{turno}/deposit", {"amount": "100.00"}),
     ("POST", "/deposits/{turno}/mark-paid", None),
+    # La nota de crédito y el envío por mail del comprobante son del central (ADR-039): el nodo no tiene el certificado de ARCA
+    # ni el SMTP. Ver y bajar el PDF, en cambio, sí.
+    ("POST", "/appointments/{turno}/nota-credito", {"motivo": "Se facturó mal", "destino": "devolver", "medio_pago": "efectivo"}),
+    ("POST", "/api/facturas/1/enviar-email", {"email": "ana@example.com"}),
     ("POST", "/branches", {"id": "otra", "name": "Otra"}),
     ("PUT", "/branches/sucursal-1", {"name": "Otro nombre"}),
     ("DELETE", "/branches/sucursal-1", None),
