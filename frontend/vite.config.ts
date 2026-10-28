@@ -18,6 +18,8 @@ const API_PATHS = [
   '/api/nodo', '/api/nodos-offline',
   // El registro de errores del navegador (libra-ui ADR-053): `instalarReporteDeErrores` y `<ErrorBoundary>` postean acá.
   '/api/errores-cliente',
+  // El PDF de la factura y de su nota de crédito (`GET /api/facturas/{id}/pdf`, del motor).
+  '/api/facturas',
 ]
 
 // Las claves del proxy se emiten como regex (Vite trata como RegExp toda

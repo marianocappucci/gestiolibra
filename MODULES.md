@@ -55,6 +55,14 @@
   LibraCore), seña ya cobrada y saldo restante como dos movimientos de
   caja separados apuntando a la misma factura. Mismo diseño exacto que
   MedLibra (ver ADR-011).
+- `app/services/factura_del_turno.py` + `app/routers/factura_del_turno.py`
+  (ADR-039): la factura de un turno completado y su **nota de crédito**.
+  `GET /appointments/{id}/factura`, `GET`/`POST
+  /appointments/{id}/nota-credito`. La nota no la arma este producto: la
+  emite `libracore.notas_de_credito` (la función de la ruta del motor);
+  acá sólo se llega desde el turno, se pide el motivo (queda en el log
+  de actividad) y se obliga a elegir qué pasa con la plata cobrada. El
+  PDF de la factura y de la nota es `build_comprobantes_pdf_router`.
 - `app/services/dashboard.py`: `DashboardService` — resumen de lectura
   pura sobre repositorios ya existentes, sin tabla ni estado propio.
   Turnos (total y por estado en el rango pedido, turnos de **hoy** —

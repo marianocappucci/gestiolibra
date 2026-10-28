@@ -42,6 +42,7 @@ from libracore.db.core import get_connection as lc_get_connection
 from libracore.docs_api import cerrar_docs_de_la_api
 from libracore.errores import instalar_registro_de_errores
 from libracore.estado_del_sistema import build_estado_del_sistema_router
+from libracore.facturas_router import build_comprobantes_pdf_router
 from libracore.nodo_conexion_router import build_conexion_del_nodo_router
 from libracore.nodo_offline import SinConexion, SoloEnElCentral
 from libracore.resguardo_enlace import build_resguardo_enlace_router
@@ -66,7 +67,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from . import empresa_demo, mercadopago, offline
-from .auditoria import AUDITABLES
+from .auditoria import AUDITABLES, ENTIDADES_A_MANO
 from .auth import build_session_auth, get_current_user, require_admin, require_admin_o_servicio, require_staff
 from .config import misma_base, url_de_libracore
 from .modules_gate import require_module
@@ -81,6 +82,7 @@ from .routers import (
     business_settings,
     clients,
     deposits,
+    factura_del_turno,
     health,
     holidays,
     reminders,
@@ -626,6 +628,22 @@ def create_app(database_url: str) -> FastAPI:
     # Agenda surface: staff manages their own turnos too.
     staff_or_admin = [Depends(require_staff)]
     app.include_router(appointments.router, dependencies=staff_or_admin)
+    # La factura de un turno y su nota de crédito (ADR-039). Ver y pedir el destino de la plata es de admin y staff / admin;
+    # emitir la nota es de admin (lo dice cada ruta). Sin el módulo `facturacion` no hay facturas que acreditar. En un nodo la
+    # nota es del central (409 `solo_en_el_central`: el nodo no tiene el certificado de ARCA); ver la factura, no.
+    app.include_router(
+        factura_del_turno.router,
+        dependencies=staff_or_admin + [Depends(require_module("facturacion"))] + _DEL_CENTRAL,
+    )
+    # El PDF de la factura y de la nota (`GET /api/facturas/{id}/pdf`) y su envío por mail, del motor (libracore ADR-031): el
+    # mismo archivo que se ve es el que se manda. El SMTP se resuelve en cada envío, así que guardarlo por pantalla tiene
+    # efecto sin reiniciar. Enviar es escribir: en un nodo, del central.
+    app.include_router(
+        build_comprobantes_pdf_router(
+            usuario_actual=get_current_user, smtp_config=lambda: resolver_smtp_config(auth_sessions),
+        ),
+        dependencies=staff_or_admin + [Depends(require_module("facturacion"))] + _DEL_CENTRAL,
+    )
     app.include_router(agenda.router, dependencies=staff_or_admin)
     app.include_router(
         deposits.request_router, dependencies=staff_or_admin + [Depends(require_module("senas"))] + _DEL_CENTRAL,
@@ -637,7 +655,7 @@ def create_app(database_url: str) -> FastAPI:
     #
     # El router lo arma el motor (libraauth v0.10.0) pero el gate lo pone el
     # producto: el vocabulario de roles es de acá, no del paquete.
-    app.include_router(build_logs_router(AUDITABLES), dependencies=admin_only)
+    app.include_router(build_logs_router({**AUDITABLES, **ENTIDADES_A_MANO}), dependencies=admin_only)
 
     # Datos de empresa, logo y Datos / Backup (LibraCore v1.11.0).
     #
