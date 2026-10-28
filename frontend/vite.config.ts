@@ -20,6 +20,8 @@ const API_PATHS = [
   '/api/errores-cliente',
   // El PDF de la factura y de su nota de crédito (`GET /api/facturas/{id}/pdf`, del motor).
   '/api/facturas',
+  // La configuración de los avisos por WhatsApp y mail y su registro (`/api/avisos`, del motor; ADR-040).
+  '/api/avisos',
 ]
 
 // Las claves del proxy se emiten como regex (Vite trata como RegExp toda

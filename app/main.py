@@ -29,6 +29,7 @@ from libraauth.smtp_settings import SmtpSettingsRepository, resolver_smtp_config
 from libraauth.terminos import TerminosRepository, build_terminos_router
 from libracore import config_manager
 from libracore.arca_router import build_arca_router
+from libracore.avisos_router import build_avisos_router
 from libracore.candados import una_vez_al_arrancar
 from libracore.cola_arca import pedidos_a_emitir
 from libracore.cola_arca_router import build_cola_del_nodo_router
@@ -71,7 +72,7 @@ from .auditoria import AUDITABLES, ENTIDADES_A_MANO
 from .auth import build_session_auth, get_current_user, require_admin, require_admin_o_servicio, require_staff
 from .config import misma_base, url_de_libracore
 from .modules_gate import require_module
-from .notifications import DEFAULT_REMINDER_POLICIES, LoggingNotificationPort
+from .notifications import DEFAULT_REMINDER_POLICIES, crear_puerto_de_avisos, reintentar_avisos
 from .payments import ManualPaymentPort
 from .routers import (
     agenda,
@@ -418,10 +419,22 @@ def create_app(database_url: str) -> FastAPI:
         # cargue algo.
         smtp_config=lambda: resolver_smtp_config(auth_sessions),
     )
+    # Los recordatorios salen de verdad (ADR-040, avisos del motor): WhatsApp por Evolution y mail por el SMTP de la instancia, con el
+    # canal que haya configurado. El SMTP se resuelve en cada envío, igual que en el reset de contraseña y en las facturas. Un nodo de
+    # LibraEdge no manda avisos: los manda el central (`offline.nodo()` es la identidad que lee el producto, y se lee en cada llamada).
+    def smtp_config():
+        return resolver_smtp_config(auth_sessions)
+
     app.state.reminder_dispatcher = ReminderDispatcher(
         appointment_repository, reminder_repository,
-        LoggingNotificationPort(), DEFAULT_REMINDER_POLICIES,
+        crear_puerto_de_avisos(
+            clients=client_repository, catalog=catalog, business_settings=app.state.business_settings,
+            smtp_config=smtp_config, nodo=lambda: offline.nodo(),
+        ),
+        DEFAULT_REMINDER_POLICIES,
     )
+    # Lo que corre junto con `dispatch`: volver a mandar lo que quedó `fallido` en una pasada anterior. Lo usan la ruta y el script del cron.
+    app.state.reintentar_avisos = reintentar_avisos(smtp_config, lambda: offline.nodo())
     app.state.deposits = deposit_repository
     app.state.deposit_manager = DepositManager(deposit_repository, ManualPaymentPort())
     app.state.dashboard = DashboardService(
@@ -564,6 +577,12 @@ def create_app(database_url: str) -> FastAPI:
     app.include_router(
         reminders.router, dependencies=admin_only + [Depends(require_module("recordatorios"))] + _DEL_CENTRAL,
     )
+    # La configuración de los avisos (WhatsApp por Evolution, mail) y el registro de lo que salió: `/api/avisos`, del motor (ADR-090).
+    # Sólo admin: la configuración dice con qué cuenta de WhatsApp habla el negocio y el registro lleva los teléfonos y los textos de los
+    # clientes. El gate lo pone `build_avisos_router` (no tiene default). En un nodo, guardar y probar dan 409 `solo_en_el_central`
+    # (la apikey vive en el central); ver la configuración y el registro, no. Sin `require_module`: la sección vive en Configuración y no
+    # es una función vendible aparte.
+    app.include_router(build_avisos_router(require_admin=require_admin, smtp_config=smtp_config, nodo=lambda: offline.nodo()))
     app.include_router(
         deposits.admin_router, dependencies=admin_only + [Depends(require_module("senas"))] + _DEL_CENTRAL,
     )
