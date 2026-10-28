@@ -280,10 +280,39 @@ export type Factura = {
 }
 
 // Solo A/B: Gestiolibra emite tipo A si el cliente es Responsable
-// Inscripto, B en cualquier otro caso (ver app/services/billing.py).
+// Inscripto, B en cualquier otro caso (ver app/services/billing.py). Sus notas
+// de crédito son la 3 (A) y la 8 (B): la letra se hereda de la factura.
 export const TIPO_COMPROBANTE_LABELS: Record<number, string> = {
   1: 'Factura A',
   6: 'Factura B',
+  3: 'Nota de crédito A',
+  8: 'Nota de crédito B',
+}
+
+/** Un comprobante del turno (la factura o una de sus notas de crédito), como lo manda `GET /appointments/{id}/factura`
+ *  (`app/services/factura_del_turno.py`): lo que la pantalla muestra, no la fila entera. */
+export type ComprobanteDelTurno = {
+  id: number
+  tipo: number
+  punto_venta: number
+  numero: number
+  fecha: string
+  total: number
+  cliente_razon: string
+  /** Vacío o `PENDIENTE` si ARCA todavía no lo autorizó. */
+  cae: string
+  cae_vto: string
+  observaciones: string
+}
+
+/** La factura de un turno con sus notas de crédito y lo que falta acreditar. */
+export type FacturaDelTurno = {
+  factura: ComprobanteDelTurno
+  notas_credito: ComprobanteDelTurno[]
+  acreditado: number
+  saldo_acreditable: number
+  /** Pista para la pantalla; el motor vuelve a decidir al emitir. */
+  puede_acreditar: boolean
 }
 
 export type CompleteAppointmentResponse = {

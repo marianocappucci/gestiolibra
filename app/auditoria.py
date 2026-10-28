@@ -69,3 +69,12 @@ AUDITABLES: dict[str, str] = {
 #   contenedor y la cambia el backoffice al aplicar un plan, no una persona
 #   usando el sistema. Cada deploy habria dejado filas de "editar modulo" que
 #   no le sirven a nadie.
+
+#: Lo que el producto escribe **a mano** en el log, sin pasar por el ORM: no es un modelo, así que no puede estar en
+#: `AUDITABLES` (se indexa por clase, y `tests/test_auditables.py` exige que cada clave sea un modelo vivo). Sólo se suma
+#: al selector de entidades de la pantalla de Logs, para que se pueda filtrar por ellas aunque todavía no haya habido
+#: ninguna. `{clave: nombre lógico}` con el mismo formato que `AUDITABLES`.
+ENTIDADES_A_MANO: dict[str, str] = {
+    # La nota de crédito de la factura de un turno, con su motivo (`services/factura_del_turno.py`, ADR-039).
+    "nota_de_credito": "nota_de_credito",
+}

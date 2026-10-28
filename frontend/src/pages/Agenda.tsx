@@ -87,6 +87,7 @@ import { armadores, porDiaComoEventos } from '@/components/agenda/eventos'
 import { VistaDia } from '@/components/agenda/vista-dia'
 import { ReprogramarTurnoDialog } from '@/components/agenda/reprogramar-turno'
 import { SenaDelTurno } from '@/components/agenda/sena-del-turno'
+import { FacturaDelTurno } from '@/components/agenda/factura-del-turno'
 
 // 🔴 Acá había un `MEDIO_PAGO_LABELS` con cuatro medios escritos a mano, y uno
 // de ellos —`tarjeta`— **no existía en el vocabulario de la familia**: ni
@@ -602,6 +603,8 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
                 </span>
               </div>
               <SenaDelTurno turno={turno} esAdmin={esAdmin} medios={mediosPago} soloLectura={esNodo} />
+              {/* La factura del turno completado y su nota de crédito (ADR-039): la nota la emite el administrador desde la web. */}
+              <FacturaDelTurno key={turno.id} turno={turno} esAdmin={esAdmin} soloLectura={esNodo} />
               {errorAccion && <p className="text-sm text-destructive">{errorAccion}</p>}
             </div>
           )}
@@ -742,6 +745,11 @@ export function Agenda({ esAdmin = false }: { esAdmin?: boolean } = {}) {
             </div>
           )}
           <DialogFooter>
+            {factura && (
+              <Button asChild variant="outline">
+                <a href={`/api/facturas/${factura.id}/pdf`} target="_blank" rel="noreferrer">PDF</a>
+              </Button>
+            )}
             <Button onClick={() => setFactura(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
