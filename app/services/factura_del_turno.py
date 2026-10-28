@@ -25,7 +25,6 @@ from decimal import Decimal
 
 from libraauth.auditoria import CREAR, ActividadLog, fila_de_auditoria
 from libracore import notas_de_credito as motor
-from libracore import tipos_comprobante as tipos
 from libracore.db import facturas as db_facturas
 from libracore.db.core import get_connection
 from sqlalchemy.orm import Session, sessionmaker
@@ -55,13 +54,6 @@ def factura_del_turno(turno_id: str) -> dict | None:
 
 def _tiene_cae(comprobante: dict) -> bool:
     return motor._es_cae(comprobante.get("cae"))
-
-
-def _numero(comprobante: dict) -> str:
-    """`Factura B 0001-00000012`: con el tipo, porque la numeración es por tipo y una factura y su nota pueden llevar el mismo
-    número."""
-    nombre = tipos.NOMBRE.get(comprobante["tipo"], "Comprobante")
-    return f"{nombre} {int(comprobante['punto_venta']):04d}-{int(comprobante['numero']):08d}"
 
 
 def _resumen(comprobante: dict) -> dict:
@@ -112,7 +104,7 @@ def dejar_rastro(
     registra el error y se sigue. El formato de la fila es el de `libraauth` (`fila_de_auditoria`), no una copia.
     """
     try:
-        etiqueta = f"{_numero(nota)} sobre {_numero(factura)} (turno {turno_id}) — {motivo}"
+        etiqueta = f"{motor.etiqueta(nota)} sobre {motor.etiqueta(factura)} (turno {turno_id}) — {motivo}"
         fila = fila_de_auditoria(
             entidad=ENTIDAD_DEL_LOG, accion=CREAR, entidad_id=nota["id"], etiqueta=etiqueta, usuario=usuario)
         with sessions() as sesion:

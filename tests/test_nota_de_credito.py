@@ -274,11 +274,21 @@ def test_el_pdf_de_un_comprobante_que_no_existe_da_404(admin_client: TestClient)
     assert admin_client.get("/api/facturas/999999/pdf").status_code == 404
 
 
-# ── El cableado con el motor ──────────────────────────────────────────────────────────────────────────────────────────
+# ── El motivo llega al motor ──────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_la_ruta_del_motor_que_se_usa_existe():
-    """Si `libracore` mueve o renombra la función de la nota, esto se pone rojo acá y no en producción."""
-    from app.routers.factura_del_turno import _emitir_nota
+def test_el_motivo_va_a_las_observaciones_de_la_nota_y_a_su_pdf(admin_client: TestClient, monkeypatch):
+    """Lo recibe el motor (ADR-089): queda en las `observaciones` de la nota, que es de donde sale el papel."""
+    from libracore import pdf_generator
 
-    assert _emitir_nota.__name__ == "nota_credito"
+    vistas: list[str] = []
+    generar = pdf_generator.generate_pdf_factura
+    monkeypatch.setattr(
+        pdf_generator, "generate_pdf_factura", lambda f, *a, **k: (vistas.append(f.get("observaciones")), generar(f, *a, **k))[1])
+    turno, factura = _facturado(admin_client)
+    nota = _emitir(admin_client, turno, destino="devolver", medio_pago="efectivo", motivo="  Se facturó   el servicio equivocado ")
+    assert nota.status_code == 200, nota.text
+    esperado = (f"Anula Factura B {factura['punto_venta']:04d}-{factura['numero']:08d}"
+                " — Se facturó el servicio equivocado")
+    assert nota.json()["observaciones"] == esperado
+    assert vistas[-1] == esperado, "el PDF se arma con esas observaciones"
