@@ -91,19 +91,27 @@
 - `app/services/business_settings.py`: `BusinessSettingsRepository` —
   configuración global del negocio (nombre comercial, moneda), fila única
   (`id` fijo), no hay multi-tenant de "varios negocios" en un mismo deploy.
-- `app/notifications.py`: `LoggingNotificationPort` — implementación
-  placeholder del `NotificationPort` de LibraGenda; loguea en vez de
-  enviar de verdad (sin proveedor de email/SMS/WhatsApp configurado
-  todavía). `DEFAULT_REMINDER_POLICIES` fija dos avisos (24h y 2h antes),
-  no configurable por sucursal/servicio por ahora.
+- `app/notifications.py`: el `NotificationPort` de LibraGenda de verdad
+  (ADR-040): `crear_puerto_de_avisos` arma el `NotificacionPorAvisos` del
+  motor (`libracore.avisos`) con el contacto del cliente del turno y el
+  texto de `RedactorDeRecordatorios`; sale por WhatsApp (Evolution o modo
+  Registro) y por mail (SMTP de la instancia). `despachar_recordatorios`
+  hace el reintento de lo fallido + `dispatch` (lo usan la ruta y
+  `scripts/despachar_recordatorios.py`). `DEFAULT_REMINDER_POLICIES` fija
+  dos avisos (24h y 2h antes), no configurable por sucursal/servicio por ahora.
+- `app/main.py` monta además `/api/avisos` (`build_avisos_router` del motor,
+  sólo admin) y `frontend/src/pages/configuracion/avisos.tsx` es la pestaña
+  «Avisos» de Configuración.
 - `app/payments.py`: `ManualPaymentPort` — implementación placeholder del
   `PaymentPort` de LibraGenda; `request_charge`/`request_refund` no cobran
   solos, solo loguean la intención. La confirmación real de pago es manual
   (`POST /deposits/{id}/mark-paid`, admin-only) hasta que se resuelva la
   decisión de facturación/MercadoPago (`libracore.mp_api`).
 - `app/routers/reminders.py`: `POST /reminders/dispatch` (admin-only) —
-  dispara `ReminderDispatcher.dispatch()` de LibraGenda con `now` actual;
-  pensado para un cron/scheduler externo (no configurado en este repo).
+  reintenta lo que quedó fallido y dispara
+  `ReminderDispatcher.dispatch()` de LibraGenda con `now` actual; pensado para un cron/scheduler externo
+  (no configurado en este repo; `scripts/despachar_recordatorios.py` hace lo
+  mismo sin pasar por HTTP).
 - `app/routers/deposits.py`: `POST`/`GET /appointments/{id}/deposit`
   (admin+staff, parte del flujo de reserva) y
   `POST /deposits/{id}/mark-paid`/`mark-failed`/`refund` (admin-only,
@@ -186,8 +194,8 @@
 
 ## Después del MVP
 
-- Canal real de notificaciones (email/SMS/WhatsApp) para reemplazar
-  `LoggingNotificationPort`.
+- Un cron declarado que llame a `scripts/despachar_recordatorios.py` (el
+  canal real de notificaciones ya está: ADR-040).
 - Proveedor de pago real (MercadoPago u otro) para reemplazar
   `ManualPaymentPort` y automatizar la confirmación de señas.
 - Dashboard y reportes operativos.

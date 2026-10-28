@@ -37,7 +37,8 @@
  */
 import { createConfiguracion } from 'libra-ui/Configuracion'
 import { seccionSucursalSinInternet } from 'libra-ui/SucursalSinInternet'
-import { CalendarClock, MapPin, Scissors } from 'lucide-react'
+import { BellRing, CalendarClock, MapPin, Scissors } from 'lucide-react'
+import { AvisosSeccion } from './configuracion/avisos'
 import { SucursalesCard } from './configuracion/sucursales'
 import { ServiciosCard } from './configuracion/servicios'
 import { RecursosCard } from './configuracion/recursos'
@@ -62,6 +63,9 @@ export const Configuracion = createConfiguracion({
     { clave: 'sucursales', label: 'Sucursales', icono: MapPin, contenido: <SucursalesCard /> },
     { clave: 'servicios', label: 'Servicios', icono: Scissors, contenido: <ServiciosCard /> },
     { clave: 'recursos', label: 'Recursos', icono: CalendarClock, contenido: <RecursosCard /> },
+    // Los recordatorios de turno por WhatsApp y mail (ADR-040): la conexión de WhatsApp, «probar envío» y el registro de lo que salió.
+    // Va acá y no como ítem del menú: es algo que se configura una vez y se mira de vez en cuando (el criterio de las otras tres).
+    { clave: 'avisos', label: 'Avisos', icono: BellRing, contenido: <AvisosSeccion /> },
     // «Sucursal sin internet» (libra-ui ADR-080, ADR-036 de este producto): el administrador da de alta el nodo del local y se lleva el
     // instalador y el código de vinculación. Sólo para el administrador; lo arma el router de LibraEdge (`/api/nodos-offline`).
     seccionSucursalSinInternet(),

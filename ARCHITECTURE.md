@@ -26,8 +26,8 @@ Gestiolibra posee el flujo HTTP y las reglas propias del negocio; LibraGenda apo
 - `app/services/branches.py`, `branch_hours.py`, `service_prices.py`,
   `business_settings.py`: configuración comercial, todas tablas propias de
   Gestiolibra (no de LibraGenda) — ver "Configuración comercial" abajo.
-- `app/notifications.py`, `app/payments.py`: implementaciones placeholder de
-  los puertos `NotificationPort`/`PaymentPort` de LibraGenda — ver
+- `app/notifications.py` (el `NotificationPort` real, por los avisos del
+  motor: ADR-040) y `app/payments.py` (placeholder del `PaymentPort`) — ver
   "Recordatorios y señas" abajo.
 - `app/routers/`: health (público), auth (login/logout/me), users (admin-only),
   sucursales (+ horario, + contacto), recursos, servicios (+ precio por
@@ -60,8 +60,11 @@ Ambos ya vienen resueltos como motor de dominio en LibraGenda
 en Gestiolibra era conectarlos a un canal real, y todavía no hay uno
 elegido (ver ADR-009):
 
-- **Recordatorios**: `LoggingNotificationPort` implementa `NotificationPort`
-  logueando en vez de enviar. `DEFAULT_REMINDER_POLICIES` (24h y 2h antes,
+- **Recordatorios** (ADR-040): salen por WhatsApp y por mail con
+  `libracore.avisos` (`NotificacionPorAvisos` implementa `NotificationPort`;
+  el motor pone el envío idempotente y el registro `avisos_envios`, el
+  producto el contacto y el texto). Antes era un `LoggingNotificationPort`
+  que sólo logueaba. `DEFAULT_REMINDER_POLICIES` (24h y 2h antes,
   fijo, no configurable por sucursal/servicio) se pasa a `ReminderDispatcher`
   al construir la app. `POST /reminders/dispatch` (admin-only) está pensado
   para un cron/scheduler externo, no hay uno corriendo dentro de este repo.

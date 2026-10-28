@@ -100,7 +100,7 @@ _TABLAS_DE_LA_AGENDA = (
 #: - `arca_credenciales_servicio` ni ningún certificado o clave: **el ticket de ARCA lo presta el central** (libracore
 #:   ADR-074 y ADR-079); la clave privada no sale del VPS. `arca_config` sí: lleva el CUIT, el punto de venta, el ambiente y
 #:   las *rutas* de los archivos (que en el nodo no existen ni se usan), no los archivos.
-#: - `secretos_instancia` (el almacén cifrado de claves de la instancia), `auth_log`, `envios_email`, `mp_*` (MercadoPago
+#: - `secretos_instancia` (el almacén cifrado de claves de la instancia), `auth_log`, `envios_email`, `avisos_envios` (el registro de avisos: lleva teléfonos y textos de clientes, y los manda el central), `mp_*` (MercadoPago
 #:   llega al central) y `sent_reminders`.
 #: - Lo del motor que este producto no usa (`clients`, `productos`, `ventas`, `egresos`...).
 TABLAS_DE_REFERENCIA = frozenset({
