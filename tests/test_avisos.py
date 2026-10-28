@@ -20,7 +20,8 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from libracore import config_manager
+from libracore import config_manager, fechas
+from libracore.avisos import ESPERA_ENTRE_INTENTOS
 from libragenda import ReminderNotification, ReminderPolicy
 from sqlalchemy import text
 
@@ -233,7 +234,7 @@ def test_un_numero_de_telefono_que_no_se_reconoce_queda_omitido(admin_client, ev
     assert {f["estado"] for f in _envios(admin_client)} == {"omitido"}
 
 
-def test_un_fallo_de_evolution_no_corta_el_despacho_y_el_siguiente_lo_reintenta(monkeypatch, admin_client):
+def test_un_fallo_de_evolution_no_corta_el_despacho_y_el_reintento_espera_cinco_minutos(monkeypatch, admin_client):
     falso = Evolution(503, 503)  # las dos políticas del primer despacho
     real = notifications.proveedores
     monkeypatch.setattr(notifications, "proveedores",
@@ -248,7 +249,15 @@ def test_un_fallo_de_evolution_no_corta_el_despacho_y_el_siguiente_lo_reintenta(
     assert {(f["estado"], f["intentos"]) for f in _envios(admin_client)} == {("fallido", 1)}
     assert len(falso.pedidos) == 2
 
-    # `libragenda` ya los dio por enviados: nada vence de nuevo, pero la pasada siguiente reintenta lo fallido.
+    # `libragenda` ya los dio por enviados: nada vence de nuevo. El motor espera 5 minutos desde el último intento (ADR-090, v1.202.1):
+    # una pasada inmediata no reintenta, y la de más de 5 minutos después sí. El reloj se adelanta, no se duerme.
+    r = admin_client.post("/reminders/dispatch")
+    assert r.json() == []
+    assert {(f["estado"], f["intentos"]) for f in _envios(admin_client)} == {("fallido", 1)}
+    assert len(falso.pedidos) == 2
+
+    ahora = fechas.ahora()
+    monkeypatch.setattr(fechas, "ahora", lambda: ahora + ESPERA_ENTRE_INTENTOS + timedelta(seconds=1))
     r = admin_client.post("/reminders/dispatch")
     assert r.json() == []
     assert {f["estado"] for f in _envios(admin_client)} == {"enviado"}
