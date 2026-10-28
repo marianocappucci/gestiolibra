@@ -9,8 +9,9 @@ nodo. Si saliera del código, un cambio de guarda movería el código y el test 
 - **`CODIGO`**: `POST /sync/v1/vinculacion`, el canje del código. Lo llama el instalador del nodo, sin sesión; lo protegen el
   código (un solo uso, 15 minutos) y el límite de intentos del motor. Anónimo llega al motor (no es 401 ni 403).
 - **`SALUD`**: las dos de uptime-kuma, con su propio token: sin la variable, 404.
-- **`ADMIN`**: la pantalla «Sucursal sin internet» (`/api/nodos-offline*`) y lo que decide sobre un documento fiscal de la
-  cola (reintentar, descartar y marcar emitido). Un operador (`staff`) recibe 403.
+- **`ADMIN`**: la pantalla «Sucursal sin internet» (`/api/nodos-offline*`), lo que decide sobre un documento fiscal de la
+  cola (reintentar, descartar y marcar emitido) y la configuración y el registro de los avisos (`/api/avisos*`). Un operador
+  (`staff`) recibe 403.
 - **`STAFF`**: ver la cola, pedir que se emita, la barra de estado y la lista «Turnos a revisar». Cualquier usuario.
 
 **Cobertura.** Una ruta nueva de estos prefijos que la tabla no conoce hace fallar `test_toda_ruta_tiene_fila`: un router que
@@ -51,11 +52,17 @@ TABLA = {
     ("GET", "/api/nodo/turnos-a-revisar"): STAFF,
     ("POST", "/api/nodo/turnos-a-revisar/revisar"): STAFF,
     ("GET", "/api/estado-del-sistema"): STAFF,
+    # Los avisos por WhatsApp y mail (ADR-040): la configuración dice con qué cuenta habla el negocio y el registro lleva los teléfonos y los
+    # textos de los clientes. Las cuatro son de administrador, también la lectura.
+    ("GET", "/api/avisos/config"): ADMIN,
+    ("PUT", "/api/avisos/config"): ADMIN,
+    ("POST", "/api/avisos/probar"): ADMIN,
+    ("GET", "/api/avisos/envios"): ADMIN,
     ("GET", "/appointments/{appointment_id}/comprobante-no-fiscal"): STAFF,
     ("POST", "/appointments/{appointment_id}/start"): STAFF,
     ("POST", "/appointments/{appointment_id}/no-show"): STAFF,
 }
-PREFIJOS = ("/sync/", "/api/nodos-offline", "/api/nodo/", "/api/estado-del-sistema")
+PREFIJOS = ("/sync/", "/api/nodos-offline", "/api/nodo/", "/api/estado-del-sistema", "/api/avisos")
 #: Las rutas de los turnos que son del nodo (no tienen prefijo propio).
 RUTAS_DE_TURNO_DEL_NODO = ("/comprobante-no-fiscal", "/start", "/no-show")
 

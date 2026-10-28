@@ -80,6 +80,8 @@ describe('la Configuración de Gestiolibra', () => {
       // revés, un servicio se carga sin poder ponerle precio —el precio es por
       // sucursal— y un recurso sin poder asignarlo.
       'Sucursales', 'Servicios', 'Recursos',
+      // Los recordatorios de turno por WhatsApp y mail (ADR-040): la conexión, «probar envío» y el registro de lo que salió.
+      'Avisos',
       // El alta del nodo del local (libra-ui ADR-080, ADR-036 de este producto): la pestaña es del administrador y la arma el kit.
       'Sucursal sin internet',
       'Datos / Backup',

@@ -43,8 +43,18 @@ def test_el_nodo_no_espeja_lo_que_genera_ni_lo_que_no_usa(admin_client):
         "caja_movimientos", "facturas", "cola_arca", "agenda_node_attendances", "turnos_caja", "cc_asientos",
         "arca_credenciales_servicio", "secretos_instancia", "auth_log", "envios_email", "mp_pagos", "mp_movimientos",
         "sent_reminders", "actividad_log", "sync_outbox", "sync_inbox", "node_identity", "clients",
+        # Los avisos (ADR-040): el registro lleva el teléfono y el texto de cada cliente, y los manda el central (un nodo no manda).
+        "avisos_envios",
     }
     assert not offline.TABLAS_DE_REFERENCIA & prohibidas
+
+
+def test_los_avisos_son_del_central_y_la_tabla_existe_en_la_base(admin_client):
+    """`avisos_envios` es de un solo lado: el central manda (y registra), el nodo no manda ni espeja. Si alguien la suma al espejo, el
+    nodo bajaría los teléfonos y los textos de los clientes de todas las sucursales, y el registro del central se pisaría con el del nodo."""
+    assert "avisos_envios" in tablas_de_la_base(), "el motor ya no crea la tabla: este test mide una que no existe"
+    assert "avisos_envios" not in offline.TABLAS_DE_REFERENCIA
+    assert "avisos_envios" not in offline.aprovisionamiento.nombres
 
 
 def test_la_lista_a_revisar_baja_al_nodo_y_la_atencion_propia_no(admin_client):

@@ -67,6 +67,10 @@ def get_reminder_dispatcher(request: Request) -> ReminderDispatcher:
     return request.app.state.reminder_dispatcher
 
 
+def get_reintentar_avisos(request: Request):
+    return request.app.state.reintentar_avisos
+
+
 def get_deposit_manager(request: Request) -> DepositManager:
     return request.app.state.deposit_manager
 

@@ -34,10 +34,11 @@ y `/appointments/{id}/deposit` (pedir/consultar una seña, `admin` o
 confirma el estado de la seña). El endpoint `/demo/seed` fue reemplazado
 por el CRUD.
 
-Recordatorios y señas todavía no tienen un canal real conectado: los
-recordatorios se loguean (`LoggingNotificationPort`) y las señas se cobran
-y confirman fuera de la app, a mano (`ManualPaymentPort` — ver
-`DECISIONS.md` ADR-009).
+Los recordatorios salen por WhatsApp (Evolution) y por mail con los avisos del
+motor, configurados en Configuración > Avisos (ADR-040); `POST /reminders/dispatch`
+o `scripts/despachar_recordatorios.py` (para un cron) los despachan y
+reintentan lo fallido. Las señas todavía se cobran y confirman fuera de la
+app, a mano (`ManualPaymentPort` — ver `DECISIONS.md` ADR-009).
 
 ## Autenticación
 
