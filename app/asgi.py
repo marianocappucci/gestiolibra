@@ -31,10 +31,10 @@ instead of trying to preserve it with a volume (tried first, but an
 anonymous volume only seeds from the image once and then freezes the
 frontend at that first build forever, see ADR-022)."""
 import os
-from pathlib import Path
 
 from libracore.db.url_de_instancia import url_de_instancia
 
+from app.frontend_dist import frontend_dist
 from app.spa import montar_spa
 
 from .main import create_app
@@ -59,10 +59,6 @@ else:
 
 app = create_app(database_url)
 
-_DOCKER_FRONTEND_DIST = Path("/opt/frontend-dist")
-_LOCAL_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
-FRONTEND_DIST = (
-    _DOCKER_FRONTEND_DIST if _DOCKER_FRONTEND_DIST.is_dir() else _LOCAL_FRONTEND_DIST
-)
+FRONTEND_DIST = frontend_dist()
 if FRONTEND_DIST.is_dir():
     montar_spa(app, FRONTEND_DIST)
