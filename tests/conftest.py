@@ -103,6 +103,7 @@ def _armar_app(url: str) -> None:
             mp.delenv(nombre, raising=False)
         mp.setattr(config_manager, "CONFIG_PATH", f"{carpeta}/config.json")
         mp.setattr(config_manager, "LOGO_DIR", f"{carpeta}/logos")
+        mp.setattr(config_manager, "MARCA_DIR", f"{carpeta}/marca")
         _migrar_como_el_deploy(url)
         app = create_app(url)
         app.state.auth_engine.dispose()
@@ -160,6 +161,8 @@ def _dev_env(request, monkeypatch, tmp_path):
     from libracore import config_manager
     monkeypatch.setattr(config_manager, "CONFIG_PATH", str(tmp_path / "config.json"))
     monkeypatch.setattr(config_manager, "LOGO_DIR", str(tmp_path / "logos"))
+    # La marca de la instancia (logo y Terminos propios, ADR-092/093) tambien vive en disco.
+    monkeypatch.setattr(config_manager, "MARCA_DIR", str(tmp_path / "marca"))
 
 
 def https_client(app) -> TestClient:

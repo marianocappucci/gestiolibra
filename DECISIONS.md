@@ -1335,3 +1335,23 @@ al arrancar y se tocan poco, a diferencia de la agenda y los clientes.
   - Un recordatorio que falla se reintenta en las pasadas siguientes, hasta 3 intentos en total y dentro de las 24 horas siguientes (el motor no tiene una espera mínima entre intentos); con un cron cada 10 minutos esas tres vueltas pasan en media hora, pero con un cron lento un «2 h antes» podría llegar con el turno ya empezado.
 - Tests: `tests/test_avisos.py` (sin canal: nada sale; Registro; Evolution simulado con `httpx.MockTransport`; texto y hora de la sede; sin datos de más; dos `dispatch` y libro perdido; cliente sin teléfono `omitido`; fallo y reintento; mail con SMTP simulado; el script; la apikey que no vuelve; el nodo), `tests/test_nodo_roles.py` (las cuatro rutas son de administrador), `tests/test_nodo_aprovisionamiento.py` (la tabla no se espeja), `src/test/configuracion-avisos.test.tsx` y `src/test/configuracion-forma.test.tsx` (la pestaña).
 - Verificación: backend 111 tests verdes (`test_avisos`, `test_nodo_roles`, `test_nodo_aprovisionamiento`, `test_reminders`, `test_module_gating`, `test_dashboard`, `test_rutas_no_bloquean_el_loop`, `test_docs_cerrados`, `test_migraciones_en_el_deploy`) y frontend 176 (25 archivos). **Se ponen rojos sin el cambio** (una mutación por vez): puerto que no manda (16 de 21 de `test_avisos`), puerto que manda sin el despachador (15), `/api/avisos` sin montar (10 fallan y 11 errores), `/api/avisos` con `require_staff` (4 de la matriz), hora en UTC (7), sin reintento (1), reintento después de `dispatch` (1), un fallo del reintento que rompe el despacho (1), el puerto sin la identidad del nodo (1), `avisos_envios` en el espejo (2), pestaña fuera de Configuración (2), registro sin `esAdmin` (2) y sin `demo` (1).
+
+
+## ADR-041 — La marca blanca: la instancia puede llevar el nombre, el logo, el color y los términos de un revendedor (2026-10-30)
+
+**Estado:** aceptada. Cableado del piloto de marca blanca (libracore ADR-092 y ADR-093, libraauth ADR-030, libra-ui ADR-098).
+
+**Decisión.**
+1. `app/main.py` monta `build_marca_router(dist=…)` (lectura pública, manifest e íconos) y `build_marca_admin_router()` detrás de
+   `require_admin_o_servicio`, igual que el tema: lo cambia el admin o el backoffice (token de servicio).
+2. 🔴 `TerminosRepository(contrato_propio=leer_terminos_propios, exigir_propio=es_marca_propia)`: con marca propia la instancia
+   **exige** los términos del revendedor y, sin ellos, queda frenada; nunca cae a los de la familia.
+3. `PasswordResetService(product_name=lambda: nombre_de_marca("Gestiolibra"))`: el mail de recuperación sale con el nombre de la marca.
+4. El manifest tiene que ganarle al catch-all de la SPA, así que `app/frontend_dist.py` resuelve el dist una sola vez y lo usan
+   `main.py` (el manifest de respaldo) y `asgi.py` (para servirlo).
+5. `main.tsx` espera `cargarMarca()` (tope de 2 s, no falla) antes de montar la SPA.
+
+**Pendiente a propósito.** `GESTIOLIBRA_RESET_URL_BASE` tiene por defecto `dev.gestiolibra.com.ar`: una instancia de revendedor tiene que
+definirla o el enlace de recuperación apunta al dominio equivocado. Tests: `tests/test_marca_blanca.py` y
+`tests/test_marca_blanca_terminos.py`; `tests/test_head.py` arma la app con el mismo `dist` que la SPA.
+
